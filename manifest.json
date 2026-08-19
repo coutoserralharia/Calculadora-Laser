@@ -1,0 +1,17 @@
+{
+  "name": "Calculadora de Custo — Corte Laser",
+  "short_name": "Custo Laser",
+  "description": "Calcula o custo de fabrico de peças cortadas a laser a partir de ficheiros DXF ou de dimensões manuais.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#111417",
+  "theme_color": "#111417",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
