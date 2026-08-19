@@ -1,4 +1,4 @@
-const CACHE_NAME = 'laser-calc-v1';
+const CACHE_NAME = 'laser-calc-v2';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -23,8 +23,9 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Cache-first for same-origin core assets; network falling back to cache for everything else
-// (this lets font requests go to the network when online, but never breaks the app offline).
+// Same-origin app files: network-first, so a new deploy is picked up on the very next
+// load instead of being stuck behind an old cached copy. Cache is only the offline fallback.
+// Cross-origin assets (fonts): cache-first, since they rarely change and this saves bandwidth.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -32,6 +33,14 @@ self.addEventListener('fetch', (event) => {
   const isSameOrigin = new URL(req.url).origin === self.location.origin;
 
   if (isSameOrigin) {
+    event.respondWith(
+      fetch(req).then((resp) => {
+        const clone = resp.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+        return resp;
+      }).catch(() => caches.match(req))
+    );
+  } else {
     event.respondWith(
       caches.match(req).then((cached) => {
         if (cached) return cached;
@@ -41,14 +50,6 @@ self.addEventListener('fetch', (event) => {
           return resp;
         }).catch(() => cached);
       })
-    );
-  } else {
-    event.respondWith(
-      fetch(req).then((resp) => {
-        const clone = resp.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
-        return resp;
-      }).catch(() => caches.match(req))
     );
   }
 });

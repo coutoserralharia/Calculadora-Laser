@@ -60,6 +60,13 @@
 
   .layout{display:grid; grid-template-columns:1.05fr 0.95fr; gap:20px; align-items:start;}
   @media (max-width: 880px){ .layout{grid-template-columns:1fr;} .top-note{display:none;} }
+  @media (max-width: 480px){
+    .field-row, .field-row3{grid-template-columns:1fr;}
+    .total-split{grid-template-columns:1fr; gap:16px;}
+    .total-block + .total-block{border-left:none; padding-left:0; border-top:1px solid var(--border-soft); padding-top:14px;}
+    .meta-item + .meta-item{border-left:none; padding-left:0;}
+    .preview-meta{flex-direction:column; gap:10px;}
+  }
 
   .card{
     background:var(--panel);
@@ -82,6 +89,8 @@
     font-family:'Space Grotesk', sans-serif; font-size:14.5px; font-weight:600; margin:0 0 14px;
     display:flex; align-items:center; gap:8px;
   }
+  h2.card-title.with-action{justify-content:space-between;}
+  h2.card-title .title-left{display:flex; align-items:center; gap:8px;}
   h2.card-title .dot{width:6px; height:6px; border-radius:50%; background:var(--accent); flex:none;}
 
   .tabs{display:flex; gap:6px; margin-bottom:14px; background:var(--panel-2); padding:4px; border-radius:9px; border:1px solid var(--border-soft);}
@@ -114,6 +123,7 @@
   }
   select{font-family:'Inter',sans-serif; font-size:13.5px;}
   input[type=number]:focus, input[type=text]:focus, select:focus{border-color:var(--accent);}
+  input[readonly]{color:var(--readout); opacity:0.9; cursor:default;}
   .unit-suffix{position:relative;}
   .unit-suffix span{position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:11px; color:var(--text-dim); pointer-events:none;}
 
@@ -141,6 +151,7 @@
   .mat-actions{flex-wrap:wrap; row-gap:8px;}
   .ghost-btn:hover{border-color:var(--text-muted); color:var(--text);}
   .save-hint{font-size:11px; color:var(--text-dim); font-style:italic;}
+  .save-hint code{font-style:normal; background:var(--panel-2); border:1px solid var(--border-soft); border-radius:4px; padding:1px 5px; font-family:'JetBrains Mono', monospace; color:var(--readout);}
 
   /* Results column */
   .preview-card{padding:0; overflow:hidden;}
@@ -209,14 +220,32 @@
   .order-row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 8px; border-radius:7px; transition:background .12s ease;}
   .order-row:hover{background:var(--panel-2);}
   .order-row-name{font-size:13px; font-weight:600; color:var(--text);}
+  .order-num{color:var(--accent); font-family:'JetBrains Mono', monospace; font-size:11px; margin-right:4px;}
   .order-row-meta{font-size:10.5px; color:var(--text-dim); margin-top:2px; font-family:'JetBrains Mono', monospace;}
   .order-row-actions{display:flex; align-items:center; gap:4px; flex:none;}
   .ghost-btn.sm{padding:5px 9px; font-size:11px;}
+  .btn-icon{width:13px; height:13px; vertical-align:-2px; margin-right:5px; display:inline-block;}
+  .conn-badge{
+    font-family:'JetBrains Mono', monospace; font-size:9.5px; font-weight:500; margin-left:6px;
+    padding:2px 7px; border-radius:20px; text-transform:none; letter-spacing:0; vertical-align:1px;
+  }
+  .conn-badge.conn-online{color:var(--readout); background:rgba(63,232,212,0.13);}
+  .conn-badge.conn-local{color:var(--text-dim); background:rgba(255,255,255,0.05);}
 
   .sub-details{border-top:1px solid var(--border-soft); margin-top:14px; padding-top:12px;}
   .sub-details summary.sub{font-size:12.5px; font-weight:600; color:var(--text-muted);}
   .sub-details summary.sub:hover{color:var(--text);}
   .sub-details .details-body{margin-top:12px;}
+  .update-toast{
+    position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:999;
+    background:var(--panel-2); border:1px solid var(--accent); border-radius:9px;
+    padding:10px 14px; font-size:12.5px; color:var(--text); box-shadow:0 8px 24px rgba(0,0,0,0.4);
+    display:flex; align-items:center; gap:10px; max-width:90vw;
+  }
+  .update-toast button{
+    background:var(--accent); color:#1a0d06; border:none; padding:6px 12px; border-radius:6px;
+    font-size:12px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; white-space:nowrap;
+  }
   .setup-steps{margin:0 0 12px; padding-left:18px; font-size:12px; color:var(--text-muted); line-height:1.7;}
   .sql-block{
     background:#0c0e10; border:1px solid var(--border-soft); border-radius:7px; padding:12px 14px;
@@ -278,87 +307,51 @@
     <section class="col">
 
       <details class="card" id="ordersDetails" open>
-        <summary class="summary-row"><span>Encomendas guardadas</span><span class="chev">▸</span></summary>
+        <summary class="summary-row"><span>Encomendas guardadas <span class="conn-badge" id="connBadge"></span></span><span class="chev">▸</span></summary>
         <div class="details-body">
           <div class="field" style="margin-bottom:10px;">
             <input type="text" id="orderSearch" placeholder="Procurar por cliente, encomenda ou ficheiro…">
           </div>
           <div id="ordersList" class="orders-list"></div>
           <div class="mat-actions" style="margin-top:12px;">
-            <button class="ghost-btn" id="saveOrderBtn" type="button">💾 Guardar encomenda atual</button>
+            <button class="ghost-btn" id="saveOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M2 2h9l3 3v9H2V2z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M4 2v4h6V2M4 14v-4h8v4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>Guardar encomenda atual</button>
           </div>
           <div class="mat-actions" style="margin-top:8px;">
-            <button class="ghost-btn" id="exportOrdersBtn" type="button">⭳ Exportar encomendas</button>
-            <label class="ghost-btn" for="importOrdersInput">⭱ Importar encomendas</label>
+            <button class="ghost-btn" id="exportOrdersBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Exportar encomendas</button>
+            <label class="ghost-btn" for="importOrdersInput"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 10V2m0 0l-3 3m3-3l3 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Importar encomendas</label>
             <input type="file" id="importOrdersInput" accept="application/json" style="display:none;">
           </div>
           <p class="save-hint" id="saveOrderHint"></p>
-          <p class="save-hint" id="localStorageNote">As encomendas ficam guardadas neste navegador/dispositivo. Exporte periodicamente para ter uma cópia de segurança ou para levar para outro PC/telemóvel.</p>
-
-          <details class="sub-details" id="remoteDetails">
-            <summary class="summary-row sub"><span>⚙ Armazenamento central (opcional)</span><span class="chev">▸</span></summary>
-            <div class="details-body">
-              <p class="save-hint" style="margin-bottom:10px;">Liga esta app a um projeto Supabase gratuito para as encomendas ficarem visíveis em qualquer PC ou telemóvel automaticamente, sem exportar/importar.</p>
-              <div class="field">
-                <label for="remoteUrl">Project URL</label>
-                <input type="text" id="remoteUrl" placeholder="https://xxxxxxxx.supabase.co">
-              </div>
-              <div class="field">
-                <label for="remoteKey">Chave pública (anon key)</label>
-                <input type="text" id="remoteKey" placeholder="eyJhbGciOi...">
-              </div>
-              <div class="mat-actions">
-                <button class="ghost-btn" id="remoteConnectBtn" type="button">Ligar</button>
-                <button class="ghost-btn" id="remoteDisconnectBtn" type="button" hidden>Desligar</button>
-              </div>
-              <p class="save-hint" id="remoteStatus"></p>
-
-              <details class="sub-details">
-                <summary class="summary-row sub"><span>Como criar o projeto (uma vez, grátis)</span><span class="chev">▸</span></summary>
-                <div class="details-body">
-                  <ol class="setup-steps">
-                    <li>Cria conta grátis em <strong>supabase.com</strong> e um novo projeto (demora ~2 min a ficar pronto).</li>
-                    <li>No menu lateral, abre o <strong>SQL Editor</strong> e corre o código abaixo para criar a tabela de encomendas.</li>
-                    <li>Vai a <strong>Project Settings → API</strong>, copia o <em>Project URL</em> e a <em>anon public key</em> e cola-os aqui em cima.</li>
-                  </ol>
-                  <pre class="sql-block"><code>create table orders (
-  id text primary key,
-  client text,
-  order_name text,
-  created_at timestamptz default now(),
-  mode text,
-  dxf_file_name text,
-  dxf_text text,
-  manual jsonb,
-  material_id text,
-  material_snapshot jsonb,
-  quantity int,
-  machine_snapshot jsonb,
-  cost_snapshot jsonb
-);
-
-alter table orders enable row level security;
-
-create policy "public access"
-  on orders for all
-  using (true) with check (true);</code></pre>
-                  <p class="warn">Esta política deixa a tabela acessível a quem tiver o link e a chave (que ficam visíveis no código da página). Adequado para uso interno da empresa, não para dados sensíveis ou públicos. Se um dia precisar de mais segurança (autenticação por utilizador), avise-me.</p>
-                </div>
-              </details>
-            </div>
-          </details>
+          <p class="save-hint" id="localStorageNote">As encomendas ficam guardadas neste navegador/dispositivo. Exporte periodicamente para ter uma cópia de segurança ou para levar para outro PC/telemóvel. Para ligação automática entre aparelhos, ou para guardar também numa pasta do PC, vê "Definições avançadas" mais abaixo.</p>
         </div>
       </details>
 
       <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Dados da encomenda</h2>
+        <h2 class="card-title"><span class="dot"></span>Material</h2>
+        <div class="field" style="margin-bottom:0;">
+          <label for="materialSelect">Material / espessura</label>
+          <select id="materialSelect"></select>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title with-action">
+          <span class="title-left"><span class="dot"></span>Dados da encomenda</span>
+          <button class="ghost-btn sm" id="newOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M13 8A5 5 0 113 8" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M13 3v3.5H9.5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Nova encomenda</button>
+        </h2>
         <div class="field-row">
           <div class="field"><label for="orderName">Nome da encomenda / peça</label><input type="text" id="orderName" placeholder="Ex: Suporte L-240"></div>
           <div class="field"><label for="clientName">Cliente</label><input type="text" id="clientName" placeholder="Ex: Metalúrgica Silva, Lda."></div>
         </div>
-        <div class="field" style="margin-bottom:0;">
-          <label for="qtyInput">Quantidade de peças a produzir</label>
-          <input type="number" id="qtyInput" value="1" min="1" step="1" style="max-width:160px;">
+        <div class="field-row" style="margin-bottom:0;">
+          <div class="field" style="margin-bottom:0;">
+            <label for="orderNumberPreview">Nº da encomenda (automático)</label>
+            <input type="text" id="orderNumberPreview" readonly>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="qtyInput">Quantidade de peças a produzir</label>
+            <input type="number" id="qtyInput" value="1" min="1" step="1">
+          </div>
         </div>
       </div>
 
@@ -417,48 +410,120 @@ create policy "public access"
         </div>
       </div>
 
-      <details class="card" id="machineDetails" open>
-        <summary class="summary-row"><span>Material &amp; máquina</span><span class="chev">▸</span></summary>
+      <details class="card" id="settingsDetails">
+        <summary class="summary-row"><span><svg class="btn-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.3" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Definições avançadas</span><span class="chev">▸</span></summary>
         <div class="details-body">
-          <div class="field">
-            <label for="materialSelect">Material / espessura</label>
-            <select id="materialSelect"></select>
-          </div>
-          <div class="field-row3">
-            <div class="field"><label>Preço custo/hora</label><div class="unit-suffix"><input type="number" id="hourlyRate" step="0.5" min="0"><span>€/h</span></div></div>
-            <div class="field"><label>Setup por encomenda</label><div class="unit-suffix"><input type="number" id="setupCost" step="0.5" min="0"><span>€</span></div></div>
-            <div class="field"><label>Tempo/perfuração</label><div class="unit-suffix"><input type="number" id="pierceTime" step="0.1" min="0"><span>s</span></div></div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="areaBasis">Base para custo de material</label>
-              <select id="areaBasis">
-                <option value="bbox">Retângulo envolvente (chapa ocupada)</option>
-                <option value="net">Área líquida da peça</option>
-              </select>
-            </div>
-            <div class="field"><label>Margem de venda</label><div class="unit-suffix"><input type="number" id="margin" step="1" min="0" value="0"><span>%</span></div></div>
-          </div>
-        </div>
-      </details>
+          <p class="save-hint" style="margin-bottom:14px;">Parâmetros da máquina, tabela de materiais, ligação ao servidor central e pasta local — normalmente configura-se uma vez e não se mexe mais.</p>
 
-      <details class="card" id="materialsDetails">
-        <summary class="summary-row"><span>Gerir tabela de materiais</span><span class="chev">▸</span></summary>
-        <div class="details-body">
-          <table class="mat-table">
-            <thead><tr><th>Material</th><th>Esp. (mm)</th><th>Veloc. (mm/min)</th><th>€/m²</th><th></th></tr></thead>
-            <tbody id="materialsTbody"></tbody>
-          </table>
-          <div class="mat-actions">
-            <button class="ghost-btn" id="addMaterialBtn" type="button">+ Adicionar linha</button>
-            <button class="ghost-btn" id="resetMaterialsBtn" type="button">Repor valores por defeito</button>
-          </div>
-          <div class="mat-actions" style="margin-top:8px;">
-            <button class="ghost-btn" id="exportSettingsBtn" type="button">⭳ Exportar definições</button>
-            <label class="ghost-btn" for="importSettingsInput">⭱ Importar definições</label>
-            <input type="file" id="importSettingsInput" accept="application/json" style="display:none;">
-          </div>
-          <p class="save-hint" id="saveHint">As alterações são guardadas automaticamente neste navegador.</p>
+          <details class="sub-details" open>
+            <summary class="summary-row sub"><span>Parâmetros da máquina</span><span class="chev">▸</span></summary>
+            <div class="details-body">
+              <div class="field-row3">
+                <div class="field"><label>Preço custo/hora</label><div class="unit-suffix"><input type="number" id="hourlyRate" step="0.5" min="0"><span>€/h</span></div></div>
+                <div class="field"><label>Setup por encomenda</label><div class="unit-suffix"><input type="number" id="setupCost" step="0.5" min="0"><span>€</span></div></div>
+                <div class="field"><label>Tempo/perfuração</label><div class="unit-suffix"><input type="number" id="pierceTime" step="0.1" min="0"><span>s</span></div></div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label for="areaBasis">Base para custo de material</label>
+                  <select id="areaBasis">
+                    <option value="bbox">Retângulo envolvente (chapa ocupada)</option>
+                    <option value="net">Área líquida da peça</option>
+                  </select>
+                </div>
+                <div class="field"><label>Margem de venda</label><div class="unit-suffix"><input type="number" id="margin" step="1" min="0" value="0"><span>%</span></div></div>
+              </div>
+            </div>
+          </details>
+
+          <details class="sub-details">
+            <summary class="summary-row sub"><span>Gerir tabela de materiais</span><span class="chev">▸</span></summary>
+            <div class="details-body">
+              <table class="mat-table">
+                <thead><tr><th>Material</th><th>Esp. (mm)</th><th>Veloc. (mm/min)</th><th>€/m²</th><th></th></tr></thead>
+                <tbody id="materialsTbody"></tbody>
+              </table>
+              <div class="mat-actions">
+                <button class="ghost-btn" id="addMaterialBtn" type="button">+ Adicionar linha</button>
+                <button class="ghost-btn" id="resetMaterialsBtn" type="button">Repor valores por defeito</button>
+              </div>
+              <div class="mat-actions" style="margin-top:8px;">
+                <button class="ghost-btn" id="exportSettingsBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Exportar definições</button>
+                <label class="ghost-btn" for="importSettingsInput"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 10V2m0 0l-3 3m3-3l3 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Importar definições</label>
+                <input type="file" id="importSettingsInput" accept="application/json" style="display:none;">
+              </div>
+              <p class="save-hint" id="saveHint">As alterações são guardadas automaticamente neste navegador.</p>
+            </div>
+          </details>
+
+          <details class="sub-details" id="remoteDetails">
+            <summary class="summary-row sub"><span><svg class="btn-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.3" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Armazenamento central (opcional)</span><span class="chev">▸</span></summary>
+            <div class="details-body">
+              <p class="save-hint" style="margin-bottom:10px;">Liga esta app a um projeto Supabase gratuito para as encomendas ficarem visíveis em qualquer PC ou telemóvel automaticamente, sem exportar/importar.</p>
+              <div class="field">
+                <label for="remoteUrl">Project URL</label>
+                <input type="text" id="remoteUrl" placeholder="https://xxxxxxxx.supabase.co">
+              </div>
+              <div class="field">
+                <label for="remoteKey">Chave pública (anon key)</label>
+                <input type="text" id="remoteKey" placeholder="eyJhbGciOi...">
+              </div>
+              <div class="mat-actions">
+                <button class="ghost-btn" id="remoteConnectBtn" type="button">Ligar</button>
+                <button class="ghost-btn" id="remoteDisconnectBtn" type="button" hidden>Desligar</button>
+              </div>
+              <p class="save-hint" id="remoteStatus"></p>
+
+              <details class="sub-details">
+                <summary class="summary-row sub"><span>Como criar o projeto (uma vez, grátis)</span><span class="chev">▸</span></summary>
+                <div class="details-body">
+                  <ol class="setup-steps">
+                    <li>Cria conta grátis em <strong>supabase.com</strong> e um novo projeto (demora ~2 min a ficar pronto).</li>
+                    <li>No menu lateral, abre o <strong>SQL Editor</strong> e corre o código abaixo para criar a tabela de encomendas.</li>
+                    <li>Vai a <strong>Project Settings → API</strong>, copia o <em>Project URL</em> e a <em>anon public key</em> e cola-os aqui em cima.</li>
+                  </ol>
+                  <pre class="sql-block"><code>create table orders (
+  id text primary key,
+  client text,
+  order_name text,
+  created_at timestamptz default now(),
+  mode text,
+  dxf_file_name text,
+  dxf_text text,
+  manual jsonb,
+  material_id text,
+  material_snapshot jsonb,
+  quantity int,
+  machine_snapshot jsonb,
+  cost_snapshot jsonb
+);
+
+alter table orders enable row level security;
+
+create policy "public access"
+  on orders for all
+  using (true) with check (true);</code></pre>
+                  <p class="warn">Esta política deixa a tabela acessível a quem tiver o link e a chave (que ficam visíveis no código da página). Adequado para uso interno da empresa, não para dados sensíveis ou públicos. Se um dia precisar de mais segurança (autenticação por utilizador), avise-me.</p>
+                  <p class="save-hint">Se já tinha a tabela criada antes desta atualização, corra também: <code>alter table orders add column if not exists order_number text;</code></p>
+                </div>
+              </details>
+            </div>
+          </details>
+
+          <details class="sub-details" id="localFolderDetails">
+            <summary class="summary-row sub"><span><svg class="btn-icon" viewBox="0 0 16 16"><path d="M2 4a1 1 0 011-1h3l1.2 1.5H13a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V4z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>Guardar também numa pasta do computador (opcional)</span><span class="chev">▸</span></summary>
+            <div class="details-body">
+              <p class="save-hint" id="localFolderUnsupported" hidden>O teu navegador não suporta esta funcionalidade — funciona apenas no Chrome ou Edge, no computador (não em Safari, Firefox ou telemóveis).</p>
+              <div id="localFolderControls">
+                <p class="save-hint" style="margin-bottom:10px;">Escolhe uma pasta no computador. Sempre que guardares uma encomenda, a app cria lá dentro uma subpasta com o nome do cliente e grava o ficheiro DXF (se houver) mais um resumo em .txt com os dados e custos.</p>
+                <div class="mat-actions">
+                  <button class="ghost-btn" id="chooseFolderBtn" type="button">Escolher pasta</button>
+                  <button class="ghost-btn" id="forgetFolderBtn" type="button" hidden>Desligar pasta</button>
+                </div>
+                <p class="save-hint" id="folderStatus"></p>
+              </div>
+            </div>
+          </details>
         </div>
       </details>
 
@@ -792,7 +857,8 @@ create policy "public access"
   }
   function orderToRow(o){
     return {
-      id: o.id, client: o.client || null, order_name: o.orderName || null, created_at: o.createdAt || new Date().toISOString(),
+      id: o.id, client: o.client || null, order_name: o.orderName || null, order_number: o.orderNumber || null,
+      created_at: o.createdAt || new Date().toISOString(),
       mode: o.mode, dxf_file_name: o.dxfFileName || null, dxf_text: o.dxfText || null, manual: o.manual || null,
       material_id: o.materialId || null, material_snapshot: o.materialSnapshot || null, quantity: o.quantity || 1,
       machine_snapshot: o.machineSnapshot || null, cost_snapshot: o.costSnapshot || null,
@@ -800,7 +866,7 @@ create policy "public access"
   }
   function rowToOrder(r){
     return {
-      id: r.id, client: r.client, orderName: r.order_name, createdAt: r.created_at, mode: r.mode,
+      id: r.id, client: r.client, orderName: r.order_name, orderNumber: r.order_number, createdAt: r.created_at, mode: r.mode,
       dxfFileName: r.dxf_file_name, dxfText: r.dxf_text, manual: r.manual, materialId: r.material_id,
       materialSnapshot: r.material_snapshot, quantity: r.quantity, machineSnapshot: r.machine_snapshot, costSnapshot: r.cost_snapshot,
     };
@@ -839,6 +905,125 @@ create policy "public access"
   }
 
   /* ---------------------------------------------------------------- */
+  /* SEQUENTIAL ORDER NUMBER (Encomenda AAAA_NNNN)                     */
+  /* ---------------------------------------------------------------- */
+  async function computeNextOrderNumber(){
+    const year = new Date().getFullYear();
+    let maxSeq = 0;
+    const scan = (list) => {
+      list.forEach(o=>{
+        const m = /^(\d{4})_(\d+)$/.exec((o && (o.orderNumber || o.order_number)) || '');
+        if(m && parseInt(m[1],10)===year) maxSeq = Math.max(maxSeq, parseInt(m[2],10));
+      });
+    };
+    if(state.remote.configured){
+      try{
+        const res = await fetch(remoteBase() + '/rest/v1/orders?select=order_number&order_number=like.' + year + '_*', { headers: remoteHeaders() });
+        if(res.ok) scan(await res.json());
+      }catch(e){ /* fall back to whatever is already loaded locally */ }
+    }
+    scan(state.orders);
+    return year + '_' + String(maxSeq+1).padStart(4,'0');
+  }
+
+  async function refreshOrderNumberPreview(){
+    const el = $('orderNumberPreview');
+    if(!el) return;
+    try{ el.value = await computeNextOrderNumber(); }
+    catch(e){ el.value = ''; }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* LOCAL FOLDER (File System Access API — Chrome/Edge desktop only)  */
+  /* ---------------------------------------------------------------- */
+  const HANDLE_DB_NAME = 'laser_calc_handles', HANDLE_STORE = 'handles';
+  function openHandleDB(){
+    return new Promise((resolve, reject)=>{
+      const req = indexedDB.open(HANDLE_DB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(HANDLE_STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbSet(key, value){
+    const db = await openHandleDB();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(HANDLE_STORE, 'readwrite');
+      tx.objectStore(HANDLE_STORE).put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function idbGet(key){
+    const db = await openHandleDB();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(HANDLE_STORE, 'readonly');
+      const req = tx.objectStore(HANDLE_STORE).get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbDelete(key){
+    const db = await openHandleDB();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(HANDLE_STORE, 'readwrite');
+      tx.objectStore(HANDLE_STORE).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  function sanitizeFileName(s){
+    return String(s||'').trim().replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,' ').slice(0,120) || 'sem-nome';
+  }
+
+  function buildSummaryText(rec){
+    const lines = [];
+    lines.push('ENCOMENDA ' + (rec.orderNumber || ''));
+    lines.push('='.repeat(30));
+    lines.push('Nome: ' + (rec.orderName || '—'));
+    lines.push('Cliente: ' + (rec.client || '—'));
+    lines.push('Data: ' + (rec.createdAt ? new Date(rec.createdAt).toLocaleString('pt-PT') : '—'));
+    lines.push('');
+    lines.push('Material: ' + (rec.materialSnapshot ? (rec.materialSnapshot.name + ' — ' + rec.materialSnapshot.thickness + ' mm') : '—'));
+    lines.push('Quantidade: ' + (rec.quantity || 1));
+    if(rec.dxfFileName) lines.push('Ficheiro DXF original: ' + rec.dxfFileName);
+    if(rec.manual) lines.push('Forma manual: ' + JSON.stringify(rec.manual));
+    lines.push('');
+    if(rec.costSnapshot){
+      lines.push('Custos no momento de gravação:');
+      lines.push('  Corte: ' + fmtEUR(rec.costSnapshot.cuttingCost));
+      lines.push('  Perfurações: ' + fmtEUR(rec.costSnapshot.pierceCostTotal));
+      lines.push('  Material: ' + fmtEUR(rec.costSnapshot.materialCost));
+      lines.push('  Setup: ' + fmtEUR(rec.costSnapshot.setupCost));
+      lines.push('  Preço por peça: ' + fmtEUR(rec.costSnapshot.perPartCost));
+      lines.push('  TOTAL: ' + fmtEUR(rec.costSnapshot.totalCost));
+    }
+    return lines.join('\n');
+  }
+
+  async function writeOrderToLocalFolder(rec){
+    if(!(state.localFolder.ready && state.localFolder.handle)) return { skipped:true };
+    try{
+      const clientDir = await state.localFolder.handle.getDirectoryHandle(sanitizeFileName(rec.client || 'Sem cliente'), {create:true});
+      const baseName = sanitizeFileName((rec.orderNumber ? ('[' + rec.orderNumber + '] ') : '') + (rec.orderName || 'encomenda'));
+      if(rec.mode==='dxf' && rec.dxfText){
+        const dxfHandle = await clientDir.getFileHandle(baseName + '.dxf', {create:true});
+        const w = await dxfHandle.createWritable();
+        await w.write(rec.dxfText);
+        await w.close();
+      }
+      const txtHandle = await clientDir.getFileHandle(baseName + ' - resumo.txt', {create:true});
+      const w2 = await txtHandle.createWritable();
+      await w2.write(buildSummaryText(rec));
+      await w2.close();
+      return { ok:true };
+    }catch(err){
+      return { ok:false, error: err.message };
+    }
+  }
+
+  /* ---------------------------------------------------------------- */
   /* STATE                                                             */
   /* ---------------------------------------------------------------- */
   const state = {
@@ -850,6 +1035,7 @@ create policy "public access"
     machine: Object.assign({}, DEFAULT_MACHINE),
     orders: [],
     remote: { configured:false, url:'', key:'' },
+    localFolder: { supported:false, handle:null, ready:false, name:'' },
   };
 
   const fmtEUR = n => '€' + (isFinite(n) ? n.toFixed(2) : '0.00').replace('.', ',');
@@ -997,6 +1183,14 @@ create policy "public access"
     remoteConnectBtn.hidden = state.remote.configured;
     remoteDisconnectBtn.hidden = !state.remote.configured;
     localStorageNoteEl.hidden = state.remote.configured;
+    const badge = $('connBadge');
+    if(state.remote.configured){
+      badge.textContent = '● servidor central';
+      badge.className = 'conn-badge conn-online';
+    } else {
+      badge.textContent = '● só este aparelho';
+      badge.className = 'conn-badge conn-local';
+    }
   }
 
   remoteConnectBtn.addEventListener('click', async ()=>{
@@ -1017,6 +1211,7 @@ create policy "public access"
       applyRemoteUIState();
       remoteStatusEl.style.color = 'var(--readout)';
       remoteStatusEl.textContent = 'Ligado. A carregar encomendas do servidor…';
+      showOrdersLoading('A carregar encomendas do servidor…');
       state.orders = await remoteLoadOrders();
       renderOrdersList();
       remoteStatusEl.textContent = 'Ligado — as encomendas guardadas a partir de agora ficam neste servidor central, visíveis em qualquer dispositivo.';
@@ -1037,6 +1232,81 @@ create policy "public access"
     renderOrdersList();
   });
 
+  const chooseFolderBtn = $('chooseFolderBtn'), forgetFolderBtn = $('forgetFolderBtn'), folderStatusEl = $('folderStatus');
+  const localFolderControlsEl = $('localFolderControls'), localFolderUnsupportedEl = $('localFolderUnsupported');
+
+  function updateFolderUI(){
+    chooseFolderBtn.hidden = state.localFolder.ready;
+    forgetFolderBtn.hidden = !state.localFolder.ready;
+    if(state.localFolder.ready){
+      folderStatusEl.style.color = 'var(--readout)';
+      folderStatusEl.textContent = 'Pasta ligada: "' + state.localFolder.name + '". As próximas encomendas guardadas também vão ficar aqui.';
+    }
+  }
+
+  chooseFolderBtn.addEventListener('click', async ()=>{
+    try{
+      if(state.localFolder.handle && !state.localFolder.ready){
+        const perm = await state.localFolder.handle.requestPermission({mode:'readwrite'});
+        if(perm==='granted'){
+          state.localFolder.ready = true;
+          chooseFolderBtn.textContent = 'Escolher pasta';
+          updateFolderUI();
+        } else {
+          folderStatusEl.style.color = 'var(--danger)';
+          folderStatusEl.textContent = 'Permissão não concedida.';
+        }
+        return;
+      }
+      const handle = await window.showDirectoryPicker({mode:'readwrite'});
+      await idbSet('rootDir', handle);
+      state.localFolder = { supported:true, handle, ready:true, name:handle.name };
+      chooseFolderBtn.textContent = 'Escolher pasta';
+      updateFolderUI();
+    }catch(err){
+      if(err && err.name==='AbortError') return;
+      folderStatusEl.style.color = 'var(--danger)';
+      folderStatusEl.textContent = 'Não foi possível aceder à pasta: ' + err.message;
+    }
+  });
+
+  forgetFolderBtn.addEventListener('click', async ()=>{
+    try{ await idbDelete('rootDir'); }catch(e){}
+    state.localFolder = { supported:true, handle:null, ready:false, name:'' };
+    chooseFolderBtn.textContent = 'Escolher pasta';
+    updateFolderUI();
+    folderStatusEl.style.color = '';
+    folderStatusEl.textContent = 'Pasta desligada.';
+  });
+
+  function hasUnsavedFormContent(){
+    return !!(orderNameInp.value.trim() || clientNameInp.value.trim() || state.dxfResult);
+  }
+
+  function resetOrderForm(){
+    orderNameInp.value = '';
+    clientNameInp.value = '';
+    qtyInput.value = 1;
+    state.dxfResult = null;
+    state.dxfFileName = '';
+    state.dxfRawText = '';
+    fileNameEl.textContent = '';
+    dxfMsg.innerHTML = '';
+    fileInput.value = '';
+    $('rectW').value = 200; $('rectH').value = 100; $('circleD').value = 150;
+    $('customPerim').value = 600; $('customArea').value = 20000; $('manualHoles').value = 0;
+    shapeSelect.value = 'rect';
+    shapeRect.hidden = false; shapeCircle.hidden = true; shapeCustom.hidden = true;
+    updateOrderHeader();
+    refreshOrderNumberPreview();
+    setMode('dxf');
+  }
+
+  $('newOrderBtn').addEventListener('click', ()=>{
+    if(hasUnsavedFormContent() && !confirm('Isto limpa o formulário atual (nome, cliente, ficheiro/dimensões). Continuar?')) return;
+    resetOrderForm();
+  });
+
   function collectManualInputs(){
     return {
       shape: shapeSelect.value,
@@ -1049,7 +1319,12 @@ create policy "public access"
     };
   }
 
+  function showOrdersLoading(msg){
+    ordersListEl.innerHTML = '<p class="orders-empty">' + escapeHtml(msg) + '</p>';
+  }
+
   function renderOrdersList(){
+    refreshOrderNumberPreview();
     const q = (orderSearchInp.value||'').toLowerCase().trim();
     const filtered = state.orders.filter(o=>{
       if(!q) return true;
@@ -1080,7 +1355,7 @@ create policy "public access"
         const costStr = o.costSnapshot ? fmtEUR(o.costSnapshot.totalCost) : '—';
         html += '<div class="order-row">';
         html += '<div class="order-row-main">';
-        html += '<div class="order-row-name">' + escapeHtml(o.orderName || 'Sem nome') + '</div>';
+        html += '<div class="order-row-name">' + (o.orderNumber ? '<span class="order-num">'+escapeHtml(o.orderNumber)+'</span> ' : '') + escapeHtml(o.orderName || 'Sem nome') + '</div>';
         html += '<div class="order-row-meta">' + dateStr + ' · ' + matStr + ' · ' + (o.quantity||1) + 'x · ' + costStr + '</div>';
         html += '</div>';
         html += '<div class="order-row-actions">';
@@ -1099,9 +1374,10 @@ create policy "public access"
         const id = b.getAttribute('data-del');
         const rec = state.orders.find(o=>o.id===id);
         if(!confirm('Eliminar a encomenda "' + (rec ? (rec.orderName||'sem nome') : '') + '"?')) return;
+        b.disabled = true;
         if(state.remote.configured){
           try{ await remoteDeleteOrder(id); }
-          catch(err){ alert('Não foi possível eliminar no servidor: ' + err.message); return; }
+          catch(err){ alert('Não foi possível eliminar no servidor: ' + err.message); b.disabled = false; return; }
         }
         state.orders = state.orders.filter(o=>o.id!==id);
         if(!state.remote.configured) saveOrders(state.orders);
@@ -1110,9 +1386,10 @@ create policy "public access"
     });
   }
 
-  function loadOrder(id){
+  async function loadOrder(id){
     const o = state.orders.find(x=>x.id===id);
     if(!o) return;
+    if(hasUnsavedFormContent() && !confirm('Isto vai substituir os dados atualmente preenchidos no formulário (ainda não guardados). Continuar?')) return;
     orderNameInp.value = o.orderName || '';
     clientNameInp.value = o.client || '';
     qtyInput.value = o.quantity || 1;
@@ -1149,16 +1426,18 @@ create policy "public access"
 
     updateOrderHeader();
     recalcAndRender();
+    await refreshOrderNumberPreview();
     ordersDetailsEl.open = true;
     window.scrollTo({top:0, behavior:'smooth'});
     saveOrderHint.style.color = 'var(--readout)';
-    saveOrderHint.textContent = 'Encomenda "' + (o.orderName||'sem nome') + '" reposta — os valores são recalculados com os preços/definições atuais.';
-    setTimeout(()=>{ saveOrderHint.textContent=''; }, 6000);
+    saveOrderHint.textContent = 'Encomenda ' + (o.orderNumber ? o.orderNumber+' ' : '') + '"' + (o.orderName||'sem nome') + '" reposta — se guardar de novo, fica com um número novo (' + $('orderNumberPreview').value + ') e valores recalculados com os preços/definições atuais.';
+    setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
   }
 
   const ordersDetailsEl = $('ordersDetails');
 
-  $('saveOrderBtn').addEventListener('click', async ()=>{
+  const saveOrderBtn = $('saveOrderBtn');
+  saveOrderBtn.addEventListener('click', async ()=>{
     const orderName = orderNameInp.value.trim();
     if(!orderName){
       saveOrderHint.style.color = 'var(--danger)';
@@ -1171,48 +1450,63 @@ create policy "public access"
       saveOrderHint.textContent = 'Carregue um ficheiro DXF válido antes de guardar esta encomenda.';
       return;
     }
-    const result = computeCost();
-    const material = getSelectedMaterial();
-    const rec = {
-      id: 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
-      client: clientNameInp.value.trim(),
-      orderName,
-      createdAt: new Date().toISOString(),
-      mode: state.mode,
-      dxfFileName: state.mode==='dxf' ? state.dxfFileName : null,
-      dxfText: state.mode==='dxf' ? state.dxfRawText : null,
-      manual: state.mode==='manual' ? collectManualInputs() : null,
-      materialId: material ? material.id : null,
-      materialSnapshot: material ? {name:material.name, thickness:material.thickness, speed:material.speed, price:material.price} : null,
-      quantity: Math.max(1, parseInt(qtyInput.value,10)||1),
-      machineSnapshot: Object.assign({}, state.machine),
-      costSnapshot: result.valid ? {
-        perPartCost: result.perPartCost, totalCost: result.totalCost, cuttingCost: result.cuttingCost,
-        pierceCostTotal: result.pierceCostTotal, materialCost: result.materialCost, setupCost: result.setupCost,
-      } : null,
-    };
-    if(state.remote.configured){
-      saveOrderHint.style.color = '';
-      saveOrderHint.textContent = 'A guardar no servidor…';
-      try{
-        await remoteInsertOrder(rec);
-      }catch(err){
-        saveOrderHint.style.color = 'var(--danger)';
-        saveOrderHint.textContent = 'Não foi possível guardar no servidor: ' + err.message;
-        return;
+    const originalLabel = saveOrderBtn.innerHTML;
+    saveOrderBtn.disabled = true;
+    saveOrderBtn.textContent = 'A guardar…';
+    try{
+      const result = computeCost();
+      const material = getSelectedMaterial();
+      const orderNumber = await computeNextOrderNumber();
+      const rec = {
+        id: 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+        client: clientNameInp.value.trim(),
+        orderName,
+        orderNumber,
+        createdAt: new Date().toISOString(),
+        mode: state.mode,
+        dxfFileName: state.mode==='dxf' ? state.dxfFileName : null,
+        dxfText: state.mode==='dxf' ? state.dxfRawText : null,
+        manual: state.mode==='manual' ? collectManualInputs() : null,
+        materialId: material ? material.id : null,
+        materialSnapshot: material ? {name:material.name, thickness:material.thickness, speed:material.speed, price:material.price} : null,
+        quantity: Math.max(1, parseInt(qtyInput.value,10)||1),
+        machineSnapshot: Object.assign({}, state.machine),
+        costSnapshot: result.valid ? {
+          perPartCost: result.perPartCost, totalCost: result.totalCost, cuttingCost: result.cuttingCost,
+          pierceCostTotal: result.pierceCostTotal, materialCost: result.materialCost, setupCost: result.setupCost,
+        } : null,
+      };
+      if(state.remote.configured){
+        saveOrderHint.style.color = '';
+        saveOrderHint.textContent = 'A guardar no servidor…';
+        try{
+          await remoteInsertOrder(rec);
+        }catch(err){
+          saveOrderHint.style.color = 'var(--danger)';
+          saveOrderHint.textContent = 'Não foi possível guardar no servidor: ' + err.message;
+          return;
+        }
+        state.orders.unshift(rec);
+        renderOrdersList();
+        saveOrderHint.style.color = 'var(--readout)';
+        saveOrderHint.textContent = 'Encomenda ' + orderNumber + ' guardada no servidor central, em "' + (rec.client || 'Sem cliente') + '".';
+      } else {
+        state.orders.unshift(rec);
+        saveOrders(state.orders);
+        renderOrdersList();
+        saveOrderHint.style.color = 'var(--readout)';
+        saveOrderHint.textContent = 'Encomenda ' + orderNumber + ' guardada em "' + (rec.client || 'Sem cliente') + '".';
       }
-      state.orders.unshift(rec);
-      renderOrdersList();
-      saveOrderHint.style.color = 'var(--readout)';
-      saveOrderHint.textContent = 'Encomenda guardada no servidor central, em "' + (rec.client || 'Sem cliente') + '".';
-    } else {
-      state.orders.unshift(rec);
-      saveOrders(state.orders);
-      renderOrdersList();
-      saveOrderHint.style.color = 'var(--readout)';
-      saveOrderHint.textContent = 'Encomenda guardada em "' + (rec.client || 'Sem cliente') + '".';
+      if(state.localFolder.ready){
+        const folderResult = await writeOrderToLocalFolder(rec);
+        if(folderResult.ok) saveOrderHint.textContent += ' Também guardada na pasta local.';
+        else if(!folderResult.skipped) saveOrderHint.textContent += ' (falhou a gravação na pasta local: ' + folderResult.error + ')';
+      }
+      setTimeout(()=>{ saveOrderHint.textContent=''; }, 5000);
+    } finally {
+      saveOrderBtn.disabled = false;
+      saveOrderBtn.innerHTML = originalLabel;
     }
-    setTimeout(()=>{ saveOrderHint.textContent=''; }, 4000);
   });
 
   orderSearchInp.addEventListener('input', renderOrdersList);
@@ -1237,10 +1531,10 @@ create policy "public access"
         const existingIds = new Set(state.orders.map(o=>o.id));
         const newOnes = payload.filter(o => o && o.id && !existingIds.has(o.id));
         if(state.remote.configured){
-          saveOrderHint.style.color = '';
-          saveOrderHint.textContent = 'A importar para o servidor…';
-          for(const o of newOnes){
-            try{ await remoteInsertOrder(o); state.orders.push(o); }catch(err){ /* skip records that fail (e.g. duplicate id on server) */ }
+          for(let i=0;i<newOnes.length;i++){
+            saveOrderHint.style.color = '';
+            saveOrderHint.textContent = 'A importar para o servidor… (' + (i+1) + '/' + newOnes.length + ')';
+            try{ await remoteInsertOrder(newOnes[i]); state.orders.push(newOnes[i]); }catch(err){ /* skip records that fail (e.g. duplicate id on server) */ }
           }
         } else {
           newOnes.forEach(o => state.orders.push(o));
@@ -1620,6 +1914,7 @@ create policy "public access"
     html += '<div class="p-meta">Gerado em ' + dateStr + '</div>';
 
     html += '<div class="p-section">';
+    html += pRow('Nº da encomenda', $('orderNumberPreview').value || '—');
     html += pRow('Encomenda / peça', orderName);
     if(mode==='internal') html += pRow('Cliente', client);
     html += pRow('Ficheiro / forma', source);
@@ -1725,6 +2020,7 @@ create policy "public access"
     applyRemoteUIState();
 
     if(state.remote.configured){
+      showOrdersLoading('A carregar encomendas do servidor…');
       try{
         state.orders = await remoteLoadOrders();
         remoteStatusEl.style.color = 'var(--readout)';
@@ -1739,6 +2035,27 @@ create policy "public access"
     }
     renderOrdersList();
 
+    if('showDirectoryPicker' in window){
+      state.localFolder.supported = true;
+      try{
+        const handle = await idbGet('rootDir');
+        if(handle){
+          const perm = await handle.queryPermission({mode:'readwrite'});
+          if(perm==='granted'){
+            state.localFolder = { supported:true, handle, ready:true, name:handle.name };
+          } else {
+            state.localFolder = { supported:true, handle, ready:false, name:handle.name };
+            chooseFolderBtn.textContent = 'Reautorizar pasta "' + handle.name + '"';
+            folderStatusEl.textContent = 'Pasta "' + handle.name + '" foi ligada antes — clique para reautorizar o acesso.';
+          }
+          updateFolderUI();
+        }
+      }catch(e){ /* no folder previously linked, or handle no longer valid — leave disconnected */ }
+    } else {
+      localFolderUnsupportedEl.hidden = false;
+      localFolderControlsEl.hidden = true;
+    }
+
     if(storageMode==='cloud') $('saveHint').textContent = 'As alterações são guardadas automaticamente nesta conversa.';
     else if(storageMode==='local') $('saveHint').textContent = 'As alterações são guardadas neste navegador/dispositivo. Para usar as mesmas definições noutro PC ou telemóvel, use "Exportar definições" e depois "Importar" no outro aparelho.';
     else $('saveHint').textContent = 'Armazenamento indisponível — as alterações só duram enquanto a página estiver aberta. Use "Exportar definições" para as guardar num ficheiro.';
@@ -1749,8 +2066,26 @@ create policy "public access"
 
   if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){
     window.addEventListener('load', ()=>{
-      navigator.serviceWorker.register('sw.js').catch(()=>{ /* offline install not available on this host, app still works normally */ });
+      navigator.serviceWorker.register('sw.js').then(reg=>{
+        reg.addEventListener('updatefound', ()=>{
+          const nw = reg.installing;
+          if(!nw) return;
+          nw.addEventListener('statechange', ()=>{
+            if(nw.state==='installed' && navigator.serviceWorker.controller) showUpdateToast();
+          });
+        });
+      }).catch(()=>{ /* offline install not available on this host, app still works normally */ });
     });
+  }
+
+  function showUpdateToast(){
+    if(document.getElementById('updateToast')) return;
+    const div = document.createElement('div');
+    div.id = 'updateToast';
+    div.className = 'update-toast';
+    div.innerHTML = 'Há uma versão nova desta app. <button id="updateReloadBtn" type="button">Atualizar agora</button>';
+    document.body.appendChild(div);
+    document.getElementById('updateReloadBtn').addEventListener('click', ()=> window.location.reload());
   }
 
 })();
