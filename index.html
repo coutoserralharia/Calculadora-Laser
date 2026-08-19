@@ -137,6 +137,8 @@
   }
 
   table.mat-table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  .mat-table-wrap{overflow-x:auto; margin:0 -2px;}
+  table.mat-table{min-width:560px;}
   table.mat-table th{text-align:left; color:var(--text-dim); font-weight:500; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; padding:0 6px 8px; border-bottom:1px solid var(--border-soft);}
   table.mat-table td{padding:4px 6px; border-bottom:1px solid var(--border-soft);}
   table.mat-table input{padding:6px 7px; font-size:12.5px; width:100%;}
@@ -425,12 +427,21 @@
               </div>
               <div class="field-row">
                 <div class="field">
-                  <label for="areaBasis">Base para custo de material</label>
+                  <label for="materialCostMode">Custo do material calculado por</label>
+                  <select id="materialCostMode">
+                    <option value="area">Área (€/m²)</option>
+                    <option value="weight">Peso (€/kg)</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="areaBasis">Base para área/peso de material</label>
                   <select id="areaBasis">
                     <option value="bbox">Retângulo envolvente (chapa ocupada)</option>
                     <option value="net">Área líquida da peça</option>
                   </select>
                 </div>
+              </div>
+              <div class="field-row">
                 <div class="field"><label>Margem de venda</label><div class="unit-suffix"><input type="number" id="margin" step="1" min="0" value="0"><span>%</span></div></div>
               </div>
             </div>
@@ -439,10 +450,12 @@
           <details class="sub-details">
             <summary class="summary-row sub"><span>Gerir tabela de materiais</span><span class="chev">▸</span></summary>
             <div class="details-body">
-              <table class="mat-table">
-                <thead><tr><th>Material</th><th>Esp. (mm)</th><th>Veloc. (mm/min)</th><th>€/m²</th><th></th></tr></thead>
-                <tbody id="materialsTbody"></tbody>
-              </table>
+              <div class="mat-table-wrap">
+                <table class="mat-table">
+                  <thead><tr><th>Material</th><th>Esp. (mm)</th><th>Veloc. (mm/min)</th><th>Densidade (kg/dm³)</th><th>€/m²</th><th>€/kg</th><th></th></tr></thead>
+                  <tbody id="materialsTbody"></tbody>
+                </table>
+              </div>
               <div class="mat-actions">
                 <button class="ghost-btn" id="addMaterialBtn" type="button">+ Adicionar linha</button>
                 <button class="ghost-btn" id="resetMaterialsBtn" type="button">Repor valores por defeito</button>
@@ -545,6 +558,7 @@ create policy "public access"
           <div class="meta-item"><div class="k">Dimensões</div><div class="v" id="metaDim">—</div></div>
           <div class="meta-item"><div class="k">Perímetro</div><div class="v" id="metaPerim">—</div></div>
           <div class="meta-item"><div class="k">Perfurações</div><div class="v" id="metaPierces">—</div></div>
+          <div class="meta-item" id="metaWeightWrap" hidden><div class="k">Peso estimado</div><div class="v" id="metaWeight">—</div></div>
         </div>
       </div>
 
@@ -766,28 +780,29 @@ create policy "public access"
   /* DEFAULTS & STORAGE                                                */
   /* ---------------------------------------------------------------- */
   const DEFAULT_MATERIALS = [
-    {id:'m1',  name:'Aço Carbono', thickness:1,  speed:6000, price:9},
-    {id:'m2',  name:'Aço Carbono', thickness:2,  speed:4500, price:12},
-    {id:'m3',  name:'Aço Carbono', thickness:3,  speed:3500, price:15},
-    {id:'m4',  name:'Aço Carbono', thickness:4,  speed:2500, price:19},
-    {id:'m5',  name:'Aço Carbono', thickness:5,  speed:1800, price:23},
-    {id:'m6',  name:'Aço Carbono', thickness:6,  speed:1400, price:27},
-    {id:'m7',  name:'Aço Carbono', thickness:8,  speed:900,  price:35},
-    {id:'m8',  name:'Aço Carbono', thickness:10, speed:650,  price:44},
-    {id:'m9',  name:'Aço Inox',    thickness:1,  speed:5000, price:16},
-    {id:'m10', name:'Aço Inox',    thickness:2,  speed:3500, price:22},
-    {id:'m11', name:'Aço Inox',    thickness:3,  speed:2200, price:29},
-    {id:'m12', name:'Aço Inox',    thickness:4,  speed:1500, price:37},
-    {id:'m13', name:'Aço Inox',    thickness:5,  speed:1000, price:45},
-    {id:'m14', name:'Aço Inox',    thickness:6,  speed:700,  price:54},
-    {id:'m15', name:'Alumínio',    thickness:1,  speed:5500, price:11},
-    {id:'m16', name:'Alumínio',    thickness:2,  speed:4000, price:15},
-    {id:'m17', name:'Alumínio',    thickness:3,  speed:3000, price:19},
-    {id:'m18', name:'Alumínio',    thickness:4,  speed:2000, price:24},
-    {id:'m19', name:'Alumínio',    thickness:5,  speed:1400, price:29},
-    {id:'m20', name:'Alumínio',    thickness:6,  speed:1000, price:35},
+    {id:'m1',  name:'Aço Carbono', thickness:1,  speed:6000, price:9,  density:7.85, pricePerKg:1.3},
+    {id:'m2',  name:'Aço Carbono', thickness:2,  speed:4500, price:12, density:7.85, pricePerKg:1.3},
+    {id:'m3',  name:'Aço Carbono', thickness:3,  speed:3500, price:15, density:7.85, pricePerKg:1.3},
+    {id:'m4',  name:'Aço Carbono', thickness:4,  speed:2500, price:19, density:7.85, pricePerKg:1.3},
+    {id:'m5',  name:'Aço Carbono', thickness:5,  speed:1800, price:23, density:7.85, pricePerKg:1.3},
+    {id:'m6',  name:'Aço Carbono', thickness:6,  speed:1400, price:27, density:7.85, pricePerKg:1.3},
+    {id:'m7',  name:'Aço Carbono', thickness:8,  speed:900,  price:35, density:7.85, pricePerKg:1.3},
+    {id:'m8',  name:'Aço Carbono', thickness:10, speed:650,  price:44, density:7.85, pricePerKg:1.3},
+    {id:'m9',  name:'Aço Inox',    thickness:1,  speed:5000, price:16, density:8.00, pricePerKg:4.5},
+    {id:'m10', name:'Aço Inox',    thickness:2,  speed:3500, price:22, density:8.00, pricePerKg:4.5},
+    {id:'m11', name:'Aço Inox',    thickness:3,  speed:2200, price:29, density:8.00, pricePerKg:4.5},
+    {id:'m12', name:'Aço Inox',    thickness:4,  speed:1500, price:37, density:8.00, pricePerKg:4.5},
+    {id:'m13', name:'Aço Inox',    thickness:5,  speed:1000, price:45, density:8.00, pricePerKg:4.5},
+    {id:'m14', name:'Aço Inox',    thickness:6,  speed:700,  price:54, density:8.00, pricePerKg:4.5},
+    {id:'m15', name:'Alumínio',    thickness:1,  speed:5500, price:11, density:2.70, pricePerKg:3.8},
+    {id:'m16', name:'Alumínio',    thickness:2,  speed:4000, price:15, density:2.70, pricePerKg:3.8},
+    {id:'m17', name:'Alumínio',    thickness:3,  speed:3000, price:19, density:2.70, pricePerKg:3.8},
+    {id:'m18', name:'Alumínio',    thickness:4,  speed:2000, price:24, density:2.70, pricePerKg:3.8},
+    {id:'m19', name:'Alumínio',    thickness:5,  speed:1400, price:29, density:2.70, pricePerKg:3.8},
+    {id:'m20', name:'Alumínio',    thickness:6,  speed:1000, price:35, density:2.70, pricePerKg:3.8},
   ];
-  const DEFAULT_MACHINE = { hourlyRate:45, setupCost:5, pierceTime:0.8, margin:0, areaBasis:'bbox' };
+  const DEFAULT_MACHINE = { hourlyRate:45, setupCost:5, pierceTime:0.8, margin:0, areaBasis:'bbox', materialCostMode:'area' };
+
 
   let storageMode = 'none'; // 'cloud' | 'local' | 'none'
   if(typeof window.storage !== 'undefined'){
@@ -987,6 +1002,7 @@ create policy "public access"
     lines.push('');
     lines.push('Material: ' + (rec.materialSnapshot ? (rec.materialSnapshot.name + ' — ' + rec.materialSnapshot.thickness + ' mm') : '—'));
     lines.push('Quantidade: ' + (rec.quantity || 1));
+    if(rec.costSnapshot && rec.costSnapshot.weightKg > 0) lines.push('Peso estimado: ' + fmtNum(rec.costSnapshot.weightKg,2) + ' kg');
     if(rec.dxfFileName) lines.push('Ficheiro DXF original: ' + rec.dxfFileName);
     if(rec.manual) lines.push('Forma manual: ' + JSON.stringify(rec.manual));
     lines.push('');
@@ -1054,9 +1070,11 @@ create policy "public access"
   const materialSelect = $('materialSelect');
   const hourlyRateInp = $('hourlyRate'), setupCostInp = $('setupCost'), pierceTimeInp = $('pierceTime');
   const areaBasisSel = $('areaBasis'), marginInp = $('margin'), qtyInput = $('qtyInput');
+  const materialCostModeSel = $('materialCostMode');
   const materialsTbody = $('materialsTbody');
   const canvas = $('preview'), previewEmpty = $('previewEmpty'), previewMeta = $('previewMeta');
   const metaDim = $('metaDim'), metaPerim = $('metaPerim'), metaPierces = $('metaPierces');
+  const metaWeightWrap = $('metaWeightWrap'), metaWeightEl = $('metaWeight');
   const orderNameInp = $('orderName'), clientNameInp = $('clientName');
   const totalOrderNameEl = $('totalOrderName');
 
@@ -1468,12 +1486,13 @@ create policy "public access"
         dxfText: state.mode==='dxf' ? state.dxfRawText : null,
         manual: state.mode==='manual' ? collectManualInputs() : null,
         materialId: material ? material.id : null,
-        materialSnapshot: material ? {name:material.name, thickness:material.thickness, speed:material.speed, price:material.price} : null,
+        materialSnapshot: material ? {name:material.name, thickness:material.thickness, speed:material.speed, price:material.price, density:material.density, pricePerKg:material.pricePerKg} : null,
         quantity: Math.max(1, parseInt(qtyInput.value,10)||1),
         machineSnapshot: Object.assign({}, state.machine),
         costSnapshot: result.valid ? {
           perPartCost: result.perPartCost, totalCost: result.totalCost, cuttingCost: result.cuttingCost,
           pierceCostTotal: result.pierceCostTotal, materialCost: result.materialCost, setupCost: result.setupCost,
+          weightKg: result.weightKg,
         } : null,
       };
       if(state.remote.configured){
@@ -1563,7 +1582,9 @@ create policy "public access"
         '<td><input type="text" data-i="'+i+'" data-f="name" value="'+m.name.replace(/"/g,'&quot;')+'"></td>' +
         '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="thickness" value="'+m.thickness+'"></td>' +
         '<td><input type="number" step="10" min="1" data-i="'+i+'" data-f="speed" value="'+m.speed+'"></td>' +
+        '<td><input type="number" step="0.01" min="0" data-i="'+i+'" data-f="density" value="'+(m.density||0)+'"></td>' +
         '<td><input type="number" step="0.5" min="0" data-i="'+i+'" data-f="price" value="'+m.price+'"></td>' +
+        '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="pricePerKg" value="'+(m.pricePerKg||0)+'"></td>' +
         '<td><button class="rm-btn" data-i="'+i+'" title="Remover">✕</button></td>';
       materialsTbody.appendChild(tr);
     });
@@ -1592,7 +1613,7 @@ create policy "public access"
     recalcAndRender();
   }
   $('addMaterialBtn').addEventListener('click', ()=>{
-    state.materials.push({id:'m'+Date.now(), name:'Novo material', thickness:1, speed:3000, price:15});
+    state.materials.push({id:'m'+Date.now(), name:'Novo material', thickness:1, speed:3000, price:15, density:7.85, pricePerKg:1.5});
     renderMaterialsTable();
     populateMaterialSelect();
     saveMaterials(state.materials);
@@ -1660,14 +1681,16 @@ create policy "public access"
     pierceTimeInp.value = state.machine.pierceTime;
     areaBasisSel.value = state.machine.areaBasis;
     marginInp.value = state.machine.margin;
+    materialCostModeSel.value = state.machine.materialCostMode || 'area';
   }
-  [hourlyRateInp, setupCostInp, pierceTimeInp, areaBasisSel, marginInp].forEach(inp=>{
+  [hourlyRateInp, setupCostInp, pierceTimeInp, areaBasisSel, marginInp, materialCostModeSel].forEach(inp=>{
     inp.addEventListener('input', ()=>{
       state.machine.hourlyRate = parseFloat(hourlyRateInp.value)||0;
       state.machine.setupCost = parseFloat(setupCostInp.value)||0;
       state.machine.pierceTime = parseFloat(pierceTimeInp.value)||0;
       state.machine.areaBasis = areaBasisSel.value;
       state.machine.margin = parseFloat(marginInp.value)||0;
+      state.machine.materialCostMode = materialCostModeSel.value;
       saveMachine(state.machine);
       recalcAndRender();
     });
@@ -1721,14 +1744,17 @@ create policy "public access"
     const pierceCostTotal = geo.pierces * state.machine.pierceTime * (state.machine.hourlyRate/3600);
     const areaMm2 = state.machine.areaBasis==='net' ? geo.netAreaMm2 : geo.bboxAreaMm2;
     const areaM2 = areaMm2/1e6;
-    const materialCost = areaM2 * material.price;
+    // weightKg formula: área(m²) × espessura(mm) × densidade(kg/dm³) = kg (standard sheet-metal weight formula)
+    const weightKg = areaM2 * (material.thickness||0) * (material.density||0);
+    const byWeight = state.machine.materialCostMode==='weight';
+    const materialCost = byWeight ? weightKg * (material.pricePerKg||0) : areaM2 * (material.price||0);
     const perPartCost = cuttingCost + pierceCostTotal + materialCost;
     const marginMult = 1 + (state.machine.margin/100);
     const perPartSell = perPartCost*marginMult;
     const totalCost = perPartSell*qty + state.machine.setupCost*marginMult;
     return {
       valid:true, geo, material, qty,
-      cuttingTimeMin, cuttingCost, pierceCostTotal, materialCost,
+      cuttingTimeMin, cuttingCost, pierceCostTotal, materialCost, weightKg, byWeight,
       setupCost: state.machine.setupCost*marginMult,
       perPartCost: perPartSell,
       totalCost,
@@ -1929,6 +1955,7 @@ create policy "public access"
     html += pRow('Dimensões (L × A)', (geo && geo.width) ? (fmtNum(geo.width,1) + ' × ' + fmtNum(geo.height,1) + ' mm') : '—');
     html += pRow('Perímetro de corte', geo ? (fmtNum(geo.perimeterMm/10,1) + ' cm') : '—');
     html += pRow('Nº de perfurações', geo ? geo.pierces : '—');
+    if(result.valid && result.weightKg > 0) html += pRow('Peso estimado', fmtNum(result.weightKg,2) + ' kg');
     html += '</div>';
     html += '</div>';
 
@@ -1980,6 +2007,12 @@ create policy "public access"
       metaDim.textContent = (geo.width && geo.height) ? (fmtNum(geo.width,1)+' × '+fmtNum(geo.height,1)+' mm') : '—';
       metaPerim.textContent = fmtNum(geo.perimeterMm/10,1)+' cm';
       metaPierces.textContent = geo.pierces;
+      if(result.valid && result.weightKg > 0){
+        metaWeightWrap.hidden = false;
+        metaWeightEl.textContent = fmtNum(result.weightKg,2)+' kg';
+      } else {
+        metaWeightWrap.hidden = true;
+      }
     }
 
     updateOrderHeader();
@@ -1998,7 +2031,10 @@ create policy "public access"
     $('pierceSub').textContent = result.geo.pierces+' × '+fmtNum(state.machine.pierceTime,1)+' s';
     $('costMaterial').textContent = fmtEUR(result.materialCost);
     const areaUsed = state.machine.areaBasis==='net' ? result.geo.netAreaMm2 : result.geo.bboxAreaMm2;
-    $('matSub').textContent = fmtNum(areaUsed/1e6,3)+' m² · '+result.material.name+' '+result.material.thickness+'mm';
+    const matSubText = result.byWeight
+      ? fmtNum(result.weightKg,2)+' kg · '+result.material.name+' '+result.material.thickness+'mm'
+      : fmtNum(areaUsed/1e6,3)+' m² · '+result.material.name+' '+result.material.thickness+'mm';
+    $('matSub').textContent = matSubText;
     $('costSetup').textContent = fmtEUR(result.setupCost);
 
     $('perPieceValue').textContent = fmtEUR(result.perPartCost);
