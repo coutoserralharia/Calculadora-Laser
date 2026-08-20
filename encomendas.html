@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Encomendas guardadas — Custo de Corte Laser</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111417">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Custo Laser">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<style>
+  .layout-single{max-width:760px; margin:0 auto;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="top-row">
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+          <rect x="1" y="1" width="32" height="32" rx="8" stroke="#2b3138" stroke-width="1.2"/>
+          <line x1="6" y1="17" x2="22" y2="17" stroke="#ff5a2e" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="25" cy="17" r="3.4" fill="#3fe8d4"/>
+          <path d="M4 24L30 24" stroke="#3a4149" stroke-width="1" stroke-dasharray="1 3"/>
+        </svg>
+        <div class="brand-text">
+          <p class="eyebrow">Corte Laser // Histórico</p>
+          <h1>Encomendas Guardadas</h1>
+        </div>
+      </div>
+      <p class="top-note">Pesquise, reveja ou volte a carregar uma encomenda já orçamentada.</p>
+    </div>
+    <nav class="pagenav">
+      <a href="index.html">Orçamentação</a>
+      <a href="encomendas.html" class="active">Encomendas guardadas</a>
+      <a href="definicoes.html">Definições avançadas</a>
+    </nav>
+  </header>
+
+  <main class="layout-single">
+
+    <div class="card">
+      <h2 class="card-title"><span class="dot"></span>Encomendas <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
+      <div class="field" style="margin-bottom:10px;">
+        <input type="text" id="orderSearch" placeholder="Procurar por cliente, encomenda ou ficheiro…">
+      </div>
+      <div id="ordersList" class="orders-list" style="max-height:none;"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title"><span class="dot"></span>Exportar / Importar</h2>
+      <div class="mat-actions">
+        <button class="ghost-btn" id="exportOrdersBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Exportar encomendas</button>
+        <label class="ghost-btn" for="importOrdersInput"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 10V2m0 0l-3 3m3-3l3 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Importar encomendas</label>
+        <input type="file" id="importOrdersInput" accept="application/json" style="display:none;">
+      </div>
+      <p class="save-hint" id="saveOrderHint"></p>
+      <p class="save-hint" id="localStorageNote">As encomendas ficam guardadas neste navegador/dispositivo. Exporte periodicamente para ter uma cópia de segurança ou para levar para outro PC/telemóvel. Para ligação automática entre aparelhos, vá a <a href="definicoes.html" style="color:var(--readout);">Definições avançadas</a>.</p>
+    </div>
+
+  </main>
+
+  <footer class="disclaimer">
+    Para criar ou orçamentar uma nova encomenda, vá a <a href="index.html" style="color:var(--text-dim);">Orçamentação</a>.
+  </footer>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+(function(){
+  "use strict";
+  const { fmtEUR, escapeHtml, loadOrders, saveOrders, loadRemoteConfig,
+    remoteLoadOrders, remoteInsertOrder, remoteDeleteOrder, registerServiceWorker } = window.LC;
+
+  const $ = id => document.getElementById(id);
+  const state = { orders: [], remote: { configured:false, url:'', key:'' } };
+
+  const orderSearchInp = $('orderSearch'), ordersListEl = $('ordersList'), saveOrderHint = $('saveOrderHint');
+  const localStorageNoteEl = $('localStorageNote');
+
+  function updateConnBadge(){
+    const badge = $('connBadge');
+    if(state.remote.configured){
+      badge.textContent = '● servidor central';
+      badge.className = 'conn-badge conn-online';
+      localStorageNoteEl.hidden = true;
+    } else {
+      badge.textContent = '● só este aparelho';
+      badge.className = 'conn-badge conn-local';
+      localStorageNoteEl.hidden = false;
+    }
+  }
+
+  function showOrdersLoading(msg){
+    ordersListEl.innerHTML = '<p class="orders-empty">' + escapeHtml(msg) + '</p>';
+  }
+
+  function renderOrdersList(){
+    const q = (orderSearchInp.value||'').toLowerCase().trim();
+    const filtered = state.orders.filter(o=>{
+      if(!q) return true;
+      return (o.client||'').toLowerCase().includes(q) || (o.orderName||'').toLowerCase().includes(q) || (o.dxfFileName||'').toLowerCase().includes(q);
+    });
+    if(!filtered.length){
+      ordersListEl.innerHTML = '<p class="orders-empty">' + (state.orders.length ? 'Nenhuma encomenda encontrada.' : 'Ainda não guardou nenhuma encomenda.') + '</p>';
+      return;
+    }
+    const groups = {};
+    filtered.forEach(o=>{
+      const key = (o.client && o.client.trim()) ? o.client.trim() : 'Sem cliente';
+      (groups[key] = groups[key] || []).push(o);
+    });
+    const clientNames = Object.keys(groups).sort((a,b)=>{
+      if(a==='Sem cliente') return 1;
+      if(b==='Sem cliente') return -1;
+      return a.localeCompare(b, 'pt');
+    });
+    let html = '';
+    clientNames.forEach(cn=>{
+      const orders = groups[cn].slice().sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''));
+      html += '<div class="client-group">';
+      html += '<div class="client-group-head">' + escapeHtml(cn) + ' <span class="count">(' + orders.length + ')</span></div>';
+      orders.forEach(o=>{
+        const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
+        const matStr = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' ' + o.materialSnapshot.thickness + 'mm') : '—';
+        const costStr = o.costSnapshot ? fmtEUR(o.costSnapshot.totalCost) : '—';
+        html += '<div class="order-row">';
+        html += '<div class="order-row-main">';
+        html += '<div class="order-row-name">' + (o.orderNumber ? '<span class="order-num">'+escapeHtml(o.orderNumber)+'</span> ' : '') + escapeHtml(o.orderName || 'Sem nome') + '</div>';
+        html += '<div class="order-row-meta">' + dateStr + ' · ' + matStr + ' · ' + (o.quantity||1) + 'x · ' + costStr + '</div>';
+        html += '</div>';
+        html += '<div class="order-row-actions">';
+        html += '<button class="ghost-btn sm" data-load="' + o.id + '">Carregar</button>';
+        html += '<button class="rm-btn" data-del="' + o.id + '" title="Eliminar">✕</button>';
+        html += '</div></div>';
+      });
+      html += '</div>';
+    });
+    ordersListEl.innerHTML = html;
+    ordersListEl.querySelectorAll('[data-load]').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        window.location.href = 'index.html?loadOrder=' + encodeURIComponent(b.getAttribute('data-load'));
+      });
+    });
+    ordersListEl.querySelectorAll('[data-del]').forEach(b=>{
+      b.addEventListener('click', async ()=>{
+        const id = b.getAttribute('data-del');
+        const rec = state.orders.find(o=>o.id===id);
+        if(!confirm('Eliminar a encomenda "' + (rec ? (rec.orderName||'sem nome') : '') + '"?')) return;
+        b.disabled = true;
+        if(state.remote.configured){
+          try{ await remoteDeleteOrder(state.remote, id); }
+          catch(err){ alert('Não foi possível eliminar no servidor: ' + err.message); b.disabled = false; return; }
+        }
+        state.orders = state.orders.filter(o=>o.id!==id);
+        if(!state.remote.configured) saveOrders(state.orders);
+        renderOrdersList();
+      });
+    });
+  }
+
+  orderSearchInp.addEventListener('input', renderOrdersList);
+
+  $('exportOrdersBtn').addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify(state.orders, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'laser-cost-encomendas.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  $('importOrdersInput').addEventListener('change', e=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async ev => {
+      try{
+        const payload = JSON.parse(ev.target.result);
+        if(!Array.isArray(payload)) throw new Error('formato inesperado');
+        const existingIds = new Set(state.orders.map(o=>o.id));
+        const newOnes = payload.filter(o => o && o.id && !existingIds.has(o.id));
+        if(state.remote.configured){
+          for(let i=0;i<newOnes.length;i++){
+            saveOrderHint.style.color = '';
+            saveOrderHint.textContent = 'A importar para o servidor… (' + (i+1) + '/' + newOnes.length + ')';
+            try{ await remoteInsertOrder(state.remote, newOnes[i]); state.orders.push(newOnes[i]); }catch(err){ /* skip records that fail (e.g. duplicate id on server) */ }
+          }
+        } else {
+          newOnes.forEach(o => state.orders.push(o));
+          saveOrders(state.orders);
+        }
+        renderOrdersList();
+        saveOrderHint.style.color = 'var(--readout)';
+        saveOrderHint.textContent = newOnes.length + ' encomenda(s) importada(s).';
+        setTimeout(()=>{ saveOrderHint.textContent=''; }, 4000);
+      }catch(err){
+        alert('Não foi possível importar este ficheiro de encomendas.');
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  async function init(){
+    state.remote = await loadRemoteConfig();
+    updateConnBadge();
+    if(state.remote.configured){
+      showOrdersLoading('A carregar encomendas do servidor…');
+      try{
+        state.orders = await remoteLoadOrders(state.remote);
+      }catch(err){
+        state.orders = [];
+        showOrdersLoading('Não foi possível contactar o servidor agora: ' + err.message);
+        return;
+      }
+    } else {
+      state.orders = await loadOrders();
+    }
+    renderOrdersList();
+  }
+  init();
+
+  registerServiceWorker();
+})();
+</script>
+</body>
+</html>

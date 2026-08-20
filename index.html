@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Custo de Corte Laser</title>
+<title>Orçamentação — Custo de Corte Laser</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#111417">
 <meta name="mobile-web-app-capable" content="yes">
@@ -14,321 +14,38 @@
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg:#111417;
-    --panel:#1a1e22;
-    --panel-2:#20252a;
-    --border:#2b3138;
-    --border-soft:#23282e;
-    --text:#e9e6df;
-    --text-muted:#8b939c;
-    --text-dim:#5c636b;
-    --accent:#ff5a2e;
-    --accent-dim:#c9481f;
-    --readout:#3fe8d4;
-    --readout-dim:#1f8c80;
-    --danger:#ff6b6b;
-    --radius:10px;
-    font-size:16px;
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{
-    background:
-      radial-gradient(1200px 600px at 15% -10%, rgba(255,90,46,0.07), transparent 60%),
-      radial-gradient(900px 500px at 100% 0%, rgba(63,232,212,0.05), transparent 55%),
-      var(--bg);
-    color:var(--text);
-    font-family:'Inter', system-ui, sans-serif;
-    -webkit-font-smoothing:antialiased;
-    min-height:100vh;
-  }
-  .wrap{max-width:1180px; margin:0 auto; padding:28px 20px 60px;}
-
-  header.top{display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:26px; flex-wrap:wrap;}
-  .brand{display:flex; align-items:center; gap:12px;}
-  .brand svg{flex:none;}
-  .brand-text .eyebrow{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
-    color:var(--accent); margin:0 0 3px;
-  }
-  .brand-text h1{
-    font-family:'Space Grotesk', sans-serif; font-size:22px; font-weight:600; margin:0; letter-spacing:-0.01em;
-  }
-  .top-note{font-size:12.5px; color:var(--text-dim); max-width:280px; text-align:right; line-height:1.5;}
-
-  .layout{display:grid; grid-template-columns:1.05fr 0.95fr; gap:20px; align-items:start;}
-  @media (max-width: 880px){ .layout{grid-template-columns:1fr;} .top-note{display:none;} }
-  @media (max-width: 480px){
-    .field-row, .field-row3{grid-template-columns:1fr;}
-    .total-split{grid-template-columns:1fr; gap:16px;}
-    .total-block + .total-block{border-left:none; padding-left:0; border-top:1px solid var(--border-soft); padding-top:14px;}
-    .meta-item + .meta-item{border-left:none; padding-left:0;}
-    .preview-meta{flex-direction:column; gap:10px;}
-  }
-
-  .card{
-    background:var(--panel);
-    border:1px solid var(--border);
-    border-radius:var(--radius);
-    padding:18px 18px 20px;
-    margin-bottom:16px;
-  }
-  .card > summary{cursor:pointer; list-style:none;}
-  .card > summary::-webkit-details-marker{display:none;}
-  summary.summary-row{
-    display:flex; align-items:center; justify-content:space-between;
-    font-family:'Space Grotesk', sans-serif; font-weight:600; font-size:14.5px;
-  }
-  summary.summary-row .chev{color:var(--text-dim); transition:transform .18s ease; font-size:12px;}
-  details[open] summary.summary-row .chev{transform:rotate(90deg);}
-  details .details-body{margin-top:14px;}
-
-  h2.card-title{
-    font-family:'Space Grotesk', sans-serif; font-size:14.5px; font-weight:600; margin:0 0 14px;
-    display:flex; align-items:center; gap:8px;
-  }
-  h2.card-title.with-action{justify-content:space-between;}
-  h2.card-title .title-left{display:flex; align-items:center; gap:8px;}
-  h2.card-title .dot{width:6px; height:6px; border-radius:50%; background:var(--accent); flex:none;}
-
-  .tabs{display:flex; gap:6px; margin-bottom:14px; background:var(--panel-2); padding:4px; border-radius:9px; border:1px solid var(--border-soft);}
-  .tab-btn{
-    flex:1; border:none; background:transparent; color:var(--text-muted); padding:9px 10px; border-radius:6px;
-    font-family:'Inter',sans-serif; font-weight:600; font-size:13px; cursor:pointer; transition:all .15s ease;
-  }
-  .tab-btn.active{background:var(--accent); color:#1a0d06;}
-  .tab-btn:not(.active):hover{color:var(--text);}
-
-  .dropzone{
-    border:1.5px dashed var(--border); border-radius:9px; padding:26px 16px; text-align:center;
-    cursor:pointer; transition:all .15s ease; background:var(--panel-2);
-  }
-  .dropzone:hover, .dropzone.dragover{border-color:var(--accent); background:rgba(255,90,46,0.06);}
-  .dropzone .icon{color:var(--text-dim); margin-bottom:8px;}
-  .dropzone.dragover .icon{color:var(--accent);}
-  .dropzone p{margin:0; font-size:13px; color:var(--text-muted);}
-  .dropzone .file-name{font-family:'JetBrains Mono', monospace; color:var(--readout); font-size:12.5px; margin-top:8px; word-break:break-all;}
-  input[type=file]{display:none;}
-
-  .field{margin-bottom:12px;}
-  .field label{display:block; font-size:12px; color:var(--text-muted); margin-bottom:6px; font-weight:500;}
-  #pierceDetectedNote{font-weight:400; color:var(--text-dim); font-size:11px; margin-left:4px;}
-  .field-row{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-  .field-row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;}
-  input[type=number], input[type=text], select{
-    width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text);
-    padding:9px 10px; border-radius:7px; font-family:'JetBrains Mono', monospace; font-size:13.5px;
-    outline:none; transition:border-color .15s ease;
-  }
-  select{font-family:'Inter',sans-serif; font-size:13.5px;}
-  input[type=number]:focus, input[type=text]:focus, select:focus{border-color:var(--accent);}
-  input[readonly]{color:var(--readout); opacity:0.9; cursor:default;}
-  .unit-suffix{position:relative;}
-  .unit-suffix span{position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:11px; color:var(--text-dim); pointer-events:none;}
-
-  .warn{
-    font-size:12px; color:#f0b429; background:rgba(240,180,41,0.08); border:1px solid rgba(240,180,41,0.25);
-    border-radius:7px; padding:8px 10px; margin-top:10px; line-height:1.5;
-  }
-  .err{
-    font-size:12.5px; color:var(--danger); background:rgba(255,107,107,0.08); border:1px solid rgba(255,107,107,0.25);
-    border-radius:7px; padding:8px 10px; margin-top:10px;
-  }
-
-  table.mat-table{width:100%; border-collapse:collapse; font-size:12.5px;}
-  .mat-table-wrap{overflow-x:auto; margin:0 -2px;}
-  table.mat-table{min-width:560px;}
-  table.mat-table th{text-align:left; color:var(--text-dim); font-weight:500; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; padding:0 6px 8px; border-bottom:1px solid var(--border-soft);}
-  table.mat-table td{padding:4px 6px; border-bottom:1px solid var(--border-soft);}
-  table.mat-table input{padding:6px 7px; font-size:12.5px; width:100%;}
-  table.mat-table .rm-btn{background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:15px; padding:2px 6px;}
-  table.mat-table .rm-btn:hover{color:var(--danger);}
-  .mat-actions{display:flex; justify-content:space-between; align-items:center; margin-top:12px;}
-  .ghost-btn{
-    display:inline-block;
-    background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:7px 12px; border-radius:7px;
-    font-size:12px; cursor:pointer; font-family:'Inter',sans-serif; font-weight:500; transition:all .15s ease;
-  }
-  .mat-actions{flex-wrap:wrap; row-gap:8px;}
-  .ghost-btn:hover{border-color:var(--text-muted); color:var(--text);}
-  .save-hint{font-size:11px; color:var(--text-dim); font-style:italic;}
-  .save-hint code{font-style:normal; background:var(--panel-2); border:1px solid var(--border-soft); border-radius:4px; padding:1px 5px; font-family:'JetBrains Mono', monospace; color:var(--readout);}
-
-  /* Results column */
-  .preview-card{padding:0; overflow:hidden;}
-  .preview-head{display:flex; justify-content:space-between; align-items:center; padding:14px 16px 0;}
-  canvas#preview{width:100%; height:260px; display:block; background:
-    linear-gradient(var(--panel-2) 1px, transparent 1px) 0 0/24px 24px,
-    linear-gradient(90deg, var(--panel-2) 1px, transparent 1px) 0 0/24px 24px,
-    #14181c;
-  }
-  .preview-empty{
-    height:260px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px;
-    color:var(--text-dim); font-size:12.5px; text-align:center; padding:0 30px;
-  }
-  .preview-meta{display:flex; gap:0; padding:12px 16px 14px; border-top:1px solid var(--border-soft);}
-  .meta-item{flex:1; text-align:left;}
-  .meta-item + .meta-item{border-left:1px solid var(--border-soft); padding-left:14px; margin-left:14px;}
-  .meta-item .k{font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:3px;}
-  .meta-item .v{font-family:'JetBrains Mono', monospace; font-size:14.5px; color:var(--readout); font-weight:600;}
-
-  .breakdown-row{
-    display:flex; justify-content:space-between; align-items:baseline; padding:8px 0;
-    border-bottom:1px solid var(--border-soft); font-size:13px;
-  }
-  .breakdown-row:last-child{border-bottom:none;}
-  .breakdown-row .lbl{color:var(--text-muted);}
-  .breakdown-row .lbl small{display:block; color:var(--text-dim); font-size:10.5px; margin-top:1px;}
-  .breakdown-row .val{font-family:'JetBrains Mono', monospace; font-size:13.5px;}
-
-  .total-card{
-    background:linear-gradient(160deg, rgba(255,90,46,0.10), rgba(63,232,212,0.04)), var(--panel);
-    border:1px solid var(--border);
-  }
-  .total-order-name{
-    font-family:'Space Grotesk', sans-serif; font-size:14px; font-weight:600; color:var(--text);
-    margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--border-soft);
-  }
-  .total-order-name .client{color:var(--text-dim); font-family:'Inter',sans-serif; font-weight:500; font-size:12.5px;}
-  .total-split{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
-  .total-block + .total-block{border-left:1px solid var(--border-soft); padding-left:14px;}
-  .total-label{font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px;}
-  .total-label span{text-transform:none; letter-spacing:0; font-family:'Inter',sans-serif; color:var(--text-dim);}
-  .total-value{font-family:'JetBrains Mono', monospace; font-size:34px; font-weight:700; color:var(--readout); line-height:1; text-shadow:0 0 22px rgba(63,232,212,0.25);}
-  .total-value-sm{font-size:26px; color:var(--text); text-shadow:none;}
-  .total-sub{font-size:12px; color:var(--text-dim); margin-top:12px; padding-top:12px; border-top:1px solid var(--border-soft);}
-  .total-sub + .total-sub{margin-top:4px; padding-top:0; border-top:none;}
-  @media (max-width:420px){ .total-value{font-size:26px;} .total-value-sm{font-size:20px;} }
-
-  footer.disclaimer{
-    margin-top:8px; font-size:11.5px; color:var(--text-dim); line-height:1.6; border-top:1px solid var(--border-soft); padding-top:16px;
-  }
-
-  ::selection{background:rgba(255,90,46,0.35);}
-  ::-webkit-scrollbar{width:8px; height:8px;}
-  ::-webkit-scrollbar-thumb{background:var(--border); border-radius:4px;}
-
-  .print-btns{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;}
-  .print-btn{flex:1; min-width:150px;}
-
-  .orders-list{max-height:360px; overflow-y:auto; border:1px solid var(--border-soft); border-radius:8px; padding:4px;}
-  .orders-empty{font-size:12.5px; color:var(--text-dim); text-align:center; padding:22px 10px;}
-  .client-group{margin-bottom:2px;}
-  .client-group-head{
-    font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
-    color:var(--accent); padding:9px 8px 4px; display:flex; align-items:center; gap:6px;
-  }
-  .client-group-head .count{color:var(--text-dim); font-weight:400; text-transform:none; font-family:'Inter',sans-serif;}
-  .order-row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 8px; border-radius:7px; transition:background .12s ease;}
-  .order-row:hover{background:var(--panel-2);}
-  .order-row-name{font-size:13px; font-weight:600; color:var(--text);}
-  .order-num{color:var(--accent); font-family:'JetBrains Mono', monospace; font-size:11px; margin-right:4px;}
-  .order-row-meta{font-size:10.5px; color:var(--text-dim); margin-top:2px; font-family:'JetBrains Mono', monospace;}
-  .order-row-actions{display:flex; align-items:center; gap:4px; flex:none;}
-  .ghost-btn.sm{padding:5px 9px; font-size:11px;}
-  .btn-icon{width:13px; height:13px; vertical-align:-2px; margin-right:5px; display:inline-block;}
-  .conn-badge{
-    font-family:'JetBrains Mono', monospace; font-size:9.5px; font-weight:500; margin-left:6px;
-    padding:2px 7px; border-radius:20px; text-transform:none; letter-spacing:0; vertical-align:1px;
-  }
-  .conn-badge.conn-online{color:var(--readout); background:rgba(63,232,212,0.13);}
-  .conn-badge.conn-local{color:var(--text-dim); background:rgba(255,255,255,0.05);}
-
-  .sub-details{border-top:1px solid var(--border-soft); margin-top:14px; padding-top:12px;}
-  .sub-details summary.sub{font-size:12.5px; font-weight:600; color:var(--text-muted);}
-  .sub-details summary.sub:hover{color:var(--text);}
-  .sub-details .details-body{margin-top:12px;}
-  .update-toast{
-    position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:999;
-    background:var(--panel-2); border:1px solid var(--accent); border-radius:9px;
-    padding:10px 14px; font-size:12.5px; color:var(--text); box-shadow:0 8px 24px rgba(0,0,0,0.4);
-    display:flex; align-items:center; gap:10px; max-width:90vw;
-  }
-  .update-toast button{
-    background:var(--accent); color:#1a0d06; border:none; padding:6px 12px; border-radius:6px;
-    font-size:12px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; white-space:nowrap;
-  }
-  .setup-steps{margin:0 0 12px; padding-left:18px; font-size:12px; color:var(--text-muted); line-height:1.7;}
-  .sql-block{
-    background:#0c0e10; border:1px solid var(--border-soft); border-radius:7px; padding:12px 14px;
-    font-family:'JetBrains Mono', monospace; font-size:11px; line-height:1.6; color:#9fe6da;
-    overflow-x:auto; white-space:pre; margin:0 0 12px;
-  }
-
-  .print-sheet{display:none;}
-
-  @media print{
-    body *{visibility:hidden;}
-    .print-sheet, .print-sheet *{visibility:visible;}
-    .print-sheet{
-      display:block; position:absolute; top:0; left:0; width:100%;
-      background:#fff; color:#111; padding:0; font-family:'Inter', sans-serif;
-    }
-    @page{ margin:14mm; }
-  }
-  .print-sheet .p-title{font-family:'Space Grotesk', sans-serif; font-size:20px; font-weight:700; margin:0 0 2px;}
-  .print-sheet .p-meta{font-size:11px; color:#666; margin-bottom:18px;}
-  .print-sheet .p-section{margin-bottom:16px;}
-  .print-sheet .p-row{display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #ddd; font-size:13px;}
-  .print-sheet .p-label{color:#555;}
-  .print-sheet .p-value{font-weight:600; font-family:'JetBrains Mono', monospace;}
-  .print-sheet .p-columns{display:flex; gap:24px; margin-bottom:16px; align-items:flex-start;}
-  .print-sheet .p-preview{flex:0 0 auto;}
-  .print-sheet .p-tech{flex:1;}
-  .print-sheet .p-noprev{font-size:11px; color:#999; width:220px; height:150px; border:1px dashed #ccc; display:flex; align-items:center; justify-content:center; text-align:center;}
-  .print-sheet .p-costs-title{font-weight:700; font-size:13px; margin-bottom:6px;}
-  .print-sheet .p-totals{display:flex; gap:28px; margin-top:12px; border-top:2px solid #111; padding-top:12px;}
-  .print-sheet .p-total-item{display:flex; flex-direction:column; font-size:11.5px; color:#555;}
-  .print-sheet .p-total-item strong{font-size:20px; font-family:'JetBrains Mono', monospace; color:#111; margin-top:2px;}
-  .print-sheet .p-total-main strong{font-size:27px;}
-  .print-sheet .p-sign{display:flex; justify-content:space-between; margin-top:40px; font-size:12px; color:#333;}
-</style>
+<link rel="stylesheet" href="shared.css">
 </head>
 <body>
 <div class="wrap">
 
   <header class="top">
-    <div class="brand">
-      <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
-        <rect x="1" y="1" width="32" height="32" rx="8" stroke="#2b3138" stroke-width="1.2"/>
-        <line x1="6" y1="17" x2="22" y2="17" stroke="#ff5a2e" stroke-width="2" stroke-linecap="round"/>
-        <circle cx="25" cy="17" r="3.4" fill="#3fe8d4"/>
-        <path d="M4 24L30 24" stroke="#3a4149" stroke-width="1" stroke-dasharray="1 3"/>
-      </svg>
-      <div class="brand-text">
-        <p class="eyebrow">Corte Laser // Orçamentação</p>
-        <h1>Calculadora de Custo de Peça</h1>
+    <div class="top-row">
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+          <rect x="1" y="1" width="32" height="32" rx="8" stroke="#2b3138" stroke-width="1.2"/>
+          <line x1="6" y1="17" x2="22" y2="17" stroke="#ff5a2e" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="25" cy="17" r="3.4" fill="#3fe8d4"/>
+          <path d="M4 24L30 24" stroke="#3a4149" stroke-width="1" stroke-dasharray="1 3"/>
+        </svg>
+        <div class="brand-text">
+          <p class="eyebrow">Corte Laser // Orçamentação</p>
+          <h1>Calculadora de Custo de Peça</h1>
+        </div>
       </div>
+      <p class="top-note">Carregue um DXF ou introduza as dimensões manualmente para obter o custo de fabrico em segundos.</p>
     </div>
-    <p class="top-note">Carregue um DXF ou introduza as dimensões manualmente para obter o custo de fabrico em segundos.</p>
+    <nav class="pagenav">
+      <a href="index.html" class="active">Orçamentação</a>
+      <a href="encomendas.html">Encomendas guardadas</a>
+      <a href="definicoes.html">Definições avançadas</a>
+    </nav>
   </header>
 
   <main class="layout">
 
     <!-- LEFT: CONTROLS -->
     <section class="col">
-
-      <details class="card" id="ordersDetails" open>
-        <summary class="summary-row"><span>Encomendas guardadas <span class="conn-badge" id="connBadge"></span></span><span class="chev">▸</span></summary>
-        <div class="details-body">
-          <div class="field" style="margin-bottom:10px;">
-            <input type="text" id="orderSearch" placeholder="Procurar por cliente, encomenda ou ficheiro…">
-          </div>
-          <div id="ordersList" class="orders-list"></div>
-          <div class="mat-actions" style="margin-top:12px;">
-            <button class="ghost-btn" id="saveOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M2 2h9l3 3v9H2V2z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M4 2v4h6V2M4 14v-4h8v4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>Guardar encomenda atual</button>
-          </div>
-          <div class="mat-actions" style="margin-top:8px;">
-            <button class="ghost-btn" id="exportOrdersBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Exportar encomendas</button>
-            <label class="ghost-btn" for="importOrdersInput"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 10V2m0 0l-3 3m3-3l3 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Importar encomendas</label>
-            <input type="file" id="importOrdersInput" accept="application/json" style="display:none;">
-          </div>
-          <p class="save-hint" id="saveOrderHint"></p>
-          <p class="save-hint" id="localStorageNote">As encomendas ficam guardadas neste navegador/dispositivo. Exporte periodicamente para ter uma cópia de segurança ou para levar para outro PC/telemóvel. Para ligação automática entre aparelhos, ou para guardar também numa pasta do PC, vê "Definições avançadas" mais abaixo.</p>
-        </div>
-      </details>
 
       <div class="card">
         <h2 class="card-title with-action">
@@ -392,6 +109,7 @@
           </div>
         </div>
         <select id="materialSelect" style="display:none;" aria-hidden="true" tabindex="-1"></select>
+        <p class="save-hint" style="margin-top:10px;">Preços e velocidades definem-se em <a href="definicoes.html" style="color:var(--readout);">Definições avançadas</a>.</p>
       </div>
 
       <div class="card">
@@ -457,139 +175,14 @@
         </div>
       </div>
 
-      <details class="card" id="settingsDetails">
-        <summary class="summary-row"><span><svg class="btn-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.3" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Definições avançadas</span><span class="chev">▸</span></summary>
-        <div class="details-body">
-          <p class="save-hint" style="margin-bottom:14px;">Parâmetros da máquina, tabela de materiais, ligação ao servidor central e pasta local — normalmente configura-se uma vez e não se mexe mais.</p>
-
-          <details class="sub-details" open>
-            <summary class="summary-row sub"><span>Parâmetros da máquina</span><span class="chev">▸</span></summary>
-            <div class="details-body">
-              <div class="field-row3">
-                <div class="field"><label>Preço custo/hora</label><div class="unit-suffix"><input type="number" id="hourlyRate" step="0.5" min="0"><span>€/h</span></div></div>
-                <div class="field"><label>Custo de desenho</label><div class="unit-suffix"><input type="number" id="designRate" step="0.5" min="0"><span>€/h</span></div></div>
-                <div class="field"><label>Tempo/perfuração</label><div class="unit-suffix"><input type="number" id="pierceTime" step="0.1" min="0"><span>s</span></div></div>
-              </div>
-              <p class="save-hint" style="margin:-6px 0 12px;">O custo de setup já não se define aqui — é calculado automaticamente em cada encomenda a partir do cartão "Preparação (setup)" (tempo de desenho × custo de desenho + tempo de colocação/afinação × custo/hora).</p>
-              <div class="field-row">
-                <div class="field"><label>Tempo padrão de colocação</label><div class="unit-suffix"><input type="number" id="defaultMaterialLoadMin" step="1" min="0"><span>min</span></div></div>
-                <div class="field"><label>Tempo padrão de afinação</label><div class="unit-suffix"><input type="number" id="defaultMachineTuneMin" step="1" min="0"><span>min</span></div></div>
-              </div>
-              <p class="save-hint" style="margin:-6px 0 12px;">Usados como ponto de partida sempre que se cria uma "Nova encomenda" — ajustáveis depois por encomenda, se necessário.</p>
-              <div class="field-row">
-                <div class="field">
-                  <label for="materialCostMode">Custo do material calculado por</label>
-                  <select id="materialCostMode">
-                    <option value="area">Área (€/m²)</option>
-                    <option value="weight">Peso (€/kg)</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="areaBasis">Base para área/peso de material</label>
-                  <select id="areaBasis">
-                    <option value="bbox">Retângulo envolvente (chapa ocupada)</option>
-                    <option value="net">Área líquida da peça</option>
-                  </select>
-                </div>
-              </div>
-              <div class="field-row">
-                <div class="field"><label>Margem de venda</label><div class="unit-suffix"><input type="number" id="margin" step="1" min="0" value="0"><span>%</span></div></div>
-              </div>
-            </div>
-          </details>
-
-          <details class="sub-details">
-            <summary class="summary-row sub"><span>Gerir tabela de materiais</span><span class="chev">▸</span></summary>
-            <div class="details-body">
-              <div class="mat-table-wrap">
-                <table class="mat-table">
-                  <thead><tr><th>Material</th><th>Esp. (mm)</th><th>Veloc. (mm/min)</th><th>Densidade (kg/dm³)</th><th>€/m²</th><th>€/kg</th><th></th></tr></thead>
-                  <tbody id="materialsTbody"></tbody>
-                </table>
-              </div>
-              <div class="mat-actions">
-                <button class="ghost-btn" id="addMaterialBtn" type="button">+ Adicionar linha</button>
-                <button class="ghost-btn" id="resetMaterialsBtn" type="button">Repor valores por defeito</button>
-              </div>
-              <div class="mat-actions" style="margin-top:8px;">
-                <button class="ghost-btn" id="exportSettingsBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Exportar definições</button>
-                <label class="ghost-btn" for="importSettingsInput"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 10V2m0 0l-3 3m3-3l3 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Importar definições</label>
-                <input type="file" id="importSettingsInput" accept="application/json" style="display:none;">
-              </div>
-              <p class="save-hint" id="saveHint">As alterações são guardadas automaticamente neste navegador.</p>
-            </div>
-          </details>
-
-          <details class="sub-details" id="remoteDetails">
-            <summary class="summary-row sub"><span><svg class="btn-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.3" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Armazenamento central (opcional)</span><span class="chev">▸</span></summary>
-            <div class="details-body">
-              <p class="save-hint" style="margin-bottom:10px;">Liga esta app a um projeto Supabase gratuito para as encomendas ficarem visíveis em qualquer PC ou telemóvel automaticamente, sem exportar/importar.</p>
-              <div class="field">
-                <label for="remoteUrl">Project URL</label>
-                <input type="text" id="remoteUrl" placeholder="https://xxxxxxxx.supabase.co">
-              </div>
-              <div class="field">
-                <label for="remoteKey">Chave pública (anon key)</label>
-                <input type="text" id="remoteKey" placeholder="eyJhbGciOi...">
-              </div>
-              <div class="mat-actions">
-                <button class="ghost-btn" id="remoteConnectBtn" type="button">Ligar</button>
-                <button class="ghost-btn" id="remoteDisconnectBtn" type="button" hidden>Desligar</button>
-              </div>
-              <p class="save-hint" id="remoteStatus"></p>
-
-              <details class="sub-details">
-                <summary class="summary-row sub"><span>Como criar o projeto (uma vez, grátis)</span><span class="chev">▸</span></summary>
-                <div class="details-body">
-                  <ol class="setup-steps">
-                    <li>Cria conta grátis em <strong>supabase.com</strong> e um novo projeto (demora ~2 min a ficar pronto).</li>
-                    <li>No menu lateral, abre o <strong>SQL Editor</strong> e corre o código abaixo para criar a tabela de encomendas.</li>
-                    <li>Vai a <strong>Project Settings → API</strong>, copia o <em>Project URL</em> e a <em>anon public key</em> e cola-os aqui em cima.</li>
-                  </ol>
-                  <pre class="sql-block"><code>create table orders (
-  id text primary key,
-  client text,
-  order_name text,
-  created_at timestamptz default now(),
-  mode text,
-  dxf_file_name text,
-  dxf_text text,
-  manual jsonb,
-  material_id text,
-  material_snapshot jsonb,
-  quantity int,
-  machine_snapshot jsonb,
-  cost_snapshot jsonb
-);
-
-alter table orders enable row level security;
-
-create policy "public access"
-  on orders for all
-  using (true) with check (true);</code></pre>
-                  <p class="warn">Esta política deixa a tabela acessível a quem tiver o link e a chave (que ficam visíveis no código da página). Adequado para uso interno da empresa, não para dados sensíveis ou públicos. Se um dia precisar de mais segurança (autenticação por utilizador), avise-me.</p>
-                  <p class="save-hint">Se já tinha a tabela criada antes desta atualização, corra também: <code>alter table orders add column if not exists order_number text;</code></p>
-                </div>
-              </details>
-            </div>
-          </details>
-
-          <details class="sub-details" id="localFolderDetails">
-            <summary class="summary-row sub"><span><svg class="btn-icon" viewBox="0 0 16 16"><path d="M2 4a1 1 0 011-1h3l1.2 1.5H13a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V4z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>Guardar também numa pasta do computador (opcional)</span><span class="chev">▸</span></summary>
-            <div class="details-body">
-              <p class="save-hint" id="localFolderUnsupported" hidden>O teu navegador não suporta esta funcionalidade — funciona apenas no Chrome ou Edge, no computador (não em Safari, Firefox ou telemóveis).</p>
-              <div id="localFolderControls">
-                <p class="save-hint" style="margin-bottom:10px;">Escolhe uma pasta no computador. Sempre que guardares uma encomenda, a app cria lá dentro uma subpasta com o nome do cliente e grava o ficheiro DXF (se houver) mais um resumo em .txt com os dados e custos.</p>
-                <div class="mat-actions">
-                  <button class="ghost-btn" id="chooseFolderBtn" type="button">Escolher pasta</button>
-                  <button class="ghost-btn" id="forgetFolderBtn" type="button" hidden>Desligar pasta</button>
-                </div>
-                <p class="save-hint" id="folderStatus"></p>
-              </div>
-            </div>
-          </details>
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Guardar encomenda <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
+        <div class="mat-actions">
+          <button class="ghost-btn" id="saveOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M2 2h9l3 3v9H2V2z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M4 2v4h6V2M4 14v-4h8v4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>Guardar encomenda atual</button>
+          <a class="ghost-btn sm" href="encomendas.html" style="text-decoration:none;">Ver encomendas guardadas →</a>
         </div>
-      </details>
+        <p class="save-hint" id="saveOrderHint"></p>
+      </div>
 
     </section>
 
@@ -653,453 +246,21 @@ create policy "public access"
   </main>
 
   <footer class="disclaimer">
-    Ferramenta de cálculo interno. As velocidades de corte, preços de material e custo/hora são valores de referência editáveis — ajuste-os à realidade da sua máquina e fornecedores antes de orçamentar. A área de material calculada com base no retângulo envolvente é uma aproximação à ocupação de chapa; para peças aninhadas em conjunto, o consumo real de chapa pode ser inferior.
+    Ferramenta de cálculo interno. As velocidades de corte, preços de material e custo/hora são valores de referência editáveis em <a href="definicoes.html" style="color:var(--text-dim);">Definições avançadas</a> — ajuste-os à realidade da sua máquina e fornecedores antes de orçamentar. A área de material calculada com base no retângulo envolvente é uma aproximação à ocupação de chapa; para peças aninhadas em conjunto, o consumo real de chapa pode ser inferior.
   </footer>
 
 </div>
 
 <div id="printSheet" class="print-sheet"></div>
 
+<script src="shared.js"></script>
 <script>
 (function(){
   "use strict";
-
-  /* ---------------------------------------------------------------- */
-  /* DXF PARSER                                                        */
-  /* ---------------------------------------------------------------- */
-  function dist(a,b){ return Math.hypot(b.x-a.x, b.y-a.y); }
-
-  function bulgeSegment(p1,p2,bulge,segments){
-    segments = segments || 20;
-    const chord = dist(p1,p2);
-    if (Math.abs(bulge) < 1e-9 || chord < 1e-9) return { points:[p2], length:chord };
-    const theta = 4*Math.atan(bulge);
-    const radius = Math.abs(chord/(2*Math.sin(theta/2)));
-    const sign = bulge >= 0 ? 1 : -1;
-    const mx=(p1.x+p2.x)/2, my=(p1.y+p2.y)/2;
-    const dx=p2.x-p1.x, dy=p2.y-p1.y;
-    const ux=-dy/chord, uy=dx/chord;
-    const h=Math.sqrt(Math.max(radius*radius-(chord/2)*(chord/2),0));
-    const cx=mx-sign*ux*h, cy=my-sign*uy*h;
-    const a1=Math.atan2(p1.y-cy,p1.x-cx);
-    const points=[];
-    for(let i=1;i<=segments;i++){
-      const a=a1+(theta*i)/segments;
-      points.push({x:cx+radius*Math.cos(a), y:cy+radius*Math.sin(a)});
-    }
-    return { points, length:Math.abs(radius*theta) };
-  }
-
-  function expandBulgePolyline(rawPts, closed){
-    const full=[rawPts[0]];
-    const n=rawPts.length;
-    const count = closed ? n : n-1;
-    for(let i=0;i<count;i++){
-      const p1=rawPts[i], p2=rawPts[(i+1)%n];
-      if(!p2) continue;
-      const seg=bulgeSegment(p1,p2,p1.bulge||0);
-      full.push.apply(full, seg.points);
-    }
-    return full;
-  }
-
-  function finalizeContour(points, closed){
-    let length=0;
-    for(let i=0;i<points.length-1;i++) length += dist(points[i], points[i+1]);
-    if(closed) length += dist(points[points.length-1], points[0]);
-    let area=0;
-    if(closed){
-      for(let i=0;i<points.length;i++){
-        const p1=points[i], p2=points[(i+1)%points.length];
-        area += p1.x*p2.y - p2.x*p1.y;
-      }
-      area = Math.abs(area)/2;
-    }
-    return { points, closed, length, area };
-  }
-
-  function parseDXF(text){
-    const rawLines = text.split(/\r\n|\r|\n/);
-    const tokens=[];
-    for(let i=0;i+1<rawLines.length;i+=2){
-      const code=parseInt(rawLines[i].trim(),10);
-      const value=rawLines[i+1].trim();
-      if(!Number.isFinite(code)) continue;
-      tokens.push({code,value});
-    }
-    let start=-1, end=-1;
-    for(let i=0;i<tokens.length;i++){
-      if(tokens[i].code===2 && tokens[i].value==='ENTITIES' && tokens[i-1] && tokens[i-1].code===0 && tokens[i-1].value==='SECTION'){
-        start=i+1;
-      }
-      if(start>=0 && tokens[i].code===0 && tokens[i].value==='ENDSEC' && i>start){ end=i; break; }
-    }
-    if(start<0) throw new Error('Secção ENTITIES não encontrada no ficheiro DXF.');
-    if(end<0) end=tokens.length;
-    const entityTokens = tokens.slice(start,end);
-
-    const rawEntities=[];
-    let current=null;
-    for(const t of entityTokens){
-      if(t.code===0){
-        if(current) rawEntities.push(current);
-        current={type:t.value, items:[]};
-      } else if(current) current.items.push(t);
-    }
-    if(current) rawEntities.push(current);
-
-    const contours=[];
-    const warnings=new Set();
-    const get=(ent,code)=>ent.items.filter(i=>i.code===code);
-
-    for(let idx=0; idx<rawEntities.length; idx++){
-      const ent = rawEntities[idx];
-      if(ent.type==='LINE'){
-        const x1=parseFloat((get(ent,10)[0]||{}).value), y1=parseFloat((get(ent,20)[0]||{}).value);
-        const x2=parseFloat((get(ent,11)[0]||{}).value), y2=parseFloat((get(ent,21)[0]||{}).value);
-        if([x1,y1,x2,y2].every(Number.isFinite)) contours.push(finalizeContour([{x:x1,y:y1},{x:x2,y:y2}], false));
-      } else if(ent.type==='CIRCLE'){
-        const cx=parseFloat((get(ent,10)[0]||{}).value), cy=parseFloat((get(ent,20)[0]||{}).value), rad=parseFloat((get(ent,40)[0]||{}).value);
-        if([cx,cy,rad].every(Number.isFinite)){
-          const pts=[]; const N=64;
-          for(let i=0;i<N;i++){ const a=(i/N)*2*Math.PI; pts.push({x:cx+rad*Math.cos(a), y:cy+rad*Math.sin(a)}); }
-          contours.push({points:pts, closed:true, length:2*Math.PI*rad, area:Math.PI*rad*rad});
-        }
-      } else if(ent.type==='ARC'){
-        const cx=parseFloat((get(ent,10)[0]||{}).value), cy=parseFloat((get(ent,20)[0]||{}).value), rad=parseFloat((get(ent,40)[0]||{}).value);
-        let a1=parseFloat((get(ent,50)[0]||{}).value), a2=parseFloat((get(ent,51)[0]||{}).value);
-        if([cx,cy,rad,a1,a2].every(Number.isFinite)){
-          a1=a1*Math.PI/180; a2=a2*Math.PI/180;
-          let sweep=a2-a1; if(sweep<=0) sweep+=2*Math.PI;
-          const N=Math.max(8, Math.round(sweep/(Math.PI/32)));
-          const pts=[];
-          for(let i=0;i<=N;i++){ const a=a1+sweep*i/N; pts.push({x:cx+rad*Math.cos(a), y:cy+rad*Math.sin(a)}); }
-          contours.push({points:pts, closed:false, length:rad*sweep, area:0});
-        }
-      } else if(ent.type==='LWPOLYLINE'){
-        const verts=[]; let cur=null;
-        for(const it of ent.items){
-          if(it.code===10){ if(cur) verts.push(cur); cur={x:parseFloat(it.value), y:0, bulge:0}; }
-          else if(it.code===20 && cur) cur.y=parseFloat(it.value);
-          else if(it.code===42 && cur) cur.bulge=parseFloat(it.value);
-        }
-        if(cur) verts.push(cur);
-        const flagsTok=get(ent,70)[0];
-        const flags = flagsTok ? parseInt(flagsTok.value,10) : 0;
-        const closed = (flags & 1) === 1;
-        if(verts.length>=2) contours.push(finalizeContour(expandBulgePolyline(verts, closed), closed));
-      } else if(ent.type==='POLYLINE'){
-        const flagsTok=get(ent,70)[0];
-        const flags = flagsTok ? parseInt(flagsTok.value,10) : 0;
-        const closed = (flags & 1) === 1;
-        const verts=[];
-        let j=idx+1;
-        while(j<rawEntities.length && rawEntities[j].type==='VERTEX'){
-          const v=rawEntities[j];
-          const x=parseFloat((get(v,10)[0]||{}).value), y=parseFloat((get(v,20)[0]||{}).value);
-          const bTok=get(v,42)[0];
-          const bulge = bTok ? parseFloat(bTok.value) : 0;
-          if(Number.isFinite(x) && Number.isFinite(y)) verts.push({x,y,bulge});
-          j++;
-        }
-        if(j<rawEntities.length && rawEntities[j].type==='SEQEND') idx=j; else idx=j-1;
-        if(verts.length>=2) contours.push(finalizeContour(expandBulgePolyline(verts, closed), closed));
-      } else if(ent.type==='SPLINE' || ent.type==='ELLIPSE'){
-        warnings.add(ent.type);
-        const pts=[]; let cur=null;
-        for(const it of ent.items){
-          if(it.code===10 || it.code===11){ if(cur) pts.push(cur); cur={x:parseFloat(it.value), y:0}; }
-          else if((it.code===20 || it.code===21) && cur) cur.y=parseFloat(it.value);
-        }
-        if(cur) pts.push(cur);
-        if(pts.length>=2) contours.push(finalizeContour(pts, false));
-      }
-    }
-
-    const allPoints = contours.reduce((acc,c)=>acc.concat(c.points), []);
-    const xs=allPoints.map(p=>p.x), ys=allPoints.map(p=>p.y);
-    const bbox = allPoints.length ? { minX:Math.min.apply(null,xs), maxX:Math.max.apply(null,xs), minY:Math.min.apply(null,ys), maxY:Math.max.apply(null,ys) } : null;
-
-    return {
-      contours,
-      warnings: Array.from(warnings),
-      totalLength: contours.reduce((s,c)=>s+c.length,0),
-      bbox,
-      closedContours: contours.filter(c=>c.closed),
-      openContours: contours.filter(c=>!c.closed),
-    };
-  }
-
-  /* ---------------------------------------------------------------- */
-  /* DEFAULTS & STORAGE                                                */
-  /* ---------------------------------------------------------------- */
-  const DEFAULT_MATERIALS = [
-    {id:'m1',  name:'Aço Carbono', thickness:1,  speed:6000, price:9,  density:7.85, pricePerKg:1.3},
-    {id:'m2',  name:'Aço Carbono', thickness:2,  speed:4500, price:12, density:7.85, pricePerKg:1.3},
-    {id:'m3',  name:'Aço Carbono', thickness:3,  speed:3500, price:15, density:7.85, pricePerKg:1.3},
-    {id:'m4',  name:'Aço Carbono', thickness:4,  speed:2500, price:19, density:7.85, pricePerKg:1.3},
-    {id:'m5',  name:'Aço Carbono', thickness:5,  speed:1800, price:23, density:7.85, pricePerKg:1.3},
-    {id:'m6',  name:'Aço Carbono', thickness:6,  speed:1400, price:27, density:7.85, pricePerKg:1.3},
-    {id:'m7',  name:'Aço Carbono', thickness:8,  speed:900,  price:35, density:7.85, pricePerKg:1.3},
-    {id:'m8',  name:'Aço Carbono', thickness:10, speed:650,  price:44, density:7.85, pricePerKg:1.3},
-    {id:'m9',  name:'Aço Inox',    thickness:1,  speed:5000, price:16, density:8.00, pricePerKg:4.5},
-    {id:'m10', name:'Aço Inox',    thickness:2,  speed:3500, price:22, density:8.00, pricePerKg:4.5},
-    {id:'m11', name:'Aço Inox',    thickness:3,  speed:2200, price:29, density:8.00, pricePerKg:4.5},
-    {id:'m12', name:'Aço Inox',    thickness:4,  speed:1500, price:37, density:8.00, pricePerKg:4.5},
-    {id:'m13', name:'Aço Inox',    thickness:5,  speed:1000, price:45, density:8.00, pricePerKg:4.5},
-    {id:'m14', name:'Aço Inox',    thickness:6,  speed:700,  price:54, density:8.00, pricePerKg:4.5},
-    {id:'m15', name:'Alumínio',    thickness:1,  speed:5500, price:11, density:2.70, pricePerKg:3.8},
-    {id:'m16', name:'Alumínio',    thickness:2,  speed:4000, price:15, density:2.70, pricePerKg:3.8},
-    {id:'m17', name:'Alumínio',    thickness:3,  speed:3000, price:19, density:2.70, pricePerKg:3.8},
-    {id:'m18', name:'Alumínio',    thickness:4,  speed:2000, price:24, density:2.70, pricePerKg:3.8},
-    {id:'m19', name:'Alumínio',    thickness:5,  speed:1400, price:29, density:2.70, pricePerKg:3.8},
-    {id:'m20', name:'Alumínio',    thickness:6,  speed:1000, price:35, density:2.70, pricePerKg:3.8},
-  ];
-  const DEFAULT_MACHINE = { hourlyRate:45, designRate:30, pierceTime:0.8, margin:0, areaBasis:'bbox', materialCostMode:'area', defaultMaterialLoadMin:5, defaultMachineTuneMin:5 };
-
-
-  let storageMode = 'none'; // 'cloud' | 'local' | 'none'
-  if(typeof window.storage !== 'undefined'){
-    storageMode = 'cloud';
-  } else {
-    try{ localStorage.setItem('__lc_test__','1'); localStorage.removeItem('__lc_test__'); storageMode = 'local'; }
-    catch(e){ storageMode = 'none'; }
-  }
-
-  async function storageGet(key){
-    if(storageMode==='cloud'){
-      try{ const r = await window.storage.get(key, false); return (r && r.value) ? r.value : null; }
-      catch(e){ return null; }
-    }
-    if(storageMode==='local'){
-      try{ return localStorage.getItem(key); }catch(e){ return null; }
-    }
-    return null;
-  }
-  async function storageSet(key, value){
-    if(storageMode==='cloud'){
-      try{ await window.storage.set(key, value, false); }catch(e){}
-      return;
-    }
-    if(storageMode==='local'){
-      try{ localStorage.setItem(key, value); }catch(e){}
-    }
-  }
-
-  async function loadMaterials(){
-    const raw = await storageGet('laser_materials_v1');
-    if(raw){ try{ return JSON.parse(raw); }catch(e){} }
-    return JSON.parse(JSON.stringify(DEFAULT_MATERIALS));
-  }
-  async function saveMaterials(list){
-    await storageSet('laser_materials_v1', JSON.stringify(list));
-  }
-  async function loadMachine(){
-    const raw = await storageGet('laser_machine_v1');
-    if(raw){ try{ return Object.assign({}, DEFAULT_MACHINE, JSON.parse(raw)); }catch(e){} }
-    return Object.assign({}, DEFAULT_MACHINE);
-  }
-  async function saveMachine(m){
-    await storageSet('laser_machine_v1', JSON.stringify(m));
-  }
-  async function loadOrders(){
-    const raw = await storageGet('laser_orders_v1');
-    if(raw){ try{ const arr = JSON.parse(raw); return Array.isArray(arr) ? arr : []; }catch(e){} }
-    return [];
-  }
-  async function saveOrders(list){
-    await storageSet('laser_orders_v1', JSON.stringify(list));
-  }
-
-  async function loadRemoteConfig(){
-    const raw = await storageGet('laser_remote_config_v1');
-    if(raw){ try{ const cfg = JSON.parse(raw); if(cfg && cfg.configured) return cfg; }catch(e){} }
-    return { configured:false, url:'', key:'' };
-  }
-  async function saveRemoteConfig(cfg){
-    await storageSet('laser_remote_config_v1', JSON.stringify(cfg));
-  }
-
-  function remoteBase(){ return state.remote.url.replace(/\/$/, ''); }
-  function remoteHeaders(extra){
-    return Object.assign({ apikey: state.remote.key, Authorization: 'Bearer ' + state.remote.key }, extra || {});
-  }
-  function orderToRow(o){
-    return {
-      id: o.id, client: o.client || null, order_name: o.orderName || null, order_number: o.orderNumber || null,
-      created_at: o.createdAt || new Date().toISOString(),
-      mode: o.mode, dxf_file_name: o.dxfFileName || null, dxf_text: o.dxfText || null, manual: o.manual || null,
-      material_id: o.materialId || null, material_snapshot: o.materialSnapshot || null, quantity: o.quantity || 1,
-      machine_snapshot: o.machineSnapshot || null, cost_snapshot: o.costSnapshot || null,
-    };
-  }
-  function rowToOrder(r){
-    return {
-      id: r.id, client: r.client, orderName: r.order_name, orderNumber: r.order_number, createdAt: r.created_at, mode: r.mode,
-      dxfFileName: r.dxf_file_name, dxfText: r.dxf_text, manual: r.manual, materialId: r.material_id,
-      materialSnapshot: r.material_snapshot, quantity: r.quantity, machineSnapshot: r.machine_snapshot, costSnapshot: r.cost_snapshot,
-    };
-  }
-  async function remoteRequestError(res){
-    let msg = '';
-    try{ const j = await res.json(); msg = j.message || j.hint || ''; }catch(e){}
-    return new Error('HTTP ' + res.status + (msg ? (' — ' + msg) : ''));
-  }
-  async function remoteLoadOrders(){
-    const res = await fetch(remoteBase() + '/rest/v1/orders?select=*&order=created_at.desc', { headers: remoteHeaders() });
-    if(!res.ok) throw await remoteRequestError(res);
-    const rows = await res.json();
-    return rows.map(rowToOrder);
-  }
-  async function remoteInsertOrder(rec){
-    const res = await fetch(remoteBase() + '/rest/v1/orders', {
-      method: 'POST',
-      headers: remoteHeaders({ 'Content-Type':'application/json', Prefer:'return=minimal' }),
-      body: JSON.stringify(orderToRow(rec)),
-    });
-    if(!res.ok) throw await remoteRequestError(res);
-  }
-  async function remoteDeleteOrder(id){
-    const res = await fetch(remoteBase() + '/rest/v1/orders?id=eq.' + encodeURIComponent(id), {
-      method: 'DELETE', headers: remoteHeaders(),
-    });
-    if(!res.ok) throw await remoteRequestError(res);
-  }
-  async function testRemoteConnection(url, key){
-    const base = url.replace(/\/$/, '');
-    const res = await fetch(base + '/rest/v1/orders?select=id&limit=1', {
-      headers: { apikey: key, Authorization: 'Bearer ' + key },
-    });
-    if(!res.ok) throw await remoteRequestError(res);
-  }
-
-  /* ---------------------------------------------------------------- */
-  /* SEQUENTIAL ORDER NUMBER (Encomenda AAAA_NNNN)                     */
-  /* ---------------------------------------------------------------- */
-  async function computeNextOrderNumber(){
-    const year = new Date().getFullYear();
-    let maxSeq = 0;
-    const scan = (list) => {
-      list.forEach(o=>{
-        const m = /^(\d{4})_(\d+)$/.exec((o && (o.orderNumber || o.order_number)) || '');
-        if(m && parseInt(m[1],10)===year) maxSeq = Math.max(maxSeq, parseInt(m[2],10));
-      });
-    };
-    if(state.remote.configured){
-      try{
-        const res = await fetch(remoteBase() + '/rest/v1/orders?select=order_number&order_number=like.' + year + '_*', { headers: remoteHeaders() });
-        if(res.ok) scan(await res.json());
-      }catch(e){ /* fall back to whatever is already loaded locally */ }
-    }
-    scan(state.orders);
-    return year + '_' + String(maxSeq+1).padStart(4,'0');
-  }
-
-  async function refreshOrderNumberPreview(){
-    const el = $('orderNumberPreview');
-    if(!el) return;
-    try{ el.value = await computeNextOrderNumber(); }
-    catch(e){ el.value = ''; }
-  }
-
-  /* ---------------------------------------------------------------- */
-  /* LOCAL FOLDER (File System Access API — Chrome/Edge desktop only)  */
-  /* ---------------------------------------------------------------- */
-  const HANDLE_DB_NAME = 'laser_calc_handles', HANDLE_STORE = 'handles';
-  function openHandleDB(){
-    return new Promise((resolve, reject)=>{
-      const req = indexedDB.open(HANDLE_DB_NAME, 1);
-      req.onupgradeneeded = () => { req.result.createObjectStore(HANDLE_STORE); };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-  async function idbSet(key, value){
-    const db = await openHandleDB();
-    return new Promise((resolve, reject)=>{
-      const tx = db.transaction(HANDLE_STORE, 'readwrite');
-      tx.objectStore(HANDLE_STORE).put(value, key);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  }
-  async function idbGet(key){
-    const db = await openHandleDB();
-    return new Promise((resolve, reject)=>{
-      const tx = db.transaction(HANDLE_STORE, 'readonly');
-      const req = tx.objectStore(HANDLE_STORE).get(key);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-  async function idbDelete(key){
-    const db = await openHandleDB();
-    return new Promise((resolve, reject)=>{
-      const tx = db.transaction(HANDLE_STORE, 'readwrite');
-      tx.objectStore(HANDLE_STORE).delete(key);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  }
-
-  function sanitizeFileName(s){
-    return String(s||'').trim().replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,' ').slice(0,120) || 'sem-nome';
-  }
-
-  function buildSummaryText(rec){
-    const lines = [];
-    lines.push('ENCOMENDA ' + (rec.orderNumber || ''));
-    lines.push('='.repeat(30));
-    lines.push('Nome: ' + (rec.orderName || '—'));
-    lines.push('Cliente: ' + (rec.client || '—'));
-    lines.push('Data: ' + (rec.createdAt ? new Date(rec.createdAt).toLocaleString('pt-PT') : '—'));
-    lines.push('');
-    lines.push('Material: ' + (rec.materialSnapshot ? (rec.materialSnapshot.name + ' — ' + rec.materialSnapshot.thickness + ' mm') : '—'));
-    lines.push('Quantidade: ' + (rec.quantity || 1));
-    if(rec.costSnapshot && rec.costSnapshot.weightKg > 0) lines.push('Peso estimado: ' + fmtNum(rec.costSnapshot.weightKg,2) + ' kg');
-    if(rec.dxfFileName) lines.push('Ficheiro DXF original: ' + rec.dxfFileName);
-    if(rec.manual) lines.push('Forma manual: ' + JSON.stringify(rec.manual));
-    lines.push('');
-    if(rec.costSnapshot){
-      lines.push('Custos no momento de gravação:');
-      lines.push('  Tempo de corte: ' + fmtNum(rec.costSnapshot.cuttingTimeMin,2) + ' min');
-      lines.push('  Custo de corte: ' + fmtEUR(rec.costSnapshot.cuttingCost));
-      lines.push('  Nº de perfurações: ' + (rec.costSnapshot.pierces ?? '—') + ' (' + fmtEUR(rec.costSnapshot.pierceCostTotal) + ')');
-      lines.push('  Custo material: ' + fmtEUR(rec.costSnapshot.materialCost));
-      lines.push('  Custo setup: ' + fmtEUR(rec.costSnapshot.setupCost));
-      if(rec.costSnapshot.setupInputs){
-        const si = rec.costSnapshot.setupInputs;
-        const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[si.drawingType] || si.drawingType;
-        lines.push('    · Desenho: ' + drawLabel + (si.designTimeMin ? ' — ' + si.designTimeMin + ' min (' + fmtEUR(rec.costSnapshot.designCost) + ')' : ''));
-        lines.push('    · Colocação de material: ' + si.materialLoadMin + ' min');
-        lines.push('    · Afinação da máquina: ' + si.machineTuneMin + ' min');
-      }
-      lines.push('  Preço por peça: ' + fmtEUR(rec.costSnapshot.perPartCost));
-      lines.push('  TOTAL: ' + fmtEUR(rec.costSnapshot.totalCost));
-    }
-    return lines.join('\n');
-  }
-
-  async function writeOrderToLocalFolder(rec){
-    if(!(state.localFolder.ready && state.localFolder.handle)) return { skipped:true };
-    try{
-      const clientDir = await state.localFolder.handle.getDirectoryHandle(sanitizeFileName(rec.client || 'Sem cliente'), {create:true});
-      const baseName = sanitizeFileName((rec.orderNumber ? ('[' + rec.orderNumber + '] ') : '') + (rec.orderName || 'encomenda'));
-      if(rec.mode==='dxf' && rec.dxfText){
-        const dxfHandle = await clientDir.getFileHandle(baseName + '.dxf', {create:true});
-        const w = await dxfHandle.createWritable();
-        await w.write(rec.dxfText);
-        await w.close();
-      }
-      const txtHandle = await clientDir.getFileHandle(baseName + ' - resumo.txt', {create:true});
-      const w2 = await txtHandle.createWritable();
-      await w2.write(buildSummaryText(rec));
-      await w2.close();
-      return { ok:true };
-    }catch(err){
-      return { ok:false, error: err.message };
-    }
-  }
+  const { parseDXF, fmtEUR, fmtNum, escapeHtml, sanitizeFileName,
+    loadMaterials, saveMachine, loadMachine, loadOrders, loadRemoteConfig,
+    remoteLoadOrders, remoteInsertOrder, computeNextOrderNumber,
+    idbGet, writeOrderToLocalFolder, registerServiceWorker } = window.LC;
 
   /* ---------------------------------------------------------------- */
   /* STATE                                                             */
@@ -1111,15 +272,11 @@ create policy "public access"
     dxfRawText: '',
     dxfDetectedPierces: 0,
     materials: [],
-    machine: Object.assign({}, DEFAULT_MACHINE),
+    machine: Object.assign({}, window.LC.DEFAULT_MACHINE),
     orders: [],
     remote: { configured:false, url:'', key:'' },
-    localFolder: { supported:false, handle:null, ready:false, name:'' },
+    localFolder: { ready:false, handle:null },
   };
-
-  const fmtEUR = n => '€' + (isFinite(n) ? n.toFixed(2) : '0.00').replace('.', ',');
-  const fmtNum = (n, d) => isFinite(n) ? n.toLocaleString('pt-PT', {minimumFractionDigits:d||0, maximumFractionDigits:d||0}) : '—';
-  const escapeHtml = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   /* ---------------------------------------------------------------- */
   /* DOM refs                                                          */
@@ -1134,18 +291,15 @@ create policy "public access"
   const shapeRect = $('shapeRect'), shapeCircle = $('shapeCircle'), shapeCustom = $('shapeCustom');
   const materialSelect = $('materialSelect');
   const materialTypeSelect = $('materialTypeSelect'), materialThicknessSelect = $('materialThicknessSelect');
-  const hourlyRateInp = $('hourlyRate'), designRateInp = $('designRate'), pierceTimeInp = $('pierceTime');
-  const defaultLoadMinInp = $('defaultMaterialLoadMin'), defaultTuneMinInp = $('defaultMachineTuneMin');
   const drawingTypeSel = $('drawingType'), designTimeField = $('designTimeField'), designTimeInput = $('designTimeInput');
   const materialLoadTimeInput = $('materialLoadTimeInput'), machineTuneTimeInput = $('machineTuneTimeInput');
-  const areaBasisSel = $('areaBasis'), marginInp = $('margin'), qtyInput = $('qtyInput');
-  const materialCostModeSel = $('materialCostMode');
-  const materialsTbody = $('materialsTbody');
+  const qtyInput = $('qtyInput');
   const canvas = $('preview'), previewEmpty = $('previewEmpty'), previewMeta = $('previewMeta');
   const metaDim = $('metaDim'), metaPerim = $('metaPerim'), metaPierces = $('metaPierces');
   const metaWeightWrap = $('metaWeightWrap'), metaWeightEl = $('metaWeight');
   const orderNameInp = $('orderName'), clientNameInp = $('clientName');
   const totalOrderNameEl = $('totalOrderName');
+  const saveOrderHint = $('saveOrderHint');
 
   function updateOrderHeader(){
     const name = orderNameInp.value.trim();
@@ -1156,6 +310,17 @@ create policy "public access"
   }
   orderNameInp.addEventListener('input', updateOrderHeader);
   clientNameInp.addEventListener('input', updateOrderHeader);
+
+  function updateConnBadge(){
+    const badge = $('connBadge');
+    if(state.remote.configured){
+      badge.textContent = '● servidor central';
+      badge.className = 'conn-badge conn-online';
+    } else {
+      badge.textContent = '● só este aparelho';
+      badge.className = 'conn-badge conn-local';
+    }
+  }
 
   /* ---------------------------------------------------------------- */
   /* TABS                                                              */
@@ -1267,510 +432,8 @@ create policy "public access"
   }
 
   /* ---------------------------------------------------------------- */
-  /* SAVED ORDERS (client "database")                                  */
+  /* MATERIAL SELECTORS (type -> thickness, driving hidden materialSelect) */
   /* ---------------------------------------------------------------- */
-  const orderSearchInp = $('orderSearch'), ordersListEl = $('ordersList'), saveOrderHint = $('saveOrderHint');
-  const remoteUrlInp = $('remoteUrl'), remoteKeyInp = $('remoteKey');
-  const remoteConnectBtn = $('remoteConnectBtn'), remoteDisconnectBtn = $('remoteDisconnectBtn'), remoteStatusEl = $('remoteStatus');
-  const localStorageNoteEl = $('localStorageNote');
-
-  function applyRemoteUIState(){
-    remoteUrlInp.value = state.remote.url || '';
-    remoteKeyInp.value = state.remote.key || '';
-    remoteUrlInp.disabled = state.remote.configured;
-    remoteKeyInp.disabled = state.remote.configured;
-    remoteConnectBtn.hidden = state.remote.configured;
-    remoteDisconnectBtn.hidden = !state.remote.configured;
-    localStorageNoteEl.hidden = state.remote.configured;
-    const badge = $('connBadge');
-    if(state.remote.configured){
-      badge.textContent = '● servidor central';
-      badge.className = 'conn-badge conn-online';
-    } else {
-      badge.textContent = '● só este aparelho';
-      badge.className = 'conn-badge conn-local';
-    }
-  }
-
-  remoteConnectBtn.addEventListener('click', async ()=>{
-    const url = remoteUrlInp.value.trim();
-    const key = remoteKeyInp.value.trim();
-    if(!url || !key){
-      remoteStatusEl.style.color = 'var(--danger)';
-      remoteStatusEl.textContent = 'Preencha o URL do projeto e a chave pública.';
-      return;
-    }
-    remoteStatusEl.style.color = '';
-    remoteStatusEl.textContent = 'A testar ligação…';
-    remoteConnectBtn.disabled = true;
-    try{
-      await testRemoteConnection(url, key);
-      state.remote = { configured:true, url, key };
-      await saveRemoteConfig(state.remote);
-      applyRemoteUIState();
-      remoteStatusEl.style.color = 'var(--readout)';
-      remoteStatusEl.textContent = 'Ligado. A carregar encomendas do servidor…';
-      showOrdersLoading('A carregar encomendas do servidor…');
-      state.orders = await remoteLoadOrders();
-      renderOrdersList();
-      remoteStatusEl.textContent = 'Ligado — as encomendas guardadas a partir de agora ficam neste servidor central, visíveis em qualquer dispositivo.';
-    }catch(err){
-      remoteStatusEl.style.color = 'var(--danger)';
-      remoteStatusEl.textContent = 'Não foi possível ligar: ' + err.message + '. Confirme o URL, a chave, e se a tabela "orders" foi criada com o código SQL abaixo.';
-    }
-    remoteConnectBtn.disabled = false;
-  });
-
-  remoteDisconnectBtn.addEventListener('click', async ()=>{
-    state.remote = { configured:false, url:'', key:'' };
-    await saveRemoteConfig(state.remote);
-    applyRemoteUIState();
-    remoteStatusEl.style.color = '';
-    remoteStatusEl.textContent = 'Desligado. As encomendas guardadas a partir de agora ficam apenas neste navegador.';
-    state.orders = await loadOrders();
-    renderOrdersList();
-  });
-
-  const chooseFolderBtn = $('chooseFolderBtn'), forgetFolderBtn = $('forgetFolderBtn'), folderStatusEl = $('folderStatus');
-  const localFolderControlsEl = $('localFolderControls'), localFolderUnsupportedEl = $('localFolderUnsupported');
-
-  function updateFolderUI(){
-    chooseFolderBtn.hidden = state.localFolder.ready;
-    forgetFolderBtn.hidden = !state.localFolder.ready;
-    if(state.localFolder.ready){
-      folderStatusEl.style.color = 'var(--readout)';
-      folderStatusEl.textContent = 'Pasta ligada: "' + state.localFolder.name + '". As próximas encomendas guardadas também vão ficar aqui.';
-    }
-  }
-
-  chooseFolderBtn.addEventListener('click', async ()=>{
-    try{
-      if(state.localFolder.handle && !state.localFolder.ready){
-        const perm = await state.localFolder.handle.requestPermission({mode:'readwrite'});
-        if(perm==='granted'){
-          state.localFolder.ready = true;
-          chooseFolderBtn.textContent = 'Escolher pasta';
-          updateFolderUI();
-        } else {
-          folderStatusEl.style.color = 'var(--danger)';
-          folderStatusEl.textContent = 'Permissão não concedida.';
-        }
-        return;
-      }
-      const handle = await window.showDirectoryPicker({mode:'readwrite'});
-      await idbSet('rootDir', handle);
-      state.localFolder = { supported:true, handle, ready:true, name:handle.name };
-      chooseFolderBtn.textContent = 'Escolher pasta';
-      updateFolderUI();
-    }catch(err){
-      if(err && err.name==='AbortError') return;
-      folderStatusEl.style.color = 'var(--danger)';
-      folderStatusEl.textContent = 'Não foi possível aceder à pasta: ' + err.message;
-    }
-  });
-
-  forgetFolderBtn.addEventListener('click', async ()=>{
-    try{ await idbDelete('rootDir'); }catch(e){}
-    state.localFolder = { supported:true, handle:null, ready:false, name:'' };
-    chooseFolderBtn.textContent = 'Escolher pasta';
-    updateFolderUI();
-    folderStatusEl.style.color = '';
-    folderStatusEl.textContent = 'Pasta desligada.';
-  });
-
-  function hasUnsavedFormContent(){
-    return !!(orderNameInp.value.trim() || clientNameInp.value.trim() || state.dxfResult);
-  }
-
-  function resetOrderForm(){
-    orderNameInp.value = '';
-    clientNameInp.value = '';
-    qtyInput.value = 1;
-    state.dxfResult = null;
-    state.dxfFileName = '';
-    state.dxfRawText = '';
-    fileNameEl.textContent = '';
-    dxfMsg.innerHTML = '';
-    fileInput.value = '';
-    pierceOverrideWrap.hidden = true;
-    pierceOverrideInput.value = '';
-    state.dxfDetectedPierces = 0;
-    $('rectW').value = 200; $('rectH').value = 100; $('circleD').value = 150;
-    $('customPerim').value = 600; $('customArea').value = 20000; $('manualHoles').value = 0;
-    shapeSelect.value = 'rect';
-    shapeRect.hidden = false; shapeCircle.hidden = true; shapeCustom.hidden = true;
-    drawingTypeSel.value = 'client_direct';
-    materialLoadTimeInput.value = state.machine.defaultMaterialLoadMin ?? 5;
-    machineTuneTimeInput.value = state.machine.defaultMachineTuneMin ?? 5;
-    applyDrawingTypeUI();
-    updateOrderHeader();
-    refreshOrderNumberPreview();
-    setMode('dxf');
-  }
-
-  $('newOrderBtn').addEventListener('click', ()=>{
-    if(hasUnsavedFormContent() && !confirm('Isto limpa o formulário atual (nome, cliente, ficheiro/dimensões). Continuar?')) return;
-    resetOrderForm();
-  });
-
-  function collectManualInputs(){
-    return {
-      shape: shapeSelect.value,
-      w: parseFloat($('rectW').value)||0,
-      h: parseFloat($('rectH').value)||0,
-      d: parseFloat($('circleD').value)||0,
-      perim: parseFloat($('customPerim').value)||0,
-      area: parseFloat($('customArea').value)||0,
-      holes: parseInt($('manualHoles').value,10)||0,
-    };
-  }
-
-  function showOrdersLoading(msg){
-    ordersListEl.innerHTML = '<p class="orders-empty">' + escapeHtml(msg) + '</p>';
-  }
-
-  function renderOrdersList(){
-    refreshOrderNumberPreview();
-    const q = (orderSearchInp.value||'').toLowerCase().trim();
-    const filtered = state.orders.filter(o=>{
-      if(!q) return true;
-      return (o.client||'').toLowerCase().includes(q) || (o.orderName||'').toLowerCase().includes(q) || (o.dxfFileName||'').toLowerCase().includes(q);
-    });
-    if(!filtered.length){
-      ordersListEl.innerHTML = '<p class="orders-empty">' + (state.orders.length ? 'Nenhuma encomenda encontrada.' : 'Ainda não guardou nenhuma encomenda.') + '</p>';
-      return;
-    }
-    const groups = {};
-    filtered.forEach(o=>{
-      const key = (o.client && o.client.trim()) ? o.client.trim() : 'Sem cliente';
-      (groups[key] = groups[key] || []).push(o);
-    });
-    const clientNames = Object.keys(groups).sort((a,b)=>{
-      if(a==='Sem cliente') return 1;
-      if(b==='Sem cliente') return -1;
-      return a.localeCompare(b, 'pt');
-    });
-    let html = '';
-    clientNames.forEach(cn=>{
-      const orders = groups[cn].slice().sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''));
-      html += '<div class="client-group">';
-      html += '<div class="client-group-head">' + escapeHtml(cn) + ' <span class="count">(' + orders.length + ')</span></div>';
-      orders.forEach(o=>{
-        const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
-        const matStr = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' ' + o.materialSnapshot.thickness + 'mm') : '—';
-        const costStr = o.costSnapshot ? fmtEUR(o.costSnapshot.totalCost) : '—';
-        html += '<div class="order-row">';
-        html += '<div class="order-row-main">';
-        html += '<div class="order-row-name">' + (o.orderNumber ? '<span class="order-num">'+escapeHtml(o.orderNumber)+'</span> ' : '') + escapeHtml(o.orderName || 'Sem nome') + '</div>';
-        html += '<div class="order-row-meta">' + dateStr + ' · ' + matStr + ' · ' + (o.quantity||1) + 'x · ' + costStr + '</div>';
-        html += '</div>';
-        html += '<div class="order-row-actions">';
-        html += '<button class="ghost-btn sm" data-load="' + o.id + '">Carregar</button>';
-        html += '<button class="rm-btn" data-del="' + o.id + '" title="Eliminar">✕</button>';
-        html += '</div></div>';
-      });
-      html += '</div>';
-    });
-    ordersListEl.innerHTML = html;
-    ordersListEl.querySelectorAll('[data-load]').forEach(b=>{
-      b.addEventListener('click', ()=>loadOrder(b.getAttribute('data-load')));
-    });
-    ordersListEl.querySelectorAll('[data-del]').forEach(b=>{
-      b.addEventListener('click', async ()=>{
-        const id = b.getAttribute('data-del');
-        const rec = state.orders.find(o=>o.id===id);
-        if(!confirm('Eliminar a encomenda "' + (rec ? (rec.orderName||'sem nome') : '') + '"?')) return;
-        b.disabled = true;
-        if(state.remote.configured){
-          try{ await remoteDeleteOrder(id); }
-          catch(err){ alert('Não foi possível eliminar no servidor: ' + err.message); b.disabled = false; return; }
-        }
-        state.orders = state.orders.filter(o=>o.id!==id);
-        if(!state.remote.configured) saveOrders(state.orders);
-        renderOrdersList();
-      });
-    });
-  }
-
-  async function loadOrder(id){
-    const o = state.orders.find(x=>x.id===id);
-    if(!o) return;
-    if(hasUnsavedFormContent() && !confirm('Isto vai substituir os dados atualmente preenchidos no formulário (ainda não guardados). Continuar?')) return;
-    orderNameInp.value = o.orderName || '';
-    clientNameInp.value = o.client || '';
-    qtyInput.value = o.quantity || 1;
-
-    if(o.mode==='dxf' && o.dxfText){
-      try{
-        const result = parseDXF(o.dxfText);
-        state.dxfResult = result;
-        state.dxfFileName = o.dxfFileName || 'ficheiro.dxf';
-        state.dxfRawText = o.dxfText;
-        fileNameEl.textContent = state.dxfFileName;
-        dxfMsg.innerHTML = '<div class="warn">Ficheiro reposto do histórico de encomendas (guardado em ' + (o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—') + ').</div>';
-        const detected = Math.max(result.closedContours.length, result.contours.length ? 1 : 0);
-        state.dxfDetectedPierces = detected;
-        pierceDetectedNote.textContent = '(detetado automaticamente: ' + detected + ')';
-        pierceOverrideInput.value = (o.costSnapshot && o.costSnapshot.pierces != null) ? o.costSnapshot.pierces : detected;
-        pierceOverrideWrap.hidden = false;
-      }catch(err){
-        dxfMsg.innerHTML = '<div class="err">Não foi possível reconstruir o ficheiro DXF guardado: ' + err.message + '</div>';
-        pierceOverrideWrap.hidden = true;
-      }
-      setMode('dxf');
-    } else if(o.mode==='manual' && o.manual){
-      pierceOverrideWrap.hidden = true;
-      shapeSelect.value = o.manual.shape;
-      shapeRect.hidden = o.manual.shape!=='rect';
-      shapeCircle.hidden = o.manual.shape!=='circle';
-      shapeCustom.hidden = o.manual.shape!=='custom';
-      $('rectW').value = o.manual.w;
-      $('rectH').value = o.manual.h;
-      $('circleD').value = o.manual.d;
-      $('customPerim').value = o.manual.perim;
-      $('customArea').value = o.manual.area;
-      $('manualHoles').value = o.manual.holes || 0;
-      setMode('manual');
-    }
-
-    if(o.materialId && state.materials.some(m=>m.id===o.materialId)){
-      materialSelect.value = o.materialId;
-      rebuildVisibleMaterialSelectors();
-    }
-
-    const savedSetup = o.costSnapshot && o.costSnapshot.setupInputs;
-    if(savedSetup){
-      drawingTypeSel.value = savedSetup.drawingType || 'client_direct';
-      designTimeInput.value = savedSetup.designTimeMin || 0;
-      materialLoadTimeInput.value = savedSetup.materialLoadMin ?? 5;
-      machineTuneTimeInput.value = savedSetup.machineTuneMin ?? 5;
-      applyDrawingTypeUI();
-    }
-
-    updateOrderHeader();
-    recalcAndRender();
-    await refreshOrderNumberPreview();
-    ordersDetailsEl.open = true;
-    window.scrollTo({top:0, behavior:'smooth'});
-    saveOrderHint.style.color = 'var(--readout)';
-    saveOrderHint.textContent = 'Encomenda ' + (o.orderNumber ? o.orderNumber+' ' : '') + '"' + (o.orderName||'sem nome') + '" reposta — se guardar de novo, fica com um número novo (' + $('orderNumberPreview').value + ') e valores recalculados com os preços/definições atuais.';
-    setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
-  }
-
-  const ordersDetailsEl = $('ordersDetails');
-
-  const saveOrderBtn = $('saveOrderBtn');
-  saveOrderBtn.addEventListener('click', async ()=>{
-    const orderName = orderNameInp.value.trim();
-    if(!orderName){
-      saveOrderHint.style.color = 'var(--danger)';
-      saveOrderHint.textContent = 'Introduza um nome para a encomenda antes de guardar.';
-      orderNameInp.focus();
-      return;
-    }
-    if(state.mode==='dxf' && !state.dxfRawText){
-      saveOrderHint.style.color = 'var(--danger)';
-      saveOrderHint.textContent = 'Carregue um ficheiro DXF válido antes de guardar esta encomenda.';
-      return;
-    }
-    const originalLabel = saveOrderBtn.innerHTML;
-    saveOrderBtn.disabled = true;
-    saveOrderBtn.textContent = 'A guardar…';
-    try{
-      const result = computeCost();
-      const material = getSelectedMaterial();
-      const orderNumber = await computeNextOrderNumber();
-      const rec = {
-        id: 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
-        client: clientNameInp.value.trim(),
-        orderName,
-        orderNumber,
-        createdAt: new Date().toISOString(),
-        mode: state.mode,
-        dxfFileName: state.mode==='dxf' ? state.dxfFileName : null,
-        dxfText: state.mode==='dxf' ? state.dxfRawText : null,
-        manual: state.mode==='manual' ? collectManualInputs() : null,
-        materialId: material ? material.id : null,
-        materialSnapshot: material ? {name:material.name, thickness:material.thickness, speed:material.speed, price:material.price, density:material.density, pricePerKg:material.pricePerKg} : null,
-        quantity: Math.max(1, parseInt(qtyInput.value,10)||1),
-        machineSnapshot: Object.assign({}, state.machine),
-        costSnapshot: result.valid ? {
-          perPartCost: result.perPartCost, totalCost: result.totalCost, cuttingCost: result.cuttingCost,
-          cuttingTimeMin: result.cuttingTimeMin, pierces: result.geo.pierces,
-          pierceCostTotal: result.pierceCostTotal, materialCost: result.materialCost, setupCost: result.setupCost,
-          designCost: result.designCost, machinePrepCost: result.machinePrepCost, weightKg: result.weightKg,
-          setupInputs: {
-            drawingType: drawingTypeSel.value,
-            designTimeMin: parseFloat(designTimeInput.value)||0,
-            materialLoadMin: parseFloat(materialLoadTimeInput.value)||0,
-            machineTuneMin: parseFloat(machineTuneTimeInput.value)||0,
-          },
-        } : null,
-      };
-      if(state.remote.configured){
-        saveOrderHint.style.color = '';
-        saveOrderHint.textContent = 'A guardar no servidor…';
-        try{
-          await remoteInsertOrder(rec);
-        }catch(err){
-          saveOrderHint.style.color = 'var(--danger)';
-          saveOrderHint.textContent = 'Não foi possível guardar no servidor: ' + err.message;
-          return;
-        }
-        state.orders.unshift(rec);
-        renderOrdersList();
-        saveOrderHint.style.color = 'var(--readout)';
-        saveOrderHint.textContent = 'Encomenda ' + orderNumber + ' guardada no servidor central, em "' + (rec.client || 'Sem cliente') + '".';
-      } else {
-        state.orders.unshift(rec);
-        saveOrders(state.orders);
-        renderOrdersList();
-        saveOrderHint.style.color = 'var(--readout)';
-        saveOrderHint.textContent = 'Encomenda ' + orderNumber + ' guardada em "' + (rec.client || 'Sem cliente') + '".';
-      }
-      if(state.localFolder.ready){
-        const folderResult = await writeOrderToLocalFolder(rec);
-        if(folderResult.ok) saveOrderHint.textContent += ' Também guardada na pasta local.';
-        else if(!folderResult.skipped) saveOrderHint.textContent += ' (falhou a gravação na pasta local: ' + folderResult.error + ')';
-      }
-      setTimeout(()=>{ saveOrderHint.textContent=''; }, 5000);
-    } finally {
-      saveOrderBtn.disabled = false;
-      saveOrderBtn.innerHTML = originalLabel;
-    }
-  });
-
-  orderSearchInp.addEventListener('input', renderOrdersList);
-
-  $('exportOrdersBtn').addEventListener('click', ()=>{
-    const blob = new Blob([JSON.stringify(state.orders, null, 2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'laser-cost-encomendas.json';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  });
-
-  $('importOrdersInput').addEventListener('change', e=>{
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = async ev => {
-      try{
-        const payload = JSON.parse(ev.target.result);
-        if(!Array.isArray(payload)) throw new Error('formato inesperado');
-        const existingIds = new Set(state.orders.map(o=>o.id));
-        const newOnes = payload.filter(o => o && o.id && !existingIds.has(o.id));
-        if(state.remote.configured){
-          for(let i=0;i<newOnes.length;i++){
-            saveOrderHint.style.color = '';
-            saveOrderHint.textContent = 'A importar para o servidor… (' + (i+1) + '/' + newOnes.length + ')';
-            try{ await remoteInsertOrder(newOnes[i]); state.orders.push(newOnes[i]); }catch(err){ /* skip records that fail (e.g. duplicate id on server) */ }
-          }
-        } else {
-          newOnes.forEach(o => state.orders.push(o));
-          saveOrders(state.orders);
-        }
-        renderOrdersList();
-        saveOrderHint.style.color = 'var(--readout)';
-        saveOrderHint.textContent = newOnes.length + ' encomenda(s) importada(s).';
-        setTimeout(()=>{ saveOrderHint.textContent=''; }, 4000);
-      }catch(err){
-        alert('Não foi possível importar este ficheiro de encomendas.');
-      }
-      e.target.value = '';
-    };
-    reader.readAsText(file);
-  });
-
-  /* ---------------------------------------------------------------- */
-  /* MATERIALS TABLE                                                   */
-  /* ---------------------------------------------------------------- */
-  function renderMaterialsTable(){
-    materialsTbody.innerHTML = '';
-    state.materials.forEach((m,i)=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML =
-        '<td><input type="text" data-i="'+i+'" data-f="name" value="'+m.name.replace(/"/g,'&quot;')+'"></td>' +
-        '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="thickness" value="'+m.thickness+'"></td>' +
-        '<td><input type="number" step="10" min="1" data-i="'+i+'" data-f="speed" value="'+m.speed+'"></td>' +
-        '<td><input type="number" step="0.01" min="0" data-i="'+i+'" data-f="density" value="'+(m.density||0)+'"></td>' +
-        '<td><input type="number" step="0.5" min="0" data-i="'+i+'" data-f="price" value="'+m.price+'"></td>' +
-        '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="pricePerKg" value="'+(m.pricePerKg||0)+'"></td>' +
-        '<td><button class="rm-btn" data-i="'+i+'" title="Remover">✕</button></td>';
-      materialsTbody.appendChild(tr);
-    });
-    materialsTbody.querySelectorAll('input').forEach(inp=>{
-      inp.addEventListener('change', onMaterialFieldChange);
-    });
-    materialsTbody.querySelectorAll('.rm-btn').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const i = parseInt(btn.getAttribute('data-i'),10);
-        state.materials.splice(i,1);
-        renderMaterialsTable();
-        populateMaterialSelect();
-        saveMaterials(state.materials);
-        recalcAndRender();
-      });
-    });
-  }
-  function onMaterialFieldChange(e){
-    const i = parseInt(e.target.getAttribute('data-i'),10);
-    const f = e.target.getAttribute('data-f');
-    let v = e.target.value;
-    if(f!=='name') v = parseFloat(v)||0;
-    state.materials[i][f] = v;
-    populateMaterialSelect(true);
-    saveMaterials(state.materials);
-    recalcAndRender();
-  }
-  $('addMaterialBtn').addEventListener('click', ()=>{
-    state.materials.push({id:'m'+Date.now(), name:'Novo material', thickness:1, speed:3000, price:15, density:7.85, pricePerKg:1.5});
-    renderMaterialsTable();
-    populateMaterialSelect();
-    saveMaterials(state.materials);
-  });
-  $('resetMaterialsBtn').addEventListener('click', ()=>{
-    state.materials = JSON.parse(JSON.stringify(DEFAULT_MATERIALS));
-    renderMaterialsTable();
-    populateMaterialSelect();
-    saveMaterials(state.materials);
-    recalcAndRender();
-  });
-
-  $('exportSettingsBtn').addEventListener('click', ()=>{
-    const payload = { materials: state.materials, machine: state.machine };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'laser-cost-definicoes.json';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  });
-
-  $('importSettingsInput').addEventListener('change', e=>{
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      try{
-        const payload = JSON.parse(ev.target.result);
-        if(Array.isArray(payload.materials) && payload.materials.length) state.materials = payload.materials;
-        if(payload.machine && typeof payload.machine==='object') state.machine = Object.assign({}, DEFAULT_MACHINE, payload.machine);
-        renderMaterialsTable();
-        populateMaterialSelect();
-        applyMachineToInputs();
-        saveMaterials(state.materials);
-        saveMachine(state.machine);
-        recalcAndRender();
-      }catch(err){
-        alert('Não foi possível ler este ficheiro de definições. Verifique se é o ficheiro exportado por esta ferramenta.');
-      }
-      e.target.value = '';
-    };
-    reader.readAsText(file);
-  });
-
   function getMaterialTypes(){
     const names = [];
     state.materials.forEach(m=>{ if(!names.includes(m.name)) names.push(m.name); });
@@ -1820,8 +483,7 @@ create policy "public access"
   });
   materialThicknessSelect.addEventListener('change', applySelectedMaterialFromDropdowns);
 
-  function populateMaterialSelect(keepSelection){
-    const prev = materialSelect.value;
+  function populateMaterialSelect(){
     materialSelect.innerHTML = '';
     state.materials.forEach(m=>{
       const opt = document.createElement('option');
@@ -1829,40 +491,16 @@ create policy "public access"
       opt.textContent = m.name + ' — ' + m.thickness + ' mm';
       materialSelect.appendChild(opt);
     });
-    if(keepSelection && state.materials.some(m=>m.id===prev)) materialSelect.value = prev;
     rebuildVisibleMaterialSelectors();
   }
   materialSelect.addEventListener('change', recalcAndRender);
-
-  /* ---------------------------------------------------------------- */
-  /* MACHINE SETTINGS                                                  */
-  /* ---------------------------------------------------------------- */
-  function applyMachineToInputs(){
-    hourlyRateInp.value = state.machine.hourlyRate;
-    designRateInp.value = state.machine.designRate;
-    pierceTimeInp.value = state.machine.pierceTime;
-    areaBasisSel.value = state.machine.areaBasis;
-    marginInp.value = state.machine.margin;
-    materialCostModeSel.value = state.machine.materialCostMode || 'area';
-    defaultLoadMinInp.value = state.machine.defaultMaterialLoadMin ?? 5;
-    defaultTuneMinInp.value = state.machine.defaultMachineTuneMin ?? 5;
+  function getSelectedMaterial(){
+    return state.materials.find(m=>m.id===materialSelect.value) || state.materials[0] || null;
   }
-  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, marginInp, materialCostModeSel, defaultLoadMinInp, defaultTuneMinInp].forEach(inp=>{
-    inp.addEventListener('input', ()=>{
-      state.machine.hourlyRate = parseFloat(hourlyRateInp.value)||0;
-      state.machine.designRate = parseFloat(designRateInp.value)||0;
-      state.machine.pierceTime = parseFloat(pierceTimeInp.value)||0;
-      state.machine.areaBasis = areaBasisSel.value;
-      state.machine.margin = parseFloat(marginInp.value)||0;
-      state.machine.materialCostMode = materialCostModeSel.value;
-      state.machine.defaultMaterialLoadMin = parseFloat(defaultLoadMinInp.value)||0;
-      state.machine.defaultMachineTuneMin = parseFloat(defaultTuneMinInp.value)||0;
-      saveMachine(state.machine);
-      recalcAndRender();
-    });
-  });
-  qtyInput.addEventListener('input', recalcAndRender);
 
+  /* ---------------------------------------------------------------- */
+  /* PREPARAÇÃO (SETUP)                                                */
+  /* ---------------------------------------------------------------- */
   const DRAWING_LABELS = { client_direct:'Cliente', client_convert:'Conversão', from_scratch:'De raiz' };
   function updateSetupBadge(){
     const designMin = drawingTypeSel.value==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
@@ -1915,10 +553,6 @@ create policy "public access"
     }
   }
 
-  function getSelectedMaterial(){
-    return state.materials.find(m=>m.id===materialSelect.value) || state.materials[0] || null;
-  }
-
   function computeCost(){
     const geo = getGeometry();
     const material = getSelectedMaterial();
@@ -1932,7 +566,6 @@ create policy "public access"
     const pierceCostTotal = geo.pierces * state.machine.pierceTime * (state.machine.hourlyRate/3600);
     const areaMm2 = state.machine.areaBasis==='net' ? geo.netAreaMm2 : geo.bboxAreaMm2;
     const areaM2 = areaMm2/1e6;
-    // weightKg formula: área(m²) × espessura(mm) × densidade(kg/dm³) = kg (standard sheet-metal weight formula)
     const weightKg = areaM2 * (material.thickness||0) * (material.density||0);
     const byWeight = state.machine.materialCostMode==='weight';
     const materialCost = byWeight ? weightKg * (material.pricePerKg||0) : areaM2 * (material.price||0);
@@ -2264,89 +897,251 @@ create policy "public access"
   }
 
   /* ---------------------------------------------------------------- */
+  /* NOVA ENCOMENDA / RESET                                            */
+  /* ---------------------------------------------------------------- */
+  function hasUnsavedFormContent(){
+    return !!(orderNameInp.value.trim() || clientNameInp.value.trim() || state.dxfResult);
+  }
+
+  async function refreshOrderNumberPreview(){
+    try{ $('orderNumberPreview').value = await computeNextOrderNumber(state.remote, state.orders); }
+    catch(e){ $('orderNumberPreview').value = ''; }
+  }
+
+  function resetOrderForm(){
+    orderNameInp.value = '';
+    clientNameInp.value = '';
+    qtyInput.value = 1;
+    state.dxfResult = null;
+    state.dxfFileName = '';
+    state.dxfRawText = '';
+    fileNameEl.textContent = '';
+    dxfMsg.innerHTML = '';
+    fileInput.value = '';
+    pierceOverrideWrap.hidden = true;
+    pierceOverrideInput.value = '';
+    state.dxfDetectedPierces = 0;
+    $('rectW').value = 200; $('rectH').value = 100; $('circleD').value = 150;
+    $('customPerim').value = 600; $('customArea').value = 20000; $('manualHoles').value = 0;
+    shapeSelect.value = 'rect';
+    shapeRect.hidden = false; shapeCircle.hidden = true; shapeCustom.hidden = true;
+    drawingTypeSel.value = 'client_direct';
+    materialLoadTimeInput.value = state.machine.defaultMaterialLoadMin ?? 5;
+    machineTuneTimeInput.value = state.machine.defaultMachineTuneMin ?? 5;
+    applyDrawingTypeUI();
+    updateOrderHeader();
+    refreshOrderNumberPreview();
+    setMode('dxf');
+  }
+  $('newOrderBtn').addEventListener('click', ()=>{
+    if(hasUnsavedFormContent() && !confirm('Isto limpa o formulário atual (nome, cliente, ficheiro/dimensões). Continuar?')) return;
+    resetOrderForm();
+  });
+
+  function collectManualInputs(){
+    return {
+      shape: shapeSelect.value,
+      w: parseFloat($('rectW').value)||0,
+      h: parseFloat($('rectH').value)||0,
+      d: parseFloat($('circleD').value)||0,
+      perim: parseFloat($('customPerim').value)||0,
+      area: parseFloat($('customArea').value)||0,
+      holes: parseInt($('manualHoles').value,10)||0,
+    };
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* LOAD ORDER FROM ?loadOrder=ID (comes from encomendas.html)        */
+  /* ---------------------------------------------------------------- */
+  async function loadOrderIntoForm(o){
+    orderNameInp.value = o.orderName || '';
+    clientNameInp.value = o.client || '';
+    qtyInput.value = o.quantity || 1;
+
+    if(o.mode==='dxf' && o.dxfText){
+      try{
+        const result = parseDXF(o.dxfText);
+        state.dxfResult = result;
+        state.dxfFileName = o.dxfFileName || 'ficheiro.dxf';
+        state.dxfRawText = o.dxfText;
+        fileNameEl.textContent = state.dxfFileName;
+        dxfMsg.innerHTML = '<div class="warn">Ficheiro reposto do histórico de encomendas (guardado em ' + (o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—') + ').</div>';
+        const detected = Math.max(result.closedContours.length, result.contours.length ? 1 : 0);
+        state.dxfDetectedPierces = detected;
+        pierceDetectedNote.textContent = '(detetado automaticamente: ' + detected + ')';
+        pierceOverrideInput.value = (o.costSnapshot && o.costSnapshot.pierces != null) ? o.costSnapshot.pierces : detected;
+        pierceOverrideWrap.hidden = false;
+      }catch(err){
+        dxfMsg.innerHTML = '<div class="err">Não foi possível reconstruir o ficheiro DXF guardado: ' + err.message + '</div>';
+        pierceOverrideWrap.hidden = true;
+      }
+      setMode('dxf');
+    } else if(o.mode==='manual' && o.manual){
+      pierceOverrideWrap.hidden = true;
+      shapeSelect.value = o.manual.shape;
+      shapeRect.hidden = o.manual.shape!=='rect';
+      shapeCircle.hidden = o.manual.shape!=='circle';
+      shapeCustom.hidden = o.manual.shape!=='custom';
+      $('rectW').value = o.manual.w;
+      $('rectH').value = o.manual.h;
+      $('circleD').value = o.manual.d;
+      $('customPerim').value = o.manual.perim;
+      $('customArea').value = o.manual.area;
+      $('manualHoles').value = o.manual.holes || 0;
+      setMode('manual');
+    }
+
+    if(o.materialId && state.materials.some(m=>m.id===o.materialId)){
+      materialSelect.value = o.materialId;
+      rebuildVisibleMaterialSelectors();
+    }
+
+    const savedSetup = o.costSnapshot && o.costSnapshot.setupInputs;
+    if(savedSetup){
+      drawingTypeSel.value = savedSetup.drawingType || 'client_direct';
+      designTimeInput.value = savedSetup.designTimeMin || 0;
+      materialLoadTimeInput.value = savedSetup.materialLoadMin ?? 5;
+      machineTuneTimeInput.value = savedSetup.machineTuneMin ?? 5;
+      applyDrawingTypeUI();
+    }
+
+    updateOrderHeader();
+    recalcAndRender();
+    await refreshOrderNumberPreview();
+    saveOrderHint.style.color = 'var(--readout)';
+    saveOrderHint.textContent = 'Encomenda ' + (o.orderNumber ? o.orderNumber+' ' : '') + '"' + (o.orderName||'sem nome') + '" reposta — se guardar de novo, fica com um número novo (' + $('orderNumberPreview').value + ') e valores recalculados com os preços/definições atuais.';
+    setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* SAVE ORDER                                                        */
+  /* ---------------------------------------------------------------- */
+  const saveOrderBtn = $('saveOrderBtn');
+  saveOrderBtn.addEventListener('click', async ()=>{
+    const orderName = orderNameInp.value.trim();
+    if(!orderName){
+      saveOrderHint.style.color = 'var(--danger)';
+      saveOrderHint.textContent = 'Introduza um nome para a encomenda antes de guardar.';
+      orderNameInp.focus();
+      return;
+    }
+    if(state.mode==='dxf' && !state.dxfRawText){
+      saveOrderHint.style.color = 'var(--danger)';
+      saveOrderHint.textContent = 'Carregue um ficheiro DXF válido antes de guardar esta encomenda.';
+      return;
+    }
+    const originalLabel = saveOrderBtn.innerHTML;
+    saveOrderBtn.disabled = true;
+    saveOrderBtn.textContent = 'A guardar…';
+    try{
+      const result = computeCost();
+      const material = getSelectedMaterial();
+      const orderNumber = await computeNextOrderNumber(state.remote, state.orders);
+      const rec = {
+        id: 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+        client: clientNameInp.value.trim(),
+        orderName,
+        orderNumber,
+        createdAt: new Date().toISOString(),
+        mode: state.mode,
+        dxfFileName: state.mode==='dxf' ? state.dxfFileName : null,
+        dxfText: state.mode==='dxf' ? state.dxfRawText : null,
+        manual: state.mode==='manual' ? collectManualInputs() : null,
+        materialId: material ? material.id : null,
+        materialSnapshot: material ? {name:material.name, thickness:material.thickness, speed:material.speed, price:material.price, density:material.density, pricePerKg:material.pricePerKg} : null,
+        quantity: Math.max(1, parseInt(qtyInput.value,10)||1),
+        machineSnapshot: Object.assign({}, state.machine),
+        costSnapshot: result.valid ? {
+          perPartCost: result.perPartCost, totalCost: result.totalCost, cuttingCost: result.cuttingCost,
+          cuttingTimeMin: result.cuttingTimeMin, pierces: result.geo.pierces,
+          pierceCostTotal: result.pierceCostTotal, materialCost: result.materialCost, setupCost: result.setupCost,
+          designCost: result.designCost, machinePrepCost: result.machinePrepCost, weightKg: result.weightKg,
+          setupInputs: {
+            drawingType: drawingTypeSel.value,
+            designTimeMin: parseFloat(designTimeInput.value)||0,
+            materialLoadMin: parseFloat(materialLoadTimeInput.value)||0,
+            machineTuneMin: parseFloat(machineTuneTimeInput.value)||0,
+          },
+        } : null,
+      };
+      if(state.remote.configured){
+        saveOrderHint.style.color = '';
+        saveOrderHint.textContent = 'A guardar no servidor…';
+        try{
+          await remoteInsertOrder(state.remote, rec);
+        }catch(err){
+          saveOrderHint.style.color = 'var(--danger)';
+          saveOrderHint.textContent = 'Não foi possível guardar no servidor: ' + err.message;
+          return;
+        }
+        state.orders.unshift(rec);
+        saveOrderHint.style.color = 'var(--readout)';
+        saveOrderHint.textContent = 'Encomenda ' + orderNumber + ' guardada no servidor central, em "' + (rec.client || 'Sem cliente') + '".';
+      } else {
+        state.orders.unshift(rec);
+        await window.LC.saveOrders(state.orders);
+        saveOrderHint.style.color = 'var(--readout)';
+        saveOrderHint.textContent = 'Encomenda ' + orderNumber + ' guardada em "' + (rec.client || 'Sem cliente') + '".';
+      }
+      if(state.localFolder.ready){
+        const folderResult = await writeOrderToLocalFolder(state.localFolder.handle, rec);
+        if(folderResult.ok) saveOrderHint.textContent += ' Também guardada na pasta local.';
+        else if(!folderResult.skipped) saveOrderHint.textContent += ' (falhou a gravação na pasta local: ' + folderResult.error + ')';
+      }
+      await refreshOrderNumberPreview();
+      setTimeout(()=>{ saveOrderHint.textContent=''; }, 5000);
+    } finally {
+      saveOrderBtn.disabled = false;
+      saveOrderBtn.innerHTML = originalLabel;
+    }
+  });
+
+  /* ---------------------------------------------------------------- */
   /* INIT                                                              */
   /* ---------------------------------------------------------------- */
   async function init(){
     state.materials = await loadMaterials();
     state.machine = await loadMachine();
     state.remote = await loadRemoteConfig();
-    applyMachineToInputs();
-    renderMaterialsTable();
+    updateConnBadge();
     populateMaterialSelect();
-    applyRemoteUIState();
     materialLoadTimeInput.value = state.machine.defaultMaterialLoadMin ?? 5;
     machineTuneTimeInput.value = state.machine.defaultMachineTuneMin ?? 5;
     applyDrawingTypeUI();
 
     if(state.remote.configured){
-      showOrdersLoading('A carregar encomendas do servidor…');
-      try{
-        state.orders = await remoteLoadOrders();
-        remoteStatusEl.style.color = 'var(--readout)';
-        remoteStatusEl.textContent = 'Ligado — a mostrar encomendas do servidor central.';
-      }catch(err){
-        state.orders = [];
-        remoteStatusEl.style.color = 'var(--danger)';
-        remoteStatusEl.textContent = 'Não foi possível contactar o servidor agora: ' + err.message;
-      }
+      try{ state.orders = await remoteLoadOrders(state.remote); }
+      catch(e){ state.orders = []; }
     } else {
       state.orders = await loadOrders();
     }
-    renderOrdersList();
 
     if('showDirectoryPicker' in window){
-      state.localFolder.supported = true;
       try{
         const handle = await idbGet('rootDir');
         if(handle){
           const perm = await handle.queryPermission({mode:'readwrite'});
-          if(perm==='granted'){
-            state.localFolder = { supported:true, handle, ready:true, name:handle.name };
-          } else {
-            state.localFolder = { supported:true, handle, ready:false, name:handle.name };
-            chooseFolderBtn.textContent = 'Reautorizar pasta "' + handle.name + '"';
-            folderStatusEl.textContent = 'Pasta "' + handle.name + '" foi ligada antes — clique para reautorizar o acesso.';
-          }
-          updateFolderUI();
+          if(perm==='granted') state.localFolder = { ready:true, handle };
         }
-      }catch(e){ /* no folder previously linked, or handle no longer valid — leave disconnected */ }
-    } else {
-      localFolderUnsupportedEl.hidden = false;
-      localFolderControlsEl.hidden = true;
+      }catch(e){ /* no folder linked yet, or handle no longer valid */ }
     }
 
-    if(storageMode==='cloud') $('saveHint').textContent = 'As alterações são guardadas automaticamente nesta conversa.';
-    else if(storageMode==='local') $('saveHint').textContent = 'As alterações são guardadas neste navegador/dispositivo. Para usar as mesmas definições noutro PC ou telemóvel, use "Exportar definições" e depois "Importar" no outro aparelho.';
-    else $('saveHint').textContent = 'Armazenamento indisponível — as alterações só duram enquanto a página estiver aberta. Use "Exportar definições" para as guardar num ficheiro.';
+    await refreshOrderNumberPreview();
+
+    const params = new URLSearchParams(location.search);
+    const loadId = params.get('loadOrder');
+    if(loadId){
+      const o = state.orders.find(x=>x.id===loadId);
+      if(o) await loadOrderIntoForm(o);
+      history.replaceState(null, '', 'index.html');
+    }
+
     window.addEventListener('resize', ()=>drawPreview(getGeometry()));
     recalcAndRender();
   }
   init();
 
-  if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){
-    window.addEventListener('load', ()=>{
-      navigator.serviceWorker.register('sw.js').then(reg=>{
-        reg.addEventListener('updatefound', ()=>{
-          const nw = reg.installing;
-          if(!nw) return;
-          nw.addEventListener('statechange', ()=>{
-            if(nw.state==='installed' && navigator.serviceWorker.controller) showUpdateToast();
-          });
-        });
-      }).catch(()=>{ /* offline install not available on this host, app still works normally */ });
-    });
-  }
-
-  function showUpdateToast(){
-    if(document.getElementById('updateToast')) return;
-    const div = document.createElement('div');
-    div.id = 'updateToast';
-    div.className = 'update-toast';
-    div.innerHTML = 'Há uma versão nova desta app. <button id="updateReloadBtn" type="button">Atualizar agora</button>';
-    document.body.appendChild(div);
-    document.getElementById('updateReloadBtn').addEventListener('click', ()=> window.location.reload());
-  }
-
+  registerServiceWorker();
 })();
 </script>
 </body>
