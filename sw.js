@@ -33,6 +33,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
+  if (!req.url.startsWith('http')) return; // ignore chrome-extension:// and other unsupported schemes
 
   const isSameOrigin = new URL(req.url).origin === self.location.origin;
 
