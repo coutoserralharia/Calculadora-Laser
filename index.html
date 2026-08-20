@@ -494,6 +494,7 @@
     rebuildVisibleMaterialSelectors();
   }
   materialSelect.addEventListener('change', recalcAndRender);
+  qtyInput.addEventListener('input', recalcAndRender);
   function getSelectedMaterial(){
     return state.materials.find(m=>m.id===materialSelect.value) || state.materials[0] || null;
   }
@@ -1080,6 +1081,15 @@
       } else {
         state.orders.unshift(rec);
         await window.LC.saveOrders(state.orders);
+        // Verify the write actually persisted (catches silent storage failures: quota exceeded,
+        // browser storage blocked, private-mode restrictions, etc.)
+        const verify = await window.LC.loadOrders();
+        const persisted = verify.some(o => o.id === rec.id);
+        if(!persisted){
+          saveOrderHint.style.color = 'var(--danger)';
+          saveOrderHint.textContent = 'Aviso: a encomenda não ficou guardada neste navegador (o armazenamento local pode estar bloqueado ou cheio). Tente exportar as encomendas regularmente, ou ligue o armazenamento central em Definições avançadas.';
+          return;
+        }
         saveOrderHint.style.color = 'var(--readout)';
         saveOrderHint.textContent = 'Encomenda ' + orderNumber + ' guardada em "' + (rec.client || 'Sem cliente') + '".';
       }
@@ -1089,7 +1099,12 @@
         else if(!folderResult.skipped) saveOrderHint.textContent += ' (falhou a gravação na pasta local: ' + folderResult.error + ')';
       }
       await refreshOrderNumberPreview();
-      setTimeout(()=>{ saveOrderHint.textContent=''; }, 5000);
+      if(saveOrderHint.style.color !== 'var(--danger)'){
+        setTimeout(()=>{ saveOrderHint.textContent=''; }, 5000);
+      }
+    }catch(err){
+      saveOrderHint.style.color = 'var(--danger)';
+      saveOrderHint.textContent = 'Ocorreu um erro inesperado ao guardar: ' + err.message + '. Nada foi gravado — tente novamente.';
     } finally {
       saveOrderBtn.disabled = false;
       saveOrderBtn.innerHTML = originalLabel;
