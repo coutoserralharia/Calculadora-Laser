@@ -329,14 +329,6 @@
       </details>
 
       <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Material</h2>
-        <div class="field" style="margin-bottom:0;">
-          <label for="materialSelect">Material / espessura</label>
-          <select id="materialSelect"></select>
-        </div>
-      </div>
-
-      <div class="card">
         <h2 class="card-title with-action">
           <span class="title-left"><span class="dot"></span>Dados da encomenda</span>
           <button class="ghost-btn sm" id="newOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M13 8A5 5 0 113 8" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M13 3v3.5H9.5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Nova encomenda</button>
@@ -355,6 +347,47 @@
             <input type="number" id="qtyInput" value="1" min="1" step="1">
           </div>
         </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Preparação (setup)</h2>
+        <div class="field">
+          <label for="drawingType">Origem do desenho</label>
+          <select id="drawingType">
+            <option value="client_direct">Desenho do cliente, pronto a usar</option>
+            <option value="client_convert">Converter desenho do cliente</option>
+            <option value="from_scratch">Desenho de raiz</option>
+          </select>
+        </div>
+        <div class="field" id="designTimeField" hidden>
+          <label for="designTimeInput">Tempo de desenho</label>
+          <div class="unit-suffix"><input type="number" id="designTimeInput" min="0" step="1" value="0"><span>min</span></div>
+        </div>
+        <div class="field-row" style="margin-bottom:0;">
+          <div class="field" style="margin-bottom:0;">
+            <label for="materialLoadTimeInput">Colocação do material</label>
+            <div class="unit-suffix"><input type="number" id="materialLoadTimeInput" min="0" step="1" value="5"><span>min</span></div>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="machineTuneTimeInput">Afinação da máquina</label>
+            <div class="unit-suffix"><input type="number" id="machineTuneTimeInput" min="0" step="1" value="5"><span>min</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Material</h2>
+        <div class="field-row" style="margin-bottom:0;">
+          <div class="field" style="margin-bottom:0;">
+            <label for="materialTypeSelect">Tipo de material</label>
+            <select id="materialTypeSelect"></select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="materialThicknessSelect">Espessura</label>
+            <select id="materialThicknessSelect"></select>
+          </div>
+        </div>
+        <select id="materialSelect" style="display:none;" aria-hidden="true" tabindex="-1"></select>
       </div>
 
       <div class="card">
@@ -422,9 +455,10 @@
             <div class="details-body">
               <div class="field-row3">
                 <div class="field"><label>Preço custo/hora</label><div class="unit-suffix"><input type="number" id="hourlyRate" step="0.5" min="0"><span>€/h</span></div></div>
-                <div class="field"><label>Setup por encomenda</label><div class="unit-suffix"><input type="number" id="setupCost" step="0.5" min="0"><span>€</span></div></div>
+                <div class="field"><label>Custo de desenho</label><div class="unit-suffix"><input type="number" id="designRate" step="0.5" min="0"><span>€/h</span></div></div>
                 <div class="field"><label>Tempo/perfuração</label><div class="unit-suffix"><input type="number" id="pierceTime" step="0.1" min="0"><span>s</span></div></div>
               </div>
+              <p class="save-hint" style="margin:-6px 0 12px;">O custo de setup já não se define aqui — é calculado automaticamente em cada encomenda a partir do cartão "Preparação (setup)" (tempo de desenho × custo de desenho + tempo de colocação/afinação × custo/hora).</p>
               <div class="field-row">
                 <div class="field">
                   <label for="materialCostMode">Custo do material calculado por</label>
@@ -564,10 +598,12 @@ create policy "public access"
 
       <div class="card">
         <h2 class="card-title"><span class="dot"></span>Decomposição de custo (por peça)</h2>
-        <div class="breakdown-row"><span class="lbl">Corte<small id="cutSub">—</small></span><span class="val" id="costCut">€0,00</span></div>
-        <div class="breakdown-row"><span class="lbl">Perfurações<small id="pierceSub">—</small></span><span class="val" id="costPierce">€0,00</span></div>
-        <div class="breakdown-row"><span class="lbl">Material<small id="matSub">—</small></span><span class="val" id="costMaterial">€0,00</span></div>
-        <div class="breakdown-row"><span class="lbl">Setup<small>por encomenda, uma vez</small></span><span class="val" id="costSetup">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Tempo de corte<small id="cutTimeSub">—</small></span><span class="val" id="valCutTime">—</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo de corte</span><span class="val" id="costCut">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Nº de perfurações<small id="pierceSub">—</small></span><span class="val" id="valPierces">—</span></div>
+        <div class="breakdown-row"><span class="lbl">Material<small id="matInfoSub">—</small></span><span class="val" id="valMaterialInfo">—</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo material</span><span class="val" id="costMaterial">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo setup<small id="setupSub">—</small></span><span class="val" id="costSetup">€0,00</span></div>
       </div>
 
       <div class="card total-card">
@@ -801,7 +837,7 @@ create policy "public access"
     {id:'m19', name:'Alumínio',    thickness:5,  speed:1400, price:29, density:2.70, pricePerKg:3.8},
     {id:'m20', name:'Alumínio',    thickness:6,  speed:1000, price:35, density:2.70, pricePerKg:3.8},
   ];
-  const DEFAULT_MACHINE = { hourlyRate:45, setupCost:5, pierceTime:0.8, margin:0, areaBasis:'bbox', materialCostMode:'area' };
+  const DEFAULT_MACHINE = { hourlyRate:45, designRate:30, pierceTime:0.8, margin:0, areaBasis:'bbox', materialCostMode:'area' };
 
 
   let storageMode = 'none'; // 'cloud' | 'local' | 'none'
@@ -1008,10 +1044,18 @@ create policy "public access"
     lines.push('');
     if(rec.costSnapshot){
       lines.push('Custos no momento de gravação:');
-      lines.push('  Corte: ' + fmtEUR(rec.costSnapshot.cuttingCost));
-      lines.push('  Perfurações: ' + fmtEUR(rec.costSnapshot.pierceCostTotal));
-      lines.push('  Material: ' + fmtEUR(rec.costSnapshot.materialCost));
-      lines.push('  Setup: ' + fmtEUR(rec.costSnapshot.setupCost));
+      lines.push('  Tempo de corte: ' + fmtNum(rec.costSnapshot.cuttingTimeMin,2) + ' min');
+      lines.push('  Custo de corte: ' + fmtEUR(rec.costSnapshot.cuttingCost));
+      lines.push('  Nº de perfurações: ' + (rec.costSnapshot.pierces ?? '—') + ' (' + fmtEUR(rec.costSnapshot.pierceCostTotal) + ')');
+      lines.push('  Custo material: ' + fmtEUR(rec.costSnapshot.materialCost));
+      lines.push('  Custo setup: ' + fmtEUR(rec.costSnapshot.setupCost));
+      if(rec.costSnapshot.setupInputs){
+        const si = rec.costSnapshot.setupInputs;
+        const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[si.drawingType] || si.drawingType;
+        lines.push('    · Desenho: ' + drawLabel + (si.designTimeMin ? ' — ' + si.designTimeMin + ' min (' + fmtEUR(rec.costSnapshot.designCost) + ')' : ''));
+        lines.push('    · Colocação de material: ' + si.materialLoadMin + ' min');
+        lines.push('    · Afinação da máquina: ' + si.machineTuneMin + ' min');
+      }
       lines.push('  Preço por peça: ' + fmtEUR(rec.costSnapshot.perPartCost));
       lines.push('  TOTAL: ' + fmtEUR(rec.costSnapshot.totalCost));
     }
@@ -1068,7 +1112,10 @@ create policy "public access"
   const shapeSelect = $('shapeSelect');
   const shapeRect = $('shapeRect'), shapeCircle = $('shapeCircle'), shapeCustom = $('shapeCustom');
   const materialSelect = $('materialSelect');
-  const hourlyRateInp = $('hourlyRate'), setupCostInp = $('setupCost'), pierceTimeInp = $('pierceTime');
+  const materialTypeSelect = $('materialTypeSelect'), materialThicknessSelect = $('materialThicknessSelect');
+  const hourlyRateInp = $('hourlyRate'), designRateInp = $('designRate'), pierceTimeInp = $('pierceTime');
+  const drawingTypeSel = $('drawingType'), designTimeField = $('designTimeField'), designTimeInput = $('designTimeInput');
+  const materialLoadTimeInput = $('materialLoadTimeInput'), machineTuneTimeInput = $('machineTuneTimeInput');
   const areaBasisSel = $('areaBasis'), marginInp = $('margin'), qtyInput = $('qtyInput');
   const materialCostModeSel = $('materialCostMode');
   const materialsTbody = $('materialsTbody');
@@ -1315,6 +1362,10 @@ create policy "public access"
     $('customPerim').value = 600; $('customArea').value = 20000; $('manualHoles').value = 0;
     shapeSelect.value = 'rect';
     shapeRect.hidden = false; shapeCircle.hidden = true; shapeCustom.hidden = true;
+    drawingTypeSel.value = 'client_direct';
+    materialLoadTimeInput.value = 5;
+    machineTuneTimeInput.value = 5;
+    applyDrawingTypeUI();
     updateOrderHeader();
     refreshOrderNumberPreview();
     setMode('dxf');
@@ -1440,6 +1491,16 @@ create policy "public access"
 
     if(o.materialId && state.materials.some(m=>m.id===o.materialId)){
       materialSelect.value = o.materialId;
+      rebuildVisibleMaterialSelectors();
+    }
+
+    const savedSetup = o.costSnapshot && o.costSnapshot.setupInputs;
+    if(savedSetup){
+      drawingTypeSel.value = savedSetup.drawingType || 'client_direct';
+      designTimeInput.value = savedSetup.designTimeMin || 0;
+      materialLoadTimeInput.value = savedSetup.materialLoadMin ?? 5;
+      machineTuneTimeInput.value = savedSetup.machineTuneMin ?? 5;
+      applyDrawingTypeUI();
     }
 
     updateOrderHeader();
@@ -1491,8 +1552,15 @@ create policy "public access"
         machineSnapshot: Object.assign({}, state.machine),
         costSnapshot: result.valid ? {
           perPartCost: result.perPartCost, totalCost: result.totalCost, cuttingCost: result.cuttingCost,
+          cuttingTimeMin: result.cuttingTimeMin, pierces: result.geo.pierces,
           pierceCostTotal: result.pierceCostTotal, materialCost: result.materialCost, setupCost: result.setupCost,
-          weightKg: result.weightKg,
+          designCost: result.designCost, machinePrepCost: result.machinePrepCost, weightKg: result.weightKg,
+          setupInputs: {
+            drawingType: drawingTypeSel.value,
+            designTimeMin: parseFloat(designTimeInput.value)||0,
+            materialLoadMin: parseFloat(materialLoadTimeInput.value)||0,
+            machineTuneMin: parseFloat(machineTuneTimeInput.value)||0,
+          },
         } : null,
       };
       if(state.remote.configured){
@@ -1659,6 +1727,55 @@ create policy "public access"
     reader.readAsText(file);
   });
 
+  function getMaterialTypes(){
+    const names = [];
+    state.materials.forEach(m=>{ if(!names.includes(m.name)) names.push(m.name); });
+    return names.sort((a,b)=>a.localeCompare(b,'pt'));
+  }
+  function getThicknessesForType(name){
+    return state.materials.filter(m=>m.name===name).map(m=>m.thickness).sort((a,b)=>a-b);
+  }
+  function rebuildThicknessSelector(keepThickness){
+    const type = materialTypeSelect.value;
+    const thicknesses = getThicknessesForType(type);
+    materialThicknessSelect.innerHTML = '';
+    thicknesses.forEach(t=>{
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t + ' mm';
+      materialThicknessSelect.appendChild(opt);
+    });
+    if(keepThickness!=null && thicknesses.some(t=>t===keepThickness)) materialThicknessSelect.value = keepThickness;
+    else if(thicknesses.length) materialThicknessSelect.value = thicknesses[0];
+  }
+  function rebuildVisibleMaterialSelectors(){
+    const mat = state.materials.find(m=>m.id===materialSelect.value) || state.materials[0];
+    const types = getMaterialTypes();
+    materialTypeSelect.innerHTML = '';
+    types.forEach(name=>{
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      materialTypeSelect.appendChild(opt);
+    });
+    if(mat) materialTypeSelect.value = mat.name;
+    rebuildThicknessSelector(mat ? mat.thickness : null);
+  }
+  function applySelectedMaterialFromDropdowns(){
+    const type = materialTypeSelect.value;
+    const thickness = parseFloat(materialThicknessSelect.value);
+    const mat = state.materials.find(m=>m.name===type && Math.abs(m.thickness-thickness)<1e-9);
+    if(mat){
+      materialSelect.value = mat.id;
+      materialSelect.dispatchEvent(new Event('change'));
+    }
+  }
+  materialTypeSelect.addEventListener('change', ()=>{
+    rebuildThicknessSelector(null);
+    applySelectedMaterialFromDropdowns();
+  });
+  materialThicknessSelect.addEventListener('change', applySelectedMaterialFromDropdowns);
+
   function populateMaterialSelect(keepSelection){
     const prev = materialSelect.value;
     materialSelect.innerHTML = '';
@@ -1669,6 +1786,7 @@ create policy "public access"
       materialSelect.appendChild(opt);
     });
     if(keepSelection && state.materials.some(m=>m.id===prev)) materialSelect.value = prev;
+    rebuildVisibleMaterialSelectors();
   }
   materialSelect.addEventListener('change', recalcAndRender);
 
@@ -1677,16 +1795,16 @@ create policy "public access"
   /* ---------------------------------------------------------------- */
   function applyMachineToInputs(){
     hourlyRateInp.value = state.machine.hourlyRate;
-    setupCostInp.value = state.machine.setupCost;
+    designRateInp.value = state.machine.designRate;
     pierceTimeInp.value = state.machine.pierceTime;
     areaBasisSel.value = state.machine.areaBasis;
     marginInp.value = state.machine.margin;
     materialCostModeSel.value = state.machine.materialCostMode || 'area';
   }
-  [hourlyRateInp, setupCostInp, pierceTimeInp, areaBasisSel, marginInp, materialCostModeSel].forEach(inp=>{
+  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, marginInp, materialCostModeSel].forEach(inp=>{
     inp.addEventListener('input', ()=>{
       state.machine.hourlyRate = parseFloat(hourlyRateInp.value)||0;
-      state.machine.setupCost = parseFloat(setupCostInp.value)||0;
+      state.machine.designRate = parseFloat(designRateInp.value)||0;
       state.machine.pierceTime = parseFloat(pierceTimeInp.value)||0;
       state.machine.areaBasis = areaBasisSel.value;
       state.machine.margin = parseFloat(marginInp.value)||0;
@@ -1696,6 +1814,15 @@ create policy "public access"
     });
   });
   qtyInput.addEventListener('input', recalcAndRender);
+
+  function applyDrawingTypeUI(){
+    designTimeField.hidden = drawingTypeSel.value==='client_direct';
+    if(drawingTypeSel.value==='client_direct') designTimeInput.value = 0;
+  }
+  drawingTypeSel.addEventListener('change', ()=>{ applyDrawingTypeUI(); recalcAndRender(); });
+  [designTimeInput, materialLoadTimeInput, machineTuneTimeInput].forEach(inp=>{
+    inp.addEventListener('input', recalcAndRender);
+  });
 
   /* ---------------------------------------------------------------- */
   /* CALCULATION                                                       */
@@ -1748,14 +1875,24 @@ create policy "public access"
     const weightKg = areaM2 * (material.thickness||0) * (material.density||0);
     const byWeight = state.machine.materialCostMode==='weight';
     const materialCost = byWeight ? weightKg * (material.pricePerKg||0) : areaM2 * (material.price||0);
+
+    const drawingType = drawingTypeSel.value;
+    const designTimeMin = drawingType==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
+    const materialLoadMin = parseFloat(materialLoadTimeInput.value)||0;
+    const machineTuneMin = parseFloat(machineTuneTimeInput.value)||0;
+    const designCost = (designTimeMin/60) * (state.machine.designRate||0);
+    const machinePrepCost = ((materialLoadMin+machineTuneMin)/60) * (state.machine.hourlyRate||0);
+    const setupCostRaw = designCost + machinePrepCost;
+
     const perPartCost = cuttingCost + pierceCostTotal + materialCost;
     const marginMult = 1 + (state.machine.margin/100);
     const perPartSell = perPartCost*marginMult;
-    const totalCost = perPartSell*qty + state.machine.setupCost*marginMult;
+    const totalCost = perPartSell*qty + setupCostRaw*marginMult;
     return {
       valid:true, geo, material, qty,
       cuttingTimeMin, cuttingCost, pierceCostTotal, materialCost, weightKg, byWeight,
-      setupCost: state.machine.setupCost*marginMult,
+      drawingType, designTimeMin, materialLoadMin, machineTuneMin, designCost, machinePrepCost,
+      setupCost: setupCostRaw*marginMult,
       perPartCost: perPartSell,
       totalCost,
     };
@@ -1962,10 +2099,16 @@ create policy "public access"
     if(mode==='internal'){
       html += '<div class="p-section">';
       html += '<div class="p-costs-title">Decomposição de custo (por peça)</div>';
-      html += pRow('Corte', result.valid ? fmtEUR(result.cuttingCost) : '—');
-      html += pRow('Perfurações', result.valid ? fmtEUR(result.pierceCostTotal) : '—');
-      html += pRow('Material', result.valid ? fmtEUR(result.materialCost) : '—');
-      html += pRow('Setup (por encomenda)', result.valid ? fmtEUR(result.setupCost) : '—');
+      html += pRow('Tempo de corte', result.valid ? (fmtNum(result.cuttingTimeMin,2)+' min') : '—');
+      html += pRow('Custo de corte', result.valid ? fmtEUR(result.cuttingCost) : '—');
+      html += pRow('Nº de perfurações', result.valid ? geo.pierces : '—');
+      html += pRow('Custo material', result.valid ? fmtEUR(result.materialCost) : '—');
+      html += pRow('Custo setup', result.valid ? fmtEUR(result.setupCost) : '—');
+      if(result.valid){
+        const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[result.drawingType] || result.drawingType;
+        html += pRow('　· Desenho', drawLabel + (result.designTimeMin ? ' — '+result.designTimeMin+' min ('+fmtEUR(result.designCost)+')' : ' — sem custo'));
+        html += pRow('　· Colocação + afinação', (result.materialLoadMin+result.machineTuneMin)+' min ('+fmtEUR(result.machinePrepCost)+')');
+      }
       if(state.machine.margin>0) html += pRow('Margem aplicada', state.machine.margin + '%');
       html += '</div>';
       html += '<div class="p-totals">';
@@ -2018,24 +2161,33 @@ create policy "public access"
     updateOrderHeader();
 
     if(!result.valid){
-      ['costCut','costPierce','costMaterial','costSetup','totalValue','perPieceValue'].forEach(id=>$(id).textContent = fmtEUR(0));
+      ['costCut','costMaterial','costSetup','totalValue','perPieceValue'].forEach(id=>$(id).textContent = fmtEUR(0));
+      ['valCutTime','valPierces','valMaterialInfo'].forEach(id=>$(id).textContent = '—');
       $('totalSub').textContent = state.mode==='dxf' ? 'Carregue um ficheiro DXF para calcular' : 'Preencha as dimensões da peça';
-      $('cutSub').textContent = '—'; $('pierceSub').textContent = '—'; $('matSub').textContent = '—';
+      $('cutTimeSub').textContent = '—'; $('pierceSub').textContent = '—'; $('matInfoSub').textContent = '—'; $('setupSub').textContent = '—';
       $('totalQtyTag').textContent = '';
       return;
     }
 
+    $('valCutTime').textContent = fmtNum(result.cuttingTimeMin,2)+' min';
+    $('cutTimeSub').textContent = fmtNum(result.geo.perimeterMm/1000,2)+' m a '+fmtNum(result.material.speed,0)+' mm/min';
     $('costCut').textContent = fmtEUR(result.cuttingCost);
-    $('cutSub').textContent = fmtNum(result.geo.perimeterMm/1000,2)+' m · '+fmtNum(result.cuttingTimeMin,2)+' min a '+fmtNum(result.material.speed,0)+' mm/min';
-    $('costPierce').textContent = fmtEUR(result.pierceCostTotal);
-    $('pierceSub').textContent = result.geo.pierces+' × '+fmtNum(state.machine.pierceTime,1)+' s';
-    $('costMaterial').textContent = fmtEUR(result.materialCost);
+
+    $('valPierces').textContent = result.geo.pierces;
+    $('pierceSub').textContent = '≈ '+fmtEUR(result.pierceCostTotal)+' ('+fmtNum(state.machine.pierceTime,1)+' s cada)';
+
+    $('valMaterialInfo').textContent = result.material.name+' '+result.material.thickness+'mm';
     const areaUsed = state.machine.areaBasis==='net' ? result.geo.netAreaMm2 : result.geo.bboxAreaMm2;
-    const matSubText = result.byWeight
-      ? fmtNum(result.weightKg,2)+' kg · '+result.material.name+' '+result.material.thickness+'mm'
-      : fmtNum(areaUsed/1e6,3)+' m² · '+result.material.name+' '+result.material.thickness+'mm';
-    $('matSub').textContent = matSubText;
+    $('matInfoSub').textContent = result.byWeight
+      ? fmtNum(result.weightKg,2)+' kg'
+      : fmtNum(areaUsed/1e6,3)+' m²';
+    $('costMaterial').textContent = fmtEUR(result.materialCost);
+
     $('costSetup').textContent = fmtEUR(result.setupCost);
+    const setupParts = [];
+    if(result.designTimeMin > 0) setupParts.push('Desenho '+fmtNum(result.designTimeMin,0)+'min ('+fmtEUR(result.designCost)+')');
+    setupParts.push('Máquina '+fmtNum(result.materialLoadMin+result.machineTuneMin,0)+'min ('+fmtEUR(result.machinePrepCost)+')');
+    $('setupSub').textContent = setupParts.join(' + ');
 
     $('perPieceValue').textContent = fmtEUR(result.perPartCost);
     $('totalValue').textContent = fmtEUR(result.totalCost);
@@ -2054,6 +2206,7 @@ create policy "public access"
     renderMaterialsTable();
     populateMaterialSelect();
     applyRemoteUIState();
+    applyDrawingTypeUI();
 
     if(state.remote.configured){
       showOrdersLoading('A carregar encomendas do servidor…');
