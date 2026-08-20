@@ -114,6 +114,7 @@
 
   .field{margin-bottom:12px;}
   .field label{display:block; font-size:12px; color:var(--text-muted); margin-bottom:6px; font-weight:500;}
+  #pierceDetectedNote{font-weight:400; color:var(--text-dim); font-size:11px; margin-left:4px;}
   .field-row{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .field-row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;}
   input[type=number], input[type=text], select{
@@ -198,6 +199,7 @@
   .total-value{font-family:'JetBrains Mono', monospace; font-size:34px; font-weight:700; color:var(--readout); line-height:1; text-shadow:0 0 22px rgba(63,232,212,0.25);}
   .total-value-sm{font-size:26px; color:var(--text); text-shadow:none;}
   .total-sub{font-size:12px; color:var(--text-dim); margin-top:12px; padding-top:12px; border-top:1px solid var(--border-soft);}
+  .total-sub + .total-sub{margin-top:4px; padding-top:0; border-top:none;}
   @media (max-width:420px){ .total-value{font-size:26px;} .total-value-sm{font-size:20px;} }
 
   footer.disclaimer{
@@ -349,31 +351,33 @@
         </div>
       </div>
 
-      <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Preparação (setup)</h2>
-        <div class="field">
-          <label for="drawingType">Origem do desenho</label>
-          <select id="drawingType">
-            <option value="client_direct">Desenho do cliente, pronto a usar</option>
-            <option value="client_convert">Converter desenho do cliente</option>
-            <option value="from_scratch">Desenho de raiz</option>
-          </select>
-        </div>
-        <div class="field" id="designTimeField" hidden>
-          <label for="designTimeInput">Tempo de desenho</label>
-          <div class="unit-suffix"><input type="number" id="designTimeInput" min="0" step="1" value="0"><span>min</span></div>
-        </div>
-        <div class="field-row" style="margin-bottom:0;">
-          <div class="field" style="margin-bottom:0;">
-            <label for="materialLoadTimeInput">Colocação do material</label>
-            <div class="unit-suffix"><input type="number" id="materialLoadTimeInput" min="0" step="1" value="5"><span>min</span></div>
+      <details class="card" id="setupDetails">
+        <summary class="summary-row"><span>Preparação (setup) <span class="conn-badge conn-local" id="setupBadge"></span></span><span class="chev">▸</span></summary>
+        <div class="details-body">
+          <div class="field">
+            <label for="drawingType">Origem do desenho</label>
+            <select id="drawingType">
+              <option value="client_direct">Desenho do cliente, pronto a usar</option>
+              <option value="client_convert">Converter desenho do cliente</option>
+              <option value="from_scratch">Desenho de raiz</option>
+            </select>
           </div>
-          <div class="field" style="margin-bottom:0;">
-            <label for="machineTuneTimeInput">Afinação da máquina</label>
-            <div class="unit-suffix"><input type="number" id="machineTuneTimeInput" min="0" step="1" value="5"><span>min</span></div>
+          <div class="field" id="designTimeField" hidden>
+            <label for="designTimeInput">Tempo de desenho</label>
+            <div class="unit-suffix"><input type="number" id="designTimeInput" min="0" step="1" value="0"><span>min</span></div>
+          </div>
+          <div class="field-row" style="margin-bottom:0;">
+            <div class="field" style="margin-bottom:0;">
+              <label for="materialLoadTimeInput">Colocação do material</label>
+              <div class="unit-suffix"><input type="number" id="materialLoadTimeInput" min="0" step="1" value="5"><span>min</span></div>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <label for="machineTuneTimeInput">Afinação da máquina</label>
+              <div class="unit-suffix"><input type="number" id="machineTuneTimeInput" min="0" step="1" value="5"><span>min</span></div>
+            </div>
           </div>
         </div>
-      </div>
+      </details>
 
       <div class="card">
         <h2 class="card-title"><span class="dot"></span>Material</h2>
@@ -407,6 +411,14 @@
           </div>
           <input type="file" id="fileInput" accept=".dxf">
           <div id="dxfMsg"></div>
+          <div class="field" id="pierceOverrideWrap" hidden style="margin-top:12px; margin-bottom:0;">
+            <label for="pierceOverrideInput">Nº de perfurações<span id="pierceDetectedNote"></span></label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="number" id="pierceOverrideInput" min="0" step="1" style="flex:1;">
+              <button class="ghost-btn sm" id="pierceResetBtn" type="button" title="Repor valor detetado automaticamente"><svg class="btn-icon" viewBox="0 0 16 16" style="margin-right:3px;"><path d="M13 8A5 5 0 113 8" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M13 3v3.5H9.5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Repor</button>
+            </div>
+            <p class="save-hint" style="margin-top:6px;">Editável — se o ficheiro tiver linhas soltas ou contornos mal fechados, corrija aqui o número real de perfurações.</p>
+          </div>
         </div>
 
         <!-- MANUAL PANEL -->
@@ -459,6 +471,11 @@
                 <div class="field"><label>Tempo/perfuração</label><div class="unit-suffix"><input type="number" id="pierceTime" step="0.1" min="0"><span>s</span></div></div>
               </div>
               <p class="save-hint" style="margin:-6px 0 12px;">O custo de setup já não se define aqui — é calculado automaticamente em cada encomenda a partir do cartão "Preparação (setup)" (tempo de desenho × custo de desenho + tempo de colocação/afinação × custo/hora).</p>
+              <div class="field-row">
+                <div class="field"><label>Tempo padrão de colocação</label><div class="unit-suffix"><input type="number" id="defaultMaterialLoadMin" step="1" min="0"><span>min</span></div></div>
+                <div class="field"><label>Tempo padrão de afinação</label><div class="unit-suffix"><input type="number" id="defaultMachineTuneMin" step="1" min="0"><span>min</span></div></div>
+              </div>
+              <p class="save-hint" style="margin:-6px 0 12px;">Usados como ponto de partida sempre que se cria uma "Nova encomenda" — ajustáveis depois por encomenda, se necessário.</p>
               <div class="field-row">
                 <div class="field">
                   <label for="materialCostMode">Custo do material calculado por</label>
@@ -619,6 +636,7 @@ create policy "public access"
           </div>
         </div>
         <div class="total-sub" id="totalSub">—</div>
+        <div class="total-sub" id="totalTimeSub" hidden></div>
       </div>
 
       <div class="card">
@@ -837,7 +855,7 @@ create policy "public access"
     {id:'m19', name:'Alumínio',    thickness:5,  speed:1400, price:29, density:2.70, pricePerKg:3.8},
     {id:'m20', name:'Alumínio',    thickness:6,  speed:1000, price:35, density:2.70, pricePerKg:3.8},
   ];
-  const DEFAULT_MACHINE = { hourlyRate:45, designRate:30, pierceTime:0.8, margin:0, areaBasis:'bbox', materialCostMode:'area' };
+  const DEFAULT_MACHINE = { hourlyRate:45, designRate:30, pierceTime:0.8, margin:0, areaBasis:'bbox', materialCostMode:'area', defaultMaterialLoadMin:5, defaultMachineTuneMin:5 };
 
 
   let storageMode = 'none'; // 'cloud' | 'local' | 'none'
@@ -1091,6 +1109,7 @@ create policy "public access"
     dxfResult: null,
     dxfFileName: '',
     dxfRawText: '',
+    dxfDetectedPierces: 0,
     materials: [],
     machine: Object.assign({}, DEFAULT_MACHINE),
     orders: [],
@@ -1109,11 +1128,14 @@ create policy "public access"
   const tabDxfBtn = $('tabDxfBtn'), tabManualBtn = $('tabManualBtn');
   const panelDxf = $('panelDxf'), panelManual = $('panelManual');
   const dropzone = $('dropzone'), fileInput = $('fileInput'), fileNameEl = $('fileName'), dxfMsg = $('dxfMsg');
+  const pierceOverrideWrap = $('pierceOverrideWrap'), pierceOverrideInput = $('pierceOverrideInput');
+  const pierceResetBtn = $('pierceResetBtn'), pierceDetectedNote = $('pierceDetectedNote');
   const shapeSelect = $('shapeSelect');
   const shapeRect = $('shapeRect'), shapeCircle = $('shapeCircle'), shapeCustom = $('shapeCustom');
   const materialSelect = $('materialSelect');
   const materialTypeSelect = $('materialTypeSelect'), materialThicknessSelect = $('materialThicknessSelect');
   const hourlyRateInp = $('hourlyRate'), designRateInp = $('designRate'), pierceTimeInp = $('pierceTime');
+  const defaultLoadMinInp = $('defaultMaterialLoadMin'), defaultTuneMinInp = $('defaultMachineTuneMin');
   const drawingTypeSel = $('drawingType'), designTimeField = $('designTimeField'), designTimeInput = $('designTimeInput');
   const materialLoadTimeInput = $('materialLoadTimeInput'), machineTuneTimeInput = $('machineTuneTimeInput');
   const areaBasisSel = $('areaBasis'), marginInp = $('margin'), qtyInput = $('qtyInput');
@@ -1174,6 +1196,11 @@ create policy "public access"
         state.dxfResult = result;
         state.dxfFileName = file.name;
         state.dxfRawText = ev.target.result;
+        const detected = Math.max(result.closedContours.length, result.contours.length ? 1 : 0);
+        state.dxfDetectedPierces = detected;
+        pierceOverrideInput.value = detected;
+        pierceDetectedNote.textContent = '(detetado automaticamente: ' + detected + ')';
+        pierceOverrideWrap.hidden = false;
         let msg = '';
         if(result.openContours.length){
           msg += '<div class="warn">Foram detetados ' + result.openContours.length + ' troço(s) aberto(s) — confirme se o desenho está fechado corretamente antes de orçamentar.</div>';
@@ -1185,6 +1212,7 @@ create policy "public access"
       }catch(err){
         state.dxfResult = null;
         state.dxfRawText = '';
+        pierceOverrideWrap.hidden = true;
         dxfMsg.innerHTML = '<div class="err">Não foi possível ler este ficheiro: ' + err.message + '</div>';
       }
       recalcAndRender();
@@ -1194,6 +1222,12 @@ create policy "public access"
     };
     reader.readAsText(file);
   }
+
+  pierceOverrideInput.addEventListener('input', recalcAndRender);
+  pierceResetBtn.addEventListener('click', ()=>{
+    pierceOverrideInput.value = state.dxfDetectedPierces;
+    recalcAndRender();
+  });
 
   /* ---------------------------------------------------------------- */
   /* MANUAL SHAPE                                                      */
@@ -1358,13 +1392,16 @@ create policy "public access"
     fileNameEl.textContent = '';
     dxfMsg.innerHTML = '';
     fileInput.value = '';
+    pierceOverrideWrap.hidden = true;
+    pierceOverrideInput.value = '';
+    state.dxfDetectedPierces = 0;
     $('rectW').value = 200; $('rectH').value = 100; $('circleD').value = 150;
     $('customPerim').value = 600; $('customArea').value = 20000; $('manualHoles').value = 0;
     shapeSelect.value = 'rect';
     shapeRect.hidden = false; shapeCircle.hidden = true; shapeCustom.hidden = true;
     drawingTypeSel.value = 'client_direct';
-    materialLoadTimeInput.value = 5;
-    machineTuneTimeInput.value = 5;
+    materialLoadTimeInput.value = state.machine.defaultMaterialLoadMin ?? 5;
+    machineTuneTimeInput.value = state.machine.defaultMachineTuneMin ?? 5;
     applyDrawingTypeUI();
     updateOrderHeader();
     refreshOrderNumberPreview();
@@ -1471,11 +1508,18 @@ create policy "public access"
         state.dxfRawText = o.dxfText;
         fileNameEl.textContent = state.dxfFileName;
         dxfMsg.innerHTML = '<div class="warn">Ficheiro reposto do histórico de encomendas (guardado em ' + (o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—') + ').</div>';
+        const detected = Math.max(result.closedContours.length, result.contours.length ? 1 : 0);
+        state.dxfDetectedPierces = detected;
+        pierceDetectedNote.textContent = '(detetado automaticamente: ' + detected + ')';
+        pierceOverrideInput.value = (o.costSnapshot && o.costSnapshot.pierces != null) ? o.costSnapshot.pierces : detected;
+        pierceOverrideWrap.hidden = false;
       }catch(err){
         dxfMsg.innerHTML = '<div class="err">Não foi possível reconstruir o ficheiro DXF guardado: ' + err.message + '</div>';
+        pierceOverrideWrap.hidden = true;
       }
       setMode('dxf');
     } else if(o.mode==='manual' && o.manual){
+      pierceOverrideWrap.hidden = true;
       shapeSelect.value = o.manual.shape;
       shapeRect.hidden = o.manual.shape!=='rect';
       shapeCircle.hidden = o.manual.shape!=='circle';
@@ -1800,8 +1844,10 @@ create policy "public access"
     areaBasisSel.value = state.machine.areaBasis;
     marginInp.value = state.machine.margin;
     materialCostModeSel.value = state.machine.materialCostMode || 'area';
+    defaultLoadMinInp.value = state.machine.defaultMaterialLoadMin ?? 5;
+    defaultTuneMinInp.value = state.machine.defaultMachineTuneMin ?? 5;
   }
-  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, marginInp, materialCostModeSel].forEach(inp=>{
+  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, marginInp, materialCostModeSel, defaultLoadMinInp, defaultTuneMinInp].forEach(inp=>{
     inp.addEventListener('input', ()=>{
       state.machine.hourlyRate = parseFloat(hourlyRateInp.value)||0;
       state.machine.designRate = parseFloat(designRateInp.value)||0;
@@ -1809,19 +1855,32 @@ create policy "public access"
       state.machine.areaBasis = areaBasisSel.value;
       state.machine.margin = parseFloat(marginInp.value)||0;
       state.machine.materialCostMode = materialCostModeSel.value;
+      state.machine.defaultMaterialLoadMin = parseFloat(defaultLoadMinInp.value)||0;
+      state.machine.defaultMachineTuneMin = parseFloat(defaultTuneMinInp.value)||0;
       saveMachine(state.machine);
       recalcAndRender();
     });
   });
   qtyInput.addEventListener('input', recalcAndRender);
 
+  const DRAWING_LABELS = { client_direct:'Cliente', client_convert:'Conversão', from_scratch:'De raiz' };
+  function updateSetupBadge(){
+    const designMin = drawingTypeSel.value==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
+    const totalMin = designMin + (parseFloat(materialLoadTimeInput.value)||0) + (parseFloat(machineTuneTimeInput.value)||0);
+    $('setupBadge').textContent = '● ' + (DRAWING_LABELS[drawingTypeSel.value]||'') + ' · ' + fmtNum(totalMin,0) + ' min';
+  }
   function applyDrawingTypeUI(){
     designTimeField.hidden = drawingTypeSel.value==='client_direct';
     if(drawingTypeSel.value==='client_direct') designTimeInput.value = 0;
+    updateSetupBadge();
   }
-  drawingTypeSel.addEventListener('change', ()=>{ applyDrawingTypeUI(); recalcAndRender(); });
+  drawingTypeSel.addEventListener('change', ()=>{
+    applyDrawingTypeUI();
+    if(!designTimeField.hidden) designTimeInput.focus();
+    recalcAndRender();
+  });
   [designTimeInput, materialLoadTimeInput, machineTuneTimeInput].forEach(inp=>{
-    inp.addEventListener('input', recalcAndRender);
+    inp.addEventListener('input', ()=>{ updateSetupBadge(); recalcAndRender(); });
   });
 
   /* ---------------------------------------------------------------- */
@@ -1841,12 +1900,14 @@ create policy "public access"
         const holes = closed.slice(1).reduce((s,c)=>s+c.area,0);
         netArea = Math.max(outer-holes, 0);
       }
+      const overrideVal = parseInt(pierceOverrideInput.value, 10);
+      const pierces = Number.isFinite(overrideVal) && overrideVal>=0 ? overrideVal : Math.max(closed.length, r.contours.length ? 1 : 0);
       return {
         perimeterMm: r.totalLength,
         bboxAreaMm2: width*height,
         netAreaMm2: netArea,
         width, height,
-        pierces: Math.max(closed.length, r.contours.length ? 1 : 0),
+        pierces,
         hasOpen: r.openContours.length>0,
       };
     } else {
@@ -1887,11 +1948,15 @@ create policy "public access"
     const perPartCost = cuttingCost + pierceCostTotal + materialCost;
     const marginMult = 1 + (state.machine.margin/100);
     const perPartSell = perPartCost*marginMult;
+    const pierceTimeMin = geo.pierces * state.machine.pierceTime / 60;
+    const totalTimeMin = cuttingTimeMin + pierceTimeMin + designTimeMin + materialLoadMin + machineTuneMin;
+
     const totalCost = perPartSell*qty + setupCostRaw*marginMult;
     return {
       valid:true, geo, material, qty,
       cuttingTimeMin, cuttingCost, pierceCostTotal, materialCost, weightKg, byWeight,
       drawingType, designTimeMin, materialLoadMin, machineTuneMin, designCost, machinePrepCost,
+      pierceTimeMin, totalTimeMin,
       setupCost: setupCostRaw*marginMult,
       perPartCost: perPartSell,
       totalCost,
@@ -2166,6 +2231,7 @@ create policy "public access"
       $('totalSub').textContent = state.mode==='dxf' ? 'Carregue um ficheiro DXF para calcular' : 'Preencha as dimensões da peça';
       $('cutTimeSub').textContent = '—'; $('pierceSub').textContent = '—'; $('matInfoSub').textContent = '—'; $('setupSub').textContent = '—';
       $('totalQtyTag').textContent = '';
+      $('totalTimeSub').hidden = true;
       return;
     }
 
@@ -2193,6 +2259,8 @@ create policy "public access"
     $('totalValue').textContent = fmtEUR(result.totalCost);
     $('totalQtyTag').textContent = ' (' + result.qty + (result.qty===1 ? ' peça)' : ' peças)');
     $('totalSub').textContent = result.qty+' × '+fmtEUR(result.perPartCost)+' + '+fmtEUR(result.setupCost)+' de setup' + (state.machine.margin>0 ? ' · margem '+state.machine.margin+'%' : '');
+    $('totalTimeSub').hidden = false;
+    $('totalTimeSub').textContent = 'Tempo total estimado (1 peça): '+fmtNum(result.totalTimeMin,1)+' min (corte '+fmtNum(result.cuttingTimeMin,1)+' + perfurações '+fmtNum(result.pierceTimeMin,1)+' + preparação '+fmtNum(result.designTimeMin+result.materialLoadMin+result.machineTuneMin,0)+')';
   }
 
   /* ---------------------------------------------------------------- */
@@ -2206,6 +2274,8 @@ create policy "public access"
     renderMaterialsTable();
     populateMaterialSelect();
     applyRemoteUIState();
+    materialLoadTimeInput.value = state.machine.defaultMaterialLoadMin ?? 5;
+    machineTuneTimeInput.value = state.machine.defaultMachineTuneMin ?? 5;
     applyDrawingTypeUI();
 
     if(state.remote.configured){
