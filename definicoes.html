@@ -54,12 +54,12 @@
         <div class="field"><label>Custo de desenho</label><div class="unit-suffix"><input type="number" id="designRate" step="0.5" min="0"><span>€/h</span></div></div>
         <div class="field"><label>Tempo/perfuração</label><div class="unit-suffix"><input type="number" id="pierceTime" step="0.1" min="0"><span>s</span></div></div>
       </div>
-      <p class="save-hint" style="margin:-6px 0 12px;">O custo de setup não se define aqui — é calculado automaticamente em cada encomenda, na página de Orçamentação, a partir do cartão "Preparação (setup)" (tempo de desenho × custo de desenho + tempo de colocação/afinação × custo/hora).</p>
+      <p class="save-hint" style="margin:-6px 0 12px;">O custo de setup é calculado automaticamente em cada encomenda: tempo de setup × custo de setup abaixo.</p>
       <div class="field-row">
-        <div class="field"><label>Tempo padrão de colocação</label><div class="unit-suffix"><input type="number" id="defaultMaterialLoadMin" step="1" min="0"><span>min</span></div></div>
-        <div class="field"><label>Tempo padrão de afinação</label><div class="unit-suffix"><input type="number" id="defaultMachineTuneMin" step="1" min="0"><span>min</span></div></div>
+        <div class="field"><label>Custo de setup</label><div class="unit-suffix"><input type="number" id="setupRate" step="0.5" min="0"><span>€/h</span></div></div>
+        <div class="field"><label>Tempo padrão de setup</label><div class="unit-suffix"><input type="number" id="defaultSetupMin" step="1" min="0"><span>min</span></div></div>
       </div>
-      <p class="save-hint" style="margin:-6px 0 12px;">Usados como ponto de partida sempre que se cria uma "Nova encomenda" — ajustáveis depois por encomenda, se necessário.</p>
+      <p class="save-hint" style="margin:-6px 0 12px;">O tempo padrão é o ponto de partida em cada "Nova encomenda" — ajustável depois por encomenda, se necessário.</p>
       <div class="field-row">
         <div class="field">
           <label for="materialCostMode">Custo do material calculado por</label>
@@ -76,9 +76,14 @@
           </select>
         </div>
       </div>
-      <div class="field-row" style="margin-bottom:0;">
-        <div class="field" style="margin-bottom:0;"><label>Margem de venda</label><div class="unit-suffix"><input type="number" id="margin" step="1" min="0" value="0"><span>%</span></div></div>
+      <div class="field-row">
+        <div class="field">
+          <label>Margem de desperdício de chapa</label>
+          <div class="unit-suffix"><input type="number" id="wasteMarginMm" step="0.5" min="0"><span>mm</span></div>
+        </div>
+        <div class="field"><label>Margem de venda</label><div class="unit-suffix"><input type="number" id="margin" step="1" min="0" value="0"><span>%</span></div></div>
       </div>
+      <p class="save-hint" style="margin:-6px 0 0;">A margem de desperdício soma-se à largura e ao comprimento da peça (retângulo envolvente) antes de calcular a área usada no peso/custo do material — reflete o espaço à volta de cada peça na chapa real. Não afeta o desenho mostrado na pré-visualização nem na ficha do operador, só o cálculo numérico. Só se aplica no modo "Retângulo envolvente".</p>
     </div>
 
     <div class="card">
@@ -198,7 +203,7 @@ create policy "public access"
   /* MACHINE SETTINGS                                                  */
   /* ---------------------------------------------------------------- */
   const hourlyRateInp = $('hourlyRate'), designRateInp = $('designRate'), pierceTimeInp = $('pierceTime');
-  const defaultLoadMinInp = $('defaultMaterialLoadMin'), defaultTuneMinInp = $('defaultMachineTuneMin');
+  const setupRateInp = $('setupRate'), defaultSetupMinInp = $('defaultSetupMin'), wasteMarginMmInp = $('wasteMarginMm');
   const areaBasisSel = $('areaBasis'), marginInp = $('margin'), materialCostModeSel = $('materialCostMode');
 
   function applyMachineToInputs(){
@@ -208,10 +213,11 @@ create policy "public access"
     areaBasisSel.value = state.machine.areaBasis;
     marginInp.value = state.machine.margin;
     materialCostModeSel.value = state.machine.materialCostMode || 'area';
-    defaultLoadMinInp.value = state.machine.defaultMaterialLoadMin ?? 5;
-    defaultTuneMinInp.value = state.machine.defaultMachineTuneMin ?? 5;
+    setupRateInp.value = state.machine.setupRate ?? 30;
+    defaultSetupMinInp.value = state.machine.defaultSetupMin ?? 5;
+    wasteMarginMmInp.value = state.machine.wasteMarginMm ?? 5;
   }
-  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, marginInp, materialCostModeSel, defaultLoadMinInp, defaultTuneMinInp].forEach(inp=>{
+  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, marginInp, materialCostModeSel, setupRateInp, defaultSetupMinInp, wasteMarginMmInp].forEach(inp=>{
     inp.addEventListener('input', ()=>{
       state.machine.hourlyRate = parseFloat(hourlyRateInp.value)||0;
       state.machine.designRate = parseFloat(designRateInp.value)||0;
@@ -219,8 +225,9 @@ create policy "public access"
       state.machine.areaBasis = areaBasisSel.value;
       state.machine.margin = parseFloat(marginInp.value)||0;
       state.machine.materialCostMode = materialCostModeSel.value;
-      state.machine.defaultMaterialLoadMin = parseFloat(defaultLoadMinInp.value)||0;
-      state.machine.defaultMachineTuneMin = parseFloat(defaultTuneMinInp.value)||0;
+      state.machine.setupRate = parseFloat(setupRateInp.value)||0;
+      state.machine.defaultSetupMin = parseFloat(defaultSetupMinInp.value)||0;
+      state.machine.wasteMarginMm = parseFloat(wasteMarginMmInp.value)||0;
       saveMachine(state.machine);
     });
   });

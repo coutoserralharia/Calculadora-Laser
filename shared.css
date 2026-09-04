@@ -152,6 +152,7 @@
     color:var(--text-dim); font-size:12.5px; text-align:center; padding:0 30px;
   }
   .preview-meta{display:flex; gap:0; padding:12px 16px 14px; border-top:1px solid var(--border-soft);}
+  .card .preview-meta{margin:6px -18px -20px; padding:14px 18px 20px;}
   .meta-item{flex:1; text-align:left;}
   .meta-item + .meta-item{border-left:1px solid var(--border-soft); padding-left:14px; margin-left:14px;}
   .meta-item .k{font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:3px;}

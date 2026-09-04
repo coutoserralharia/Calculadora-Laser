@@ -208,7 +208,7 @@
     {id:'m19', name:'Alumínio',    thickness:5,  speed:1400, price:29, density:2.70, pricePerKg:3.8},
     {id:'m20', name:'Alumínio',    thickness:6,  speed:1000, price:35, density:2.70, pricePerKg:3.8},
   ];
-  LC.DEFAULT_MACHINE = { hourlyRate:45, designRate:30, pierceTime:0.8, margin:0, areaBasis:'bbox', materialCostMode:'area', defaultMaterialLoadMin:5, defaultMachineTuneMin:5 };
+  LC.DEFAULT_MACHINE = { hourlyRate:45, designRate:30, setupRate:30, pierceTime:0.8, margin:0, areaBasis:'bbox', materialCostMode:'area', defaultSetupMin:5, wasteMarginMm:5 };
 
   /* ---------------------------------------------------------------- */
   /* STORAGE (Claude artifact storage -> localStorage -> memory only)  */
@@ -406,26 +406,26 @@
     lines.push('');
     lines.push('Material: ' + (rec.materialSnapshot ? (rec.materialSnapshot.name + ' — ' + rec.materialSnapshot.thickness + ' mm') : '—'));
     lines.push('Quantidade: ' + (rec.quantity || 1));
-    if(rec.costSnapshot && rec.costSnapshot.weightKg > 0) lines.push('Peso estimado: ' + fmtNum(rec.costSnapshot.weightKg,2) + ' kg');
+    if(rec.costSnapshot && rec.costSnapshot.weightPerPiece > 0){
+      lines.push('Peso unitário (1 peça): ' + fmtNum(rec.costSnapshot.weightPerPiece,2) + ' kg');
+      lines.push('Peso total: ' + fmtNum(rec.costSnapshot.weightTotal,2) + ' kg');
+    }
     if(rec.dxfFileName) lines.push('Ficheiro DXF original: ' + rec.dxfFileName);
     if(rec.manual) lines.push('Forma manual: ' + JSON.stringify(rec.manual));
     lines.push('');
     if(rec.costSnapshot){
-      lines.push('Custos no momento de gravação:');
-      lines.push('  Tempo de corte: ' + fmtNum(rec.costSnapshot.cuttingTimeMin,2) + ' min');
-      lines.push('  Custo de corte: ' + fmtEUR(rec.costSnapshot.cuttingCost));
-      lines.push('  Nº de perfurações: ' + (rec.costSnapshot.pierces ?? '—') + ' (' + fmtEUR(rec.costSnapshot.pierceCostTotal) + ')');
+      lines.push('Custos no momento de gravação (' + (rec.costSnapshot.isFinal ? 'FINAL' : 'estimado') + '):');
       lines.push('  Custo material: ' + fmtEUR(rec.costSnapshot.materialCost));
-      lines.push('  Custo setup: ' + fmtEUR(rec.costSnapshot.setupCost));
+      lines.push('  Custo pré-corte (desenho + setup): ' + fmtEUR(rec.costSnapshot.preCorteCost));
       if(rec.costSnapshot.setupInputs){
         const si = rec.costSnapshot.setupInputs;
         const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[si.drawingType] || si.drawingType;
         lines.push('    · Desenho: ' + drawLabel + (si.designTimeMin ? ' — ' + si.designTimeMin + ' min (' + fmtEUR(rec.costSnapshot.designCost) + ')' : ''));
-        lines.push('    · Colocação de material: ' + si.materialLoadMin + ' min');
-        lines.push('    · Afinação da máquina: ' + si.machineTuneMin + ' min');
+        lines.push('    · Setup: ' + si.setupTimeMin + ' min (' + fmtEUR(rec.costSnapshot.setupCost) + ')');
       }
-      lines.push('  Preço por peça: ' + fmtEUR(rec.costSnapshot.perPartCost));
-      lines.push('  TOTAL: ' + fmtEUR(rec.costSnapshot.totalCost));
+      lines.push('  Custo de corte: ' + fmtEUR(rec.costSnapshot.corteCost) + ' (' + fmtNum(rec.costSnapshot.cuttingTimeMin,2) + ' min · inclui ' + (rec.costSnapshot.pierces ?? '—') + ' perfuração(ões))');
+      lines.push('  TOTAL da encomenda (sem IVA): ' + fmtEUR(rec.costSnapshot.totalCost));
+      lines.push('  TOTAL ÷ nº peças (sem IVA): ' + fmtEUR(rec.costSnapshot.avgPerPiece));
     }
     return lines.join('\n');
   };

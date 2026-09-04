@@ -68,50 +68,6 @@
         </div>
       </div>
 
-      <details class="card" id="setupDetails">
-        <summary class="summary-row"><span>Preparação (setup) <span class="conn-badge conn-local" id="setupBadge"></span></span><span class="chev">▸</span></summary>
-        <div class="details-body">
-          <div class="field">
-            <label for="drawingType">Origem do desenho</label>
-            <select id="drawingType">
-              <option value="client_direct">Desenho do cliente, pronto a usar</option>
-              <option value="client_convert">Converter desenho do cliente</option>
-              <option value="from_scratch">Desenho de raiz</option>
-            </select>
-          </div>
-          <div class="field" id="designTimeField" hidden>
-            <label for="designTimeInput">Tempo de desenho</label>
-            <div class="unit-suffix"><input type="number" id="designTimeInput" min="0" step="1" value="0"><span>min</span></div>
-          </div>
-          <div class="field-row" style="margin-bottom:0;">
-            <div class="field" style="margin-bottom:0;">
-              <label for="materialLoadTimeInput">Colocação do material</label>
-              <div class="unit-suffix"><input type="number" id="materialLoadTimeInput" min="0" step="1" value="5"><span>min</span></div>
-            </div>
-            <div class="field" style="margin-bottom:0;">
-              <label for="machineTuneTimeInput">Afinação da máquina</label>
-              <div class="unit-suffix"><input type="number" id="machineTuneTimeInput" min="0" step="1" value="5"><span>min</span></div>
-            </div>
-          </div>
-        </div>
-      </details>
-
-      <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Material</h2>
-        <div class="field-row" style="margin-bottom:0;">
-          <div class="field" style="margin-bottom:0;">
-            <label for="materialTypeSelect">Tipo de material</label>
-            <select id="materialTypeSelect"></select>
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label for="materialThicknessSelect">Espessura</label>
-            <select id="materialThicknessSelect"></select>
-          </div>
-        </div>
-        <select id="materialSelect" style="display:none;" aria-hidden="true" tabindex="-1"></select>
-        <p class="save-hint" style="margin-top:10px;">Preços e velocidades definem-se em <a href="definicoes.html" style="color:var(--readout);">Definições avançadas</a>.</p>
-      </div>
-
       <div class="card">
         <div class="tabs">
           <button class="tab-btn active" id="tabDxfBtn" type="button">Ficheiro DXF</button>
@@ -176,6 +132,44 @@
       </div>
 
       <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Material</h2>
+        <div class="field-row" style="margin-bottom:0;">
+          <div class="field" style="margin-bottom:0;">
+            <label for="materialTypeSelect">Tipo de material</label>
+            <select id="materialTypeSelect"></select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="materialThicknessSelect">Espessura</label>
+            <select id="materialThicknessSelect"></select>
+          </div>
+        </div>
+        <select id="materialSelect" style="display:none;" aria-hidden="true" tabindex="-1"></select>
+        <p class="save-hint" style="margin-top:10px;">Preços e velocidades definem-se em <a href="definicoes.html" style="color:var(--readout);">Definições avançadas</a>.</p>
+      </div>
+
+      <details class="card" id="setupDetails">
+        <summary class="summary-row"><span>Preparação (setup) <span class="conn-badge conn-local" id="setupBadge"></span></span><span class="chev">▸</span></summary>
+        <div class="details-body">
+          <div class="field">
+            <label for="drawingType">Origem do desenho</label>
+            <select id="drawingType">
+              <option value="client_direct">Desenho do cliente, pronto a usar</option>
+              <option value="client_convert">Converter desenho do cliente</option>
+              <option value="from_scratch">Desenho de raiz</option>
+            </select>
+          </div>
+          <div class="field" id="designTimeField" hidden>
+            <label for="designTimeInput">Tempo de desenho</label>
+            <div class="unit-suffix"><input type="number" id="designTimeInput" min="0" step="1" value="0"><span>min</span></div>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="setupTimeInput">Tempo de setup</label>
+            <div class="unit-suffix"><input type="number" id="setupTimeInput" min="0" step="1" value="5"><span>min</span></div>
+          </div>
+        </div>
+      </details>
+
+      <div class="card">
         <h2 class="card-title"><span class="dot"></span>Guardar encomenda <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
         <div class="mat-actions">
           <button class="ghost-btn" id="saveOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M2 2h9l3 3v9H2V2z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M4 2v4h6V2M4 14v-4h8v4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>Guardar encomenda atual</button>
@@ -198,38 +192,29 @@
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 3"/></svg>
           <span>Carregue um ficheiro DXF para ver o percurso de corte, ou use o modo manual</span>
         </div>
-        <div class="preview-meta" id="previewMeta" hidden>
-          <div class="meta-item"><div class="k">Dimensões</div><div class="v" id="metaDim">—</div></div>
-          <div class="meta-item"><div class="k">Perímetro</div><div class="v" id="metaPerim">—</div></div>
-          <div class="meta-item"><div class="k">Perfurações</div><div class="v" id="metaPierces">—</div></div>
-          <div class="meta-item" id="metaWeightWrap" hidden><div class="k">Peso estimado</div><div class="v" id="metaWeight">—</div></div>
-        </div>
       </div>
 
       <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Decomposição de custo (por peça)</h2>
-        <div class="breakdown-row"><span class="lbl">Tempo de corte<small id="cutTimeSub">—</small></span><span class="val" id="valCutTime">—</span></div>
-        <div class="breakdown-row"><span class="lbl">Custo de corte</span><span class="val" id="costCut">€0,00</span></div>
-        <div class="breakdown-row"><span class="lbl">Nº de perfurações<small id="pierceSub">—</small></span><span class="val" id="valPierces">—</span></div>
-        <div class="breakdown-row"><span class="lbl">Material<small id="matInfoSub">—</small></span><span class="val" id="valMaterialInfo">—</span></div>
-        <div class="breakdown-row"><span class="lbl">Custo material</span><span class="val" id="costMaterial">€0,00</span></div>
-        <div class="breakdown-row"><span class="lbl">Custo setup<small id="setupSub">—</small></span><span class="val" id="costSetup">€0,00</span></div>
+        <h2 class="card-title"><span class="dot"></span>Dimensões</h2>
+        <div class="preview-meta" id="previewMeta" hidden>
+          <div class="meta-item"><div class="k">Dimensões (L × A)</div><div class="v" id="metaDim">—</div></div>
+          <div class="meta-item"><div class="k">Perímetro</div><div class="v" id="metaPerim">—</div></div>
+          <div class="meta-item"><div class="k">Perfurações</div><div class="v" id="metaPierces">—</div></div>
+        </div>
+        <p class="orders-empty" id="dimEmpty" style="padding:14px 0 4px;">Carregue um ficheiro ou preencha as dimensões para confirmar aqui.</p>
       </div>
 
-      <div class="card total-card">
-        <div class="total-order-name" id="totalOrderName" hidden></div>
-        <div class="total-split">
-          <div class="total-block">
-            <div class="total-label">Preço por peça</div>
-            <div class="total-value total-value-sm" id="perPieceValue">€0,00</div>
-          </div>
-          <div class="total-block">
-            <div class="total-label">Total da encomenda<span id="totalQtyTag"></span></div>
-            <div class="total-value" id="totalValue">€0,00</div>
-          </div>
-        </div>
-        <div class="total-sub" id="totalSub">—</div>
-        <div class="total-sub" id="totalTimeSub" hidden></div>
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Custo da encomenda <small id="costFinalBadge" style="margin-left:auto;"></small></h2>
+        <div class="breakdown-row"><span class="lbl">Peso unitário (1 peça)</span><span class="val" id="valWeightUnit">—</span></div>
+        <div class="breakdown-row"><span class="lbl">Peso total<small id="weightTotalSub">—</small></span><span class="val" id="valWeightTotal">—</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo do material<small id="matInfoSub">—</small></span><span class="val" id="costMaterial">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo pré-corte<small id="preCorteSub">—</small></span><span class="val" id="costPreCorte">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo do corte<small id="cutTimeSub">—</small></span><span class="val" id="costCorte">€0,00</span></div>
+        <div class="breakdown-row" style="border-top:1.5px solid var(--border); margin-top:4px; padding-top:12px;"><span class="lbl" style="font-weight:600; color:var(--text);">Custo total da encomenda <small>(sem IVA)<span id="totalQtyTag"></span></small></span><span class="val" id="totalValue" style="font-size:16px; color:var(--readout);">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo total ÷ nº peças <small>(sem IVA)</small></span><span class="val" id="avgPerPieceValue">€0,00</span></div>
+        <div class="total-order-name" id="totalOrderName" hidden style="margin:12px 0 0;"></div>
+        <div class="total-sub" id="totalTimeSub" hidden style="margin-top:10px; padding-top:10px;"></div>
       </div>
 
       <div class="card">
@@ -292,11 +277,11 @@
   const materialSelect = $('materialSelect');
   const materialTypeSelect = $('materialTypeSelect'), materialThicknessSelect = $('materialThicknessSelect');
   const drawingTypeSel = $('drawingType'), designTimeField = $('designTimeField'), designTimeInput = $('designTimeInput');
-  const materialLoadTimeInput = $('materialLoadTimeInput'), machineTuneTimeInput = $('machineTuneTimeInput');
+  const setupTimeInput = $('setupTimeInput');
   const qtyInput = $('qtyInput');
   const canvas = $('preview'), previewEmpty = $('previewEmpty'), previewMeta = $('previewMeta');
   const metaDim = $('metaDim'), metaPerim = $('metaPerim'), metaPierces = $('metaPierces');
-  const metaWeightWrap = $('metaWeightWrap'), metaWeightEl = $('metaWeight');
+  const dimEmptyEl = $('dimEmpty');
   const orderNameInp = $('orderName'), clientNameInp = $('clientName');
   const totalOrderNameEl = $('totalOrderName');
   const saveOrderHint = $('saveOrderHint');
@@ -505,7 +490,7 @@
   const DRAWING_LABELS = { client_direct:'Cliente', client_convert:'Conversão', from_scratch:'De raiz' };
   function updateSetupBadge(){
     const designMin = drawingTypeSel.value==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
-    const totalMin = designMin + (parseFloat(materialLoadTimeInput.value)||0) + (parseFloat(machineTuneTimeInput.value)||0);
+    const totalMin = designMin + (parseFloat(setupTimeInput.value)||0);
     $('setupBadge').textContent = '● ' + (DRAWING_LABELS[drawingTypeSel.value]||'') + ' · ' + fmtNum(totalMin,0) + ' min';
   }
   function applyDrawingTypeUI(){
@@ -518,7 +503,7 @@
     if(!designTimeField.hidden) designTimeInput.focus();
     recalcAndRender();
   });
-  [designTimeInput, materialLoadTimeInput, machineTuneTimeInput].forEach(inp=>{
+  [designTimeInput, setupTimeInput].forEach(inp=>{
     inp.addEventListener('input', ()=>{ updateSetupBadge(); recalcAndRender(); });
   });
 
@@ -565,35 +550,50 @@
     const cuttingTimeMin = geo.perimeterMm / speed;
     const cuttingCost = cuttingTimeMin * (state.machine.hourlyRate/60);
     const pierceCostTotal = geo.pierces * state.machine.pierceTime * (state.machine.hourlyRate/3600);
-    const areaMm2 = state.machine.areaBasis==='net' ? geo.netAreaMm2 : geo.bboxAreaMm2;
+
+    // Waste margin: adds to the bounding-box width/height before computing area, to reflect the
+    // sheet space around each part that isn't reused (parts aren't nested together). Only applies
+    // to the "retângulo envolvente" basis — net (líquida) area is left as an exact calculation.
+    const marginMm = state.machine.wasteMarginMm || 0;
+    let areaMm2;
+    if(state.machine.areaBasis==='net'){
+      areaMm2 = geo.netAreaMm2;
+    } else if(geo.width!=null && geo.height!=null){
+      areaMm2 = (geo.width+marginMm) * (geo.height+marginMm);
+    } else {
+      areaMm2 = geo.bboxAreaMm2; // manual "custom" shape: no width/height to add margin to
+    }
     const areaM2 = areaMm2/1e6;
-    const weightKg = areaM2 * (material.thickness||0) * (material.density||0);
+    const weightPerPiece = areaM2 * (material.thickness||0) * (material.density||0);
+    const weightTotal = weightPerPiece * qty;
     const byWeight = state.machine.materialCostMode==='weight';
-    const materialCost = byWeight ? weightKg * (material.pricePerKg||0) : areaM2 * (material.price||0);
+    const materialCost = byWeight ? weightPerPiece * (material.pricePerKg||0) : areaM2 * (material.price||0);
 
     const drawingType = drawingTypeSel.value;
     const designTimeMin = drawingType==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
-    const materialLoadMin = parseFloat(materialLoadTimeInput.value)||0;
-    const machineTuneMin = parseFloat(machineTuneTimeInput.value)||0;
+    const setupTimeMin = parseFloat(setupTimeInput.value)||0;
     const designCost = (designTimeMin/60) * (state.machine.designRate||0);
-    const machinePrepCost = ((materialLoadMin+machineTuneMin)/60) * (state.machine.hourlyRate||0);
-    const setupCostRaw = designCost + machinePrepCost;
+    const setupCost = (setupTimeMin/60) * (state.machine.setupRate||0);
+    const preCorteCost = designCost + setupCost;
+    const corteCost = cuttingCost + pierceCostTotal;
 
-    const perPartCost = cuttingCost + pierceCostTotal + materialCost;
+    const perPartCost = corteCost + materialCost;
     const marginMult = 1 + (state.machine.margin/100);
     const perPartSell = perPartCost*marginMult;
     const pierceTimeMin = geo.pierces * state.machine.pierceTime / 60;
-    const totalTimeMin = cuttingTimeMin + pierceTimeMin + designTimeMin + materialLoadMin + machineTuneMin;
+    const totalTimeMin = cuttingTimeMin + pierceTimeMin + designTimeMin + setupTimeMin;
 
-    const totalCost = perPartSell*qty + setupCostRaw*marginMult;
+    const totalCost = perPartSell*qty + preCorteCost*marginMult;
+    const avgPerPiece = totalCost / qty;
     return {
       valid:true, geo, material, qty,
-      cuttingTimeMin, cuttingCost, pierceCostTotal, materialCost, weightKg, byWeight,
-      drawingType, designTimeMin, materialLoadMin, machineTuneMin, designCost, machinePrepCost,
+      cuttingTimeMin, cuttingCost, pierceCostTotal, materialCost, weightPerPiece, weightTotal, byWeight,
+      drawingType, designTimeMin, setupTimeMin, designCost,
       pierceTimeMin, totalTimeMin,
-      setupCost: setupCostRaw*marginMult,
+      preCorteCost: preCorteCost*marginMult,
+      setupCost, corteCost,
       perPartCost: perPartSell,
-      totalCost,
+      totalCost, avgPerPiece,
     };
   }
 
@@ -791,28 +791,28 @@
     html += pRow('Dimensões (L × A)', (geo && geo.width) ? (fmtNum(geo.width,1) + ' × ' + fmtNum(geo.height,1) + ' mm') : '—');
     html += pRow('Perímetro de corte', geo ? (fmtNum(geo.perimeterMm/10,1) + ' cm') : '—');
     html += pRow('Nº de perfurações', geo ? geo.pierces : '—');
-    if(result.valid && result.weightKg > 0) html += pRow('Peso estimado', fmtNum(result.weightKg,2) + ' kg');
+    if(result.valid && result.weightPerPiece > 0) html += pRow('Peso unitário (1 peça)', fmtNum(result.weightPerPiece,2) + ' kg');
     html += '</div>';
     html += '</div>';
 
     if(mode==='internal'){
       html += '<div class="p-section">';
-      html += '<div class="p-costs-title">Decomposição de custo (por peça)</div>';
-      html += pRow('Tempo de corte', result.valid ? (fmtNum(result.cuttingTimeMin,2)+' min') : '—');
-      html += pRow('Custo de corte', result.valid ? fmtEUR(result.cuttingCost) : '—');
-      html += pRow('Nº de perfurações', result.valid ? geo.pierces : '—');
-      html += pRow('Custo material', result.valid ? fmtEUR(result.materialCost) : '—');
-      html += pRow('Custo setup', result.valid ? fmtEUR(result.setupCost) : '—');
+      html += '<div class="p-costs-title">Custo da encomenda' + (result.valid ? '' : '') + '</div>';
+      html += pRow('Peso unitário (1 peça)', result.valid ? (fmtNum(result.weightPerPiece,2)+' kg') : '—');
+      html += pRow('Peso total', result.valid ? (fmtNum(result.weightTotal,2)+' kg') : '—');
+      html += pRow('Custo do material', result.valid ? fmtEUR(result.materialCost) : '—');
+      html += pRow('Custo pré-corte', result.valid ? fmtEUR(result.preCorteCost) : '—');
       if(result.valid){
         const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[result.drawingType] || result.drawingType;
         html += pRow('　· Desenho', drawLabel + (result.designTimeMin ? ' — '+result.designTimeMin+' min ('+fmtEUR(result.designCost)+')' : ' — sem custo'));
-        html += pRow('　· Colocação + afinação', (result.materialLoadMin+result.machineTuneMin)+' min ('+fmtEUR(result.machinePrepCost)+')');
+        html += pRow('　· Setup', result.setupTimeMin+' min ('+fmtEUR(result.setupCost)+')');
       }
+      html += pRow('Custo do corte', result.valid ? (fmtEUR(result.corteCost)+' ('+fmtNum(result.cuttingTimeMin,2)+' min, estimado)') : '—');
       if(state.machine.margin>0) html += pRow('Margem aplicada', state.machine.margin + '%');
       html += '</div>';
       html += '<div class="p-totals">';
-      html += '<div class="p-total-item"><span>Preço por peça</span><strong>' + (result.valid?fmtEUR(result.perPartCost):'—') + '</strong></div>';
-      html += '<div class="p-total-item p-total-main"><span>Total da encomenda (' + qty + (qty===1?' peça':' peças') + ')</span><strong>' + (result.valid?fmtEUR(result.totalCost):'—') + '</strong></div>';
+      html += '<div class="p-total-item p-total-main"><span>Total da encomenda (' + qty + (qty===1?' peça':' peças') + ') — sem IVA</span><strong>' + (result.valid?fmtEUR(result.totalCost):'—') + '</strong></div>';
+      html += '<div class="p-total-item"><span>Total ÷ nº peças — sem IVA</span><strong>' + (result.valid?fmtEUR(result.avgPerPiece):'—') + '</strong></div>';
       html += '</div>';
     }
 
@@ -846,55 +846,50 @@
     drawPreview(geo);
 
     if(geo && geo.perimeterMm){
+      dimEmptyEl.hidden = true;
+      previewMeta.hidden = false;
       metaDim.textContent = (geo.width && geo.height) ? (fmtNum(geo.width,1)+' × '+fmtNum(geo.height,1)+' mm') : '—';
       metaPerim.textContent = fmtNum(geo.perimeterMm/10,1)+' cm';
       metaPierces.textContent = geo.pierces;
-      if(result.valid && result.weightKg > 0){
-        metaWeightWrap.hidden = false;
-        metaWeightEl.textContent = fmtNum(result.weightKg,2)+' kg';
-      } else {
-        metaWeightWrap.hidden = true;
-      }
+    } else {
+      dimEmptyEl.hidden = false;
+      previewMeta.hidden = true;
     }
 
     updateOrderHeader();
 
     if(!result.valid){
-      ['costCut','costMaterial','costSetup','totalValue','perPieceValue'].forEach(id=>$(id).textContent = fmtEUR(0));
-      ['valCutTime','valPierces','valMaterialInfo'].forEach(id=>$(id).textContent = '—');
-      $('totalSub').textContent = state.mode==='dxf' ? 'Carregue um ficheiro DXF para calcular' : 'Preencha as dimensões da peça';
-      $('cutTimeSub').textContent = '—'; $('pierceSub').textContent = '—'; $('matInfoSub').textContent = '—'; $('setupSub').textContent = '—';
+      ['costMaterial','costPreCorte','costCorte','totalValue','avgPerPieceValue'].forEach(id=>$(id).textContent = fmtEUR(0));
+      ['valWeightUnit','valWeightTotal'].forEach(id=>$(id).textContent = '—');
+      $('totalOrderName').hidden = true;
+      $('matInfoSub').textContent = '—'; $('preCorteSub').textContent = '—'; $('cutTimeSub').textContent = '—'; $('weightTotalSub').textContent = '—';
       $('totalQtyTag').textContent = '';
       $('totalTimeSub').hidden = true;
+      $('costFinalBadge').textContent = '';
       return;
     }
 
-    $('valCutTime').textContent = fmtNum(result.cuttingTimeMin,2)+' min';
-    $('cutTimeSub').textContent = fmtNum(result.geo.perimeterMm/1000,2)+' m a '+fmtNum(result.material.speed,0)+' mm/min';
-    $('costCut').textContent = fmtEUR(result.cuttingCost);
+    $('valWeightUnit').textContent = fmtNum(result.weightPerPiece,2)+' kg';
+    $('valWeightTotal').textContent = fmtNum(result.weightTotal,2)+' kg';
+    $('weightTotalSub').textContent = result.qty>1 ? (result.qty+' × '+fmtNum(result.weightPerPiece,2)+' kg') : 'igual ao unitário (1 peça)';
 
-    $('valPierces').textContent = result.geo.pierces;
-    $('pierceSub').textContent = '≈ '+fmtEUR(result.pierceCostTotal)+' ('+fmtNum(state.machine.pierceTime,1)+' s cada)';
-
-    $('valMaterialInfo').textContent = result.material.name+' '+result.material.thickness+'mm';
-    const areaUsed = state.machine.areaBasis==='net' ? result.geo.netAreaMm2 : result.geo.bboxAreaMm2;
-    $('matInfoSub').textContent = result.byWeight
-      ? fmtNum(result.weightKg,2)+' kg'
-      : fmtNum(areaUsed/1e6,3)+' m²';
+    $('matInfoSub').textContent = result.material.name+' '+result.material.thickness+'mm · '+(result.byWeight ? '€/kg' : '€/m²');
     $('costMaterial').textContent = fmtEUR(result.materialCost);
 
-    $('costSetup').textContent = fmtEUR(result.setupCost);
-    const setupParts = [];
-    if(result.designTimeMin > 0) setupParts.push('Desenho '+fmtNum(result.designTimeMin,0)+'min ('+fmtEUR(result.designCost)+')');
-    setupParts.push('Máquina '+fmtNum(result.materialLoadMin+result.machineTuneMin,0)+'min ('+fmtEUR(result.machinePrepCost)+')');
-    $('setupSub').textContent = setupParts.join(' + ');
+    $('preCorteSub').textContent = 'Desenho '+fmtNum(result.designTimeMin,0)+'min ('+fmtEUR(result.designCost)+') + Setup '+fmtNum(result.setupTimeMin,0)+'min ('+fmtEUR(result.setupCost)+')';
+    $('costPreCorte').textContent = fmtEUR(result.preCorteCost);
 
-    $('perPieceValue').textContent = fmtEUR(result.perPartCost);
+    $('cutTimeSub').textContent = fmtNum(result.cuttingTimeMin,2)+' min a '+fmtNum(result.material.speed,0)+' mm/min · '+result.geo.pierces+' perfuração(ões)';
+    $('costCorte').textContent = fmtEUR(result.corteCost);
+
     $('totalValue').textContent = fmtEUR(result.totalCost);
-    $('totalQtyTag').textContent = ' (' + result.qty + (result.qty===1 ? ' peça)' : ' peças)');
-    $('totalSub').textContent = result.qty+' × '+fmtEUR(result.perPartCost)+' + '+fmtEUR(result.setupCost)+' de setup' + (state.machine.margin>0 ? ' · margem '+state.machine.margin+'%' : '');
+    $('totalQtyTag').textContent = ' — '+result.qty+(result.qty===1 ? ' peça' : ' peças');
+    $('avgPerPieceValue').textContent = fmtEUR(result.avgPerPiece);
+
+    $('costFinalBadge').textContent = '(estimado — velocidade da tabela)';
+
     $('totalTimeSub').hidden = false;
-    $('totalTimeSub').textContent = 'Tempo total estimado (1 peça): '+fmtNum(result.totalTimeMin,1)+' min (corte '+fmtNum(result.cuttingTimeMin,1)+' + perfurações '+fmtNum(result.pierceTimeMin,1)+' + preparação '+fmtNum(result.designTimeMin+result.materialLoadMin+result.machineTuneMin,0)+')';
+    $('totalTimeSub').textContent = 'Tempo total estimado (1 peça): '+fmtNum(result.totalTimeMin,1)+' min (corte '+fmtNum(result.cuttingTimeMin,1)+' + perfurações '+fmtNum(result.pierceTimeMin,1)+' + preparação '+fmtNum(result.designTimeMin+result.setupTimeMin,0)+')';
   }
 
   /* ---------------------------------------------------------------- */
@@ -927,8 +922,7 @@
     shapeSelect.value = 'rect';
     shapeRect.hidden = false; shapeCircle.hidden = true; shapeCustom.hidden = true;
     drawingTypeSel.value = 'client_direct';
-    materialLoadTimeInput.value = state.machine.defaultMaterialLoadMin ?? 5;
-    machineTuneTimeInput.value = state.machine.defaultMachineTuneMin ?? 5;
+    setupTimeInput.value = state.machine.defaultSetupMin ?? 5;
     applyDrawingTypeUI();
     updateOrderHeader();
     refreshOrderNumberPreview();
@@ -1001,8 +995,7 @@
     if(savedSetup){
       drawingTypeSel.value = savedSetup.drawingType || 'client_direct';
       designTimeInput.value = savedSetup.designTimeMin || 0;
-      materialLoadTimeInput.value = savedSetup.materialLoadMin ?? 5;
-      machineTuneTimeInput.value = savedSetup.machineTuneMin ?? 5;
+      setupTimeInput.value = savedSetup.setupTimeMin ?? (savedSetup.materialLoadMin!=null ? (savedSetup.materialLoadMin+(savedSetup.machineTuneMin||0)) : 5);
       applyDrawingTypeUI();
     }
 
@@ -1053,15 +1046,16 @@
         quantity: Math.max(1, parseInt(qtyInput.value,10)||1),
         machineSnapshot: Object.assign({}, state.machine),
         costSnapshot: result.valid ? {
-          perPartCost: result.perPartCost, totalCost: result.totalCost, cuttingCost: result.cuttingCost,
-          cuttingTimeMin: result.cuttingTimeMin, pierces: result.geo.pierces,
-          pierceCostTotal: result.pierceCostTotal, materialCost: result.materialCost, setupCost: result.setupCost,
-          designCost: result.designCost, machinePrepCost: result.machinePrepCost, weightKg: result.weightKg,
+          perPartCost: result.perPartCost, totalCost: result.totalCost, avgPerPiece: result.avgPerPiece,
+          cuttingCost: result.cuttingCost, cuttingTimeMin: result.cuttingTimeMin, pierces: result.geo.pierces,
+          pierceCostTotal: result.pierceCostTotal, corteCost: result.corteCost,
+          materialCost: result.materialCost, weightPerPiece: result.weightPerPiece, weightTotal: result.weightTotal,
+          designCost: result.designCost, setupCost: result.setupCost, preCorteCost: result.preCorteCost,
+          isFinal: false,
           setupInputs: {
             drawingType: drawingTypeSel.value,
             designTimeMin: parseFloat(designTimeInput.value)||0,
-            materialLoadMin: parseFloat(materialLoadTimeInput.value)||0,
-            machineTuneMin: parseFloat(machineTuneTimeInput.value)||0,
+            setupTimeMin: parseFloat(setupTimeInput.value)||0,
           },
         } : null,
       };
@@ -1120,8 +1114,7 @@
     state.remote = await loadRemoteConfig();
     updateConnBadge();
     populateMaterialSelect();
-    materialLoadTimeInput.value = state.machine.defaultMaterialLoadMin ?? 5;
-    machineTuneTimeInput.value = state.machine.defaultMachineTuneMin ?? 5;
+    setupTimeInput.value = state.machine.defaultSetupMin ?? 5;
     applyDrawingTypeUI();
 
     if(state.remote.configured){
