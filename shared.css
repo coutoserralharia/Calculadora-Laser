@@ -267,6 +267,10 @@
   .print-sheet .p-total-item{display:flex; flex-direction:column; font-size:11.5px; color:#555;}
   .print-sheet .p-total-item strong{font-size:20px; font-family:'JetBrains Mono', monospace; color:#111; margin-top:2px;}
   .print-sheet .p-total-main strong{font-size:27px;}
+  .print-sheet .p-realtime-box{
+    margin-top:20px; padding:12px 14px; border:1.5px dashed #111; border-radius:4px;
+    font-size:13px; font-weight:600; color:#111;
+  }
   .print-sheet .p-sign{display:flex; justify-content:space-between; margin-top:40px; font-size:12px; color:#333;}
 
   nav.pagenav{display:flex; gap:6px; background:var(--panel-2); padding:4px; border-radius:9px; border:1px solid var(--border-soft);}

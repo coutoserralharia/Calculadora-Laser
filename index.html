@@ -778,7 +778,7 @@
     html += '<div class="p-section">';
     html += pRow('Nº da encomenda', $('orderNumberPreview').value || '—');
     html += pRow('Encomenda / peça', orderName);
-    if(mode==='internal') html += pRow('Cliente', client);
+    html += pRow('Cliente', client);
     html += pRow('Ficheiro / forma', source);
     html += pRow('Material', material ? material.name : '—');
     html += pRow('Espessura', material ? (material.thickness + ' mm') : '—');
@@ -816,6 +816,7 @@
       html += '</div>';
     }
 
+    html += '<div class="p-realtime-box">Tempo de corte real: __________________ min &nbsp;&nbsp;&nbsp; Nº de perfurações (se diferente): __________</div>';
     html += '<div class="p-sign"><div>Operador: ______________________</div><div>Data: ______________</div></div>';
     return html;
   }
