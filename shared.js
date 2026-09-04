@@ -319,6 +319,14 @@
     });
     if(!res.ok) throw await remoteRequestError(res);
   };
+  LC.remoteUpdateOrder = async function(remoteCfg, id, costSnapshot){
+    const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: remoteHeaders(remoteCfg, { 'Content-Type':'application/json', Prefer:'return=minimal' }),
+      body: JSON.stringify({ cost_snapshot: costSnapshot }),
+    });
+    if(!res.ok) throw await remoteRequestError(res);
+  };
   LC.remoteDeleteOrder = async function(remoteCfg, id){
     const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?id=eq.' + encodeURIComponent(id), {
       method: 'DELETE', headers: remoteHeaders(remoteCfg),
@@ -353,6 +361,41 @@
     }
     scan(ordersList);
     return year + '_' + String(maxSeq+1).padStart(4,'0');
+  };
+
+  /* ---------------------------------------------------------------- */
+  /* FINAL COST — recompute from the real cutting time reported after  */
+  /* the piece was actually cut (replaces the estimate; material,      */
+  /* pierce cost, and pré-corte stay as originally quoted).             */
+  /* ---------------------------------------------------------------- */
+  LC.recomputeFinalCost = function(rec, realCuttingTimeMin){
+    const cs = rec.costSnapshot || {};
+    const ms = rec.machineSnapshot || {};
+    const hourlyRate = ms.hourlyRate || 0;
+    const marginMult = 1 + ((ms.margin||0)/100);
+    const qty = rec.quantity || 1;
+
+    const pierceCostTotal = cs.pierceCostTotal || 0;
+    const materialCost = cs.materialCost || 0;
+    const preCorteCost = cs.preCorteCost || 0; // already includes marginMult from the original quote
+
+    const corteCost = (realCuttingTimeMin/60) * hourlyRate + pierceCostTotal;
+    const perPartCost = corteCost + materialCost;
+    const perPartSell = perPartCost * marginMult;
+    const totalCost = perPartSell * qty + preCorteCost;
+    const avgPerPiece = totalCost / qty;
+
+    const estimado = cs.isFinal ? cs.estimado : {
+      cuttingTimeMin: cs.cuttingTimeMin, corteCost: cs.corteCost,
+      totalCost: cs.totalCost, avgPerPiece: cs.avgPerPiece,
+    };
+
+    return Object.assign({}, cs, {
+      cuttingTimeMin: realCuttingTimeMin,
+      corteCost, perPartCost: perPartSell, totalCost, avgPerPiece,
+      isFinal: true,
+      estimado,
+    });
   };
 
   /* ---------------------------------------------------------------- */

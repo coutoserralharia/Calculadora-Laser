@@ -17,6 +17,18 @@
 <link rel="stylesheet" href="shared.css">
 <style>
   .layout-single{max-width:760px; margin:0 auto;}
+  .status-badge{
+    font-family:'JetBrains Mono', monospace; font-size:9.5px; font-weight:600; padding:2px 6px; border-radius:20px;
+    text-transform:uppercase; letter-spacing:.03em; vertical-align:1px;
+  }
+  .status-est{color:var(--text-dim); background:rgba(255,255,255,0.05);}
+  .status-final{color:var(--readout); background:rgba(63,232,212,0.13);}
+  .order-row-compare{color:var(--text-dim); font-style:italic;}
+  .realtime-form{
+    background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px;
+    padding:12px; margin:2px 0 8px;
+  }
+  .realtime-form label{display:block; font-size:11.5px; color:var(--text-muted); margin-bottom:8px;}
 </style>
 </head>
 <body>
@@ -78,8 +90,8 @@
 <script>
 (function(){
   "use strict";
-  const { fmtEUR, escapeHtml, loadOrders, saveOrders, loadRemoteConfig,
-    remoteLoadOrders, remoteInsertOrder, remoteDeleteOrder, registerServiceWorker } = window.LC;
+  const { fmtEUR, fmtNum, escapeHtml, loadOrders, saveOrders, loadRemoteConfig,
+    remoteLoadOrders, remoteInsertOrder, remoteUpdateOrder, remoteDeleteOrder, recomputeFinalCost, registerServiceWorker } = window.LC;
 
   const $ = id => document.getElementById(id);
   const state = { orders: [], remote: { configured:false, url:'', key:'' } };
@@ -132,20 +144,40 @@
       orders.forEach(o=>{
         const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
         const matStr = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' ' + o.materialSnapshot.thickness + 'mm') : '—';
-        const costStr = o.costSnapshot ? fmtEUR(o.costSnapshot.totalCost) : '—';
+        const cs = o.costSnapshot;
+        const isFinal = !!(cs && cs.isFinal);
+        const costStr = cs ? fmtEUR(cs.totalCost) : '—';
+        const statusBadge = cs ? ('<span class="status-badge ' + (isFinal?'status-final':'status-est') + '">' + (isFinal?'Final':'Estimado') + '</span>') : '';
+        let metaExtra = '';
+        if(isFinal && cs.estimado){
+          metaExtra = ' <span class="order-row-compare">(estimado era ' + fmtEUR(cs.estimado.totalCost) + ')</span>';
+        }
+        html += '<div class="order-item">';
         html += '<div class="order-row">';
         html += '<div class="order-row-main">';
-        html += '<div class="order-row-name">' + (o.orderNumber ? '<span class="order-num">'+escapeHtml(o.orderNumber)+'</span> ' : '') + escapeHtml(o.orderName || 'Sem nome') + '</div>';
-        html += '<div class="order-row-meta">' + dateStr + ' · ' + matStr + ' · ' + (o.quantity||1) + 'x · ' + costStr + '</div>';
+        html += '<div class="order-row-name">' + (o.orderNumber ? '<span class="order-num">'+escapeHtml(o.orderNumber)+'</span> ' : '') + escapeHtml(o.orderName || 'Sem nome') + ' ' + statusBadge + '</div>';
+        html += '<div class="order-row-meta">' + dateStr + ' · ' + matStr + ' · ' + (o.quantity||1) + 'x · ' + costStr + metaExtra + '</div>';
         html += '</div>';
         html += '<div class="order-row-actions">';
+        html += '<button class="ghost-btn sm" data-realtime="' + o.id + '">Tempo real</button>';
         html += '<button class="ghost-btn sm" data-load="' + o.id + '">Carregar</button>';
         html += '<button class="rm-btn" data-del="' + o.id + '" title="Eliminar">✕</button>';
         html += '</div></div>';
+        html += '<div class="realtime-form" id="rtform-' + o.id + '" hidden>';
+        html += '<label for="rtinput-' + o.id + '">Tempo de corte real (o colega deu depois do corte)</label>';
+        html += '<div style="display:flex; gap:8px; align-items:center;">';
+        html += '<div class="unit-suffix" style="flex:1;"><input type="number" min="0" step="0.1" id="rtinput-' + o.id + '" value="' + (cs && isFinite(cs.cuttingTimeMin) ? cs.cuttingTimeMin.toFixed(1) : '') + '"><span>min</span></div>';
+        html += '<button class="ghost-btn sm" data-rt-save="' + o.id + '">Guardar e recalcular</button>';
+        html += '<button class="ghost-btn sm" data-rt-cancel="' + o.id + '">Cancelar</button>';
+        html += '</div>';
+        html += '<p class="save-hint" id="rthint-' + o.id + '" style="margin-top:6px;"></p>';
+        html += '</div>';
+        html += '</div>';
       });
       html += '</div>';
     });
     ordersListEl.innerHTML = html;
+
     ordersListEl.querySelectorAll('[data-load]').forEach(b=>{
       b.addEventListener('click', ()=>{
         window.location.href = 'index.html?loadOrder=' + encodeURIComponent(b.getAttribute('data-load'));
@@ -164,6 +196,50 @@
         state.orders = state.orders.filter(o=>o.id!==id);
         if(!state.remote.configured) saveOrders(state.orders);
         renderOrdersList();
+      });
+    });
+    ordersListEl.querySelectorAll('[data-realtime]').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        const id = b.getAttribute('data-realtime');
+        const form = $('rtform-' + id);
+        form.hidden = !form.hidden;
+        if(!form.hidden) $('rtinput-' + id).focus();
+      });
+    });
+    ordersListEl.querySelectorAll('[data-rt-cancel]').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        $('rtform-' + b.getAttribute('data-rt-cancel')).hidden = true;
+      });
+    });
+    ordersListEl.querySelectorAll('[data-rt-save]').forEach(b=>{
+      b.addEventListener('click', async ()=>{
+        const id = b.getAttribute('data-rt-save');
+        const rec = state.orders.find(o=>o.id===id);
+        const input = $('rtinput-' + id);
+        const hint = $('rthint-' + id);
+        const val = parseFloat(input.value);
+        if(!rec || !rec.costSnapshot){
+          hint.style.color = 'var(--danger)'; hint.textContent = 'Esta encomenda não tem dados de custo guardados.'; return;
+        }
+        if(!Number.isFinite(val) || val < 0){
+          hint.style.color = 'var(--danger)'; hint.textContent = 'Introduza um tempo válido, em minutos.'; return;
+        }
+        const originalLabel = b.textContent;
+        b.disabled = true; b.textContent = 'A guardar…';
+        hint.style.color = ''; hint.textContent = '';
+        try{
+          const newCostSnapshot = recomputeFinalCost(rec, val);
+          if(state.remote.configured){
+            await remoteUpdateOrder(state.remote, id, newCostSnapshot);
+          }
+          rec.costSnapshot = newCostSnapshot;
+          if(!state.remote.configured) await saveOrders(state.orders);
+          renderOrdersList();
+        }catch(err){
+          hint.style.color = 'var(--danger)';
+          hint.textContent = 'Não foi possível guardar: ' + err.message;
+          b.disabled = false; b.textContent = originalLabel;
+        }
       });
     });
   }
