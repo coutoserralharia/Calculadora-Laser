@@ -254,7 +254,7 @@
   }
   .print-sheet .p-title{font-family:'Space Grotesk', sans-serif; font-size:20px; font-weight:700; margin:0 0 2px;}
   .print-sheet .p-meta{font-size:11px; color:#666; margin-bottom:18px;}
-  .print-sheet .p-section{margin-bottom:16px;}
+  .print-sheet .p-section{margin-bottom:16px; page-break-inside:avoid;}
   .print-sheet .p-row{display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #ddd; font-size:13px;}
   .print-sheet .p-label{color:#555;}
   .print-sheet .p-value{font-weight:600; font-family:'JetBrains Mono', monospace;}

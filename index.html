@@ -720,7 +720,7 @@
     return 'Forma manual (perímetro/área introduzidos)';
   }
 
-  function buildPrintSVG(){
+  function buildPrintSVG(big){
     let contours = [], bbox = null;
     if(state.mode==='dxf' && state.dxfResult){
       contours = state.dxfResult.contours;
@@ -738,7 +738,8 @@
       }
     }
     if(!contours.length || !bbox) return '';
-    const w=560, h=340, pad=24;
+    const w = big ? 400 : 300, h = big ? 260 : 200, pad = big ? 20 : 16;
+    const cssMaxWidth = big ? 340 : 220;
     const gw=bbox.maxX-bbox.minX, gh=bbox.maxY-bbox.minY;
     const scale = Math.min((w-pad*2)/(gw||1), (h-pad*2)/(gh||1));
     const offX = pad + ((w-pad*2)-gw*scale)/2, offY = pad + ((h-pad*2)-gh*scale)/2;
@@ -750,9 +751,9 @@
       let d = 'M ' + p0.x.toFixed(1) + ' ' + p0.y.toFixed(1) + ' ';
       for(let i=1;i<c.points.length;i++){ const p=tx(c.points[i]); d += 'L ' + p.x.toFixed(1) + ' ' + p.y.toFixed(1) + ' '; }
       if(c.closed) d += 'Z';
-      paths += '<path d="'+d+'" fill="none" stroke="#111" stroke-width="1.4"/>';
+      paths += '<path d="'+d+'" fill="none" stroke="#111" stroke-width="1.2"/>';
     });
-    return '<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:520px;height:auto;border:1px solid #ccc;display:block;margin:0 auto;">'+paths+'</svg>';
+    return '<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:'+cssMaxWidth+'px;height:auto;border:1px solid #ccc;display:block;margin:0 auto;">'+paths+'</svg>';
   }
 
   function pRow(label, value){
@@ -769,37 +770,61 @@
     const qty = Math.max(1, parseInt(qtyInput.value,10) || 1);
     const now = new Date();
     const dateStr = now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'});
-    const svg = buildPrintSVG();
 
     let html = '';
     html += '<div class="p-title">' + (mode==='internal' ? 'Ficha Interna — Custos de Fabrico' : 'Ordem de Corte — Operador') + '</div>';
     html += '<div class="p-meta">Gerado em ' + dateStr + '</div>';
 
-    html += '<div class="p-section">';
-    html += pRow('Nº da encomenda', $('orderNumberPreview').value || '—');
-    html += pRow('Encomenda / peça', orderName);
-    html += pRow('Cliente', client);
-    html += pRow('Ficheiro / forma', source);
-    html += '</div>';
+    if(mode==='operator'){
+      const svg = buildPrintSVG(true);
+      html += '<div class="p-section">';
+      html += pRow('Nº da encomenda', $('orderNumberPreview').value || '—');
+      html += pRow('Encomenda / peça', orderName);
+      html += pRow('Cliente', client);
+      html += pRow('Ficheiro / forma', source);
+      html += '</div>';
 
-    html += '<div class="p-preview-big">' + (svg || '<div class="p-noprev">Sem pré-visualização disponível</div>') + '</div>';
+      html += '<div class="p-preview-big">' + (svg || '<div class="p-noprev">Sem pré-visualização disponível</div>') + '</div>';
 
-    html += '<div class="p-section">';
-    html += pRow('Material', material ? material.name : '—');
-    html += pRow('Espessura', material ? (material.thickness + ' mm') : '—');
-    html += pRow('Quantidade a produzir', qty);
-    html += '</div>';
+      html += '<div class="p-section">';
+      html += pRow('Material', material ? material.name : '—');
+      html += pRow('Espessura', material ? (material.thickness + ' mm') : '—');
+      html += pRow('Quantidade a produzir', qty);
+      html += '</div>';
 
-    html += '<div class="p-section">';
-    html += pRow('Dimensões (L × A)', (geo && geo.width) ? (fmtNum(geo.width,1) + ' × ' + fmtNum(geo.height,1) + ' mm') : '—');
-    html += pRow('Perímetro de corte', geo ? (fmtNum(geo.perimeterMm/10,1) + ' cm') : '—');
-    html += pRow('Nº de perfurações', geo ? geo.pierces : '—');
-    if(result.valid && result.weightPerPiece > 0) html += pRow('Peso de 1 peça', fmtNum(result.weightPerPiece,2) + ' kg');
-    html += '</div>';
+      html += '<div class="p-section">';
+      html += pRow('Dimensões (L × A)', (geo && geo.width) ? (fmtNum(geo.width,1) + ' × ' + fmtNum(geo.height,1) + ' mm') : '—');
+      html += pRow('Perímetro de corte', geo ? (fmtNum(geo.perimeterMm/10,1) + ' cm') : '—');
+      html += pRow('Nº de perfurações', geo ? geo.pierces : '—');
+      if(result.valid && result.weightPerPiece > 0) html += pRow('Peso de 1 peça', fmtNum(result.weightPerPiece,2) + ' kg');
+      html += '</div>';
 
-    html += '<div class="p-realtime-box">Tempo de corte real: __________________ min &nbsp;&nbsp;&nbsp; Nº de perfurações (se diferente): __________</div>';
+      html += '<div class="p-realtime-box">Tempo de corte real: __________________ min &nbsp;&nbsp;&nbsp; Nº de perfurações (se diferente): __________</div>';
 
-    if(mode==='internal'){
+    } else {
+      const svg = buildPrintSVG(false);
+      html += '<div class="p-section">';
+      html += pRow('Nº da encomenda', $('orderNumberPreview').value || '—');
+      html += pRow('Encomenda / peça', orderName);
+      html += pRow('Cliente', client);
+      html += pRow('Ficheiro / forma', source);
+      html += pRow('Material', material ? material.name : '—');
+      html += pRow('Espessura', material ? (material.thickness + ' mm') : '—');
+      html += pRow('Quantidade a produzir', qty);
+      html += '</div>';
+
+      html += '<div class="p-columns">';
+      html += '<div class="p-preview">' + (svg || '<div class="p-noprev">Sem pré-visualização disponível</div>') + '</div>';
+      html += '<div class="p-tech p-section">';
+      html += pRow('Dimensões (L × A)', (geo && geo.width) ? (fmtNum(geo.width,1) + ' × ' + fmtNum(geo.height,1) + ' mm') : '—');
+      html += pRow('Perímetro de corte', geo ? (fmtNum(geo.perimeterMm/10,1) + ' cm') : '—');
+      html += pRow('Nº de perfurações', geo ? geo.pierces : '—');
+      if(result.valid && result.weightPerPiece > 0) html += pRow('Peso de 1 peça', fmtNum(result.weightPerPiece,2) + ' kg');
+      html += '</div>';
+      html += '</div>';
+
+      html += '<div class="p-realtime-box">Tempo de corte real: __________________ min &nbsp;&nbsp;&nbsp; Nº de perfurações (se diferente): __________</div>';
+
       html += '<div class="p-section">';
       html += '<div class="p-costs-title">Custo da encomenda' + (result.valid ? '' : '') + '</div>';
       html += pRow('Peso unitário (1 peça)', result.valid ? (fmtNum(result.weightPerPiece,2)+' kg') : '—');
