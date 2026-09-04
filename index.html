@@ -171,8 +171,9 @@
 
       <div class="card">
         <h2 class="card-title"><span class="dot"></span>Guardar encomenda <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
+        <p class="save-hint" id="editingNote" hidden style="color:var(--accent); margin-bottom:10px;"></p>
         <div class="mat-actions">
-          <button class="ghost-btn" id="saveOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M2 2h9l3 3v9H2V2z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M4 2v4h6V2M4 14v-4h8v4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>Guardar encomenda atual</button>
+          <button class="ghost-btn" id="saveOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M2 2h9l3 3v9H2V2z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M4 2v4h6V2M4 14v-4h8v4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg><span id="saveOrderBtnLabel">Guardar encomenda atual</span></button>
           <a class="ghost-btn sm" href="encomendas.html" style="text-decoration:none;">Ver encomendas guardadas →</a>
         </div>
         <p class="save-hint" id="saveOrderHint"></p>
@@ -213,7 +214,6 @@
         <div class="breakdown-row"><span class="lbl">Custo do corte<small id="cutTimeSub">—</small></span><span class="val" id="costCorte">€0,00</span></div>
         <div class="breakdown-row" style="border-top:1.5px solid var(--border); margin-top:4px; padding-top:12px;"><span class="lbl" style="font-weight:600; color:var(--text);">Custo total da encomenda <small>(sem IVA)<span id="totalQtyTag"></span></small></span><span class="val" id="totalValue" style="font-size:16px; color:var(--readout);">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo total ÷ nº peças <small>(sem IVA)</small></span><span class="val" id="avgPerPieceValue">€0,00</span></div>
-        <div class="total-order-name" id="totalOrderName" hidden style="margin:12px 0 0;"></div>
         <div class="total-sub" id="totalTimeSub" hidden style="margin-top:10px; padding-top:10px;"></div>
       </div>
 
@@ -244,7 +244,7 @@
   "use strict";
   const { parseDXF, fmtEUR, fmtNum, escapeHtml, sanitizeFileName,
     loadMaterials, saveMachine, loadMachine, loadOrders, loadRemoteConfig,
-    remoteLoadOrders, remoteInsertOrder, computeNextOrderNumber,
+    remoteLoadOrders, remoteInsertOrder, remoteUpdateFullOrder, computeNextOrderNumber,
     idbGet, writeOrderToLocalFolder, registerServiceWorker } = window.LC;
 
   /* ---------------------------------------------------------------- */
@@ -261,6 +261,9 @@
     orders: [],
     remote: { configured:false, url:'', key:'' },
     localFolder: { ready:false, handle:null },
+    loadedOrderId: null,
+    loadedOrderNumber: null,
+    loadedOrderCreatedAt: null,
   };
 
   /* ---------------------------------------------------------------- */
@@ -283,15 +286,11 @@
   const metaDim = $('metaDim'), metaPerim = $('metaPerim'), metaPierces = $('metaPierces');
   const dimEmptyEl = $('dimEmpty');
   const orderNameInp = $('orderName'), clientNameInp = $('clientName');
-  const totalOrderNameEl = $('totalOrderName');
   const saveOrderHint = $('saveOrderHint');
 
   function updateOrderHeader(){
-    const name = orderNameInp.value.trim();
-    const client = clientNameInp.value.trim();
-    if(!name && !client){ totalOrderNameEl.hidden = true; return; }
-    totalOrderNameEl.hidden = false;
-    totalOrderNameEl.innerHTML = (name ? name : 'Encomenda sem nome') + (client ? ' <span class="client">— '+client+'</span>' : '');
+    // Nome/cliente já não são mostrados no cartão de custos (mantido só para clareza dos dados
+    // preenchidos noutros sítios da página, como a ficha de impressão).
   }
   orderNameInp.addEventListener('input', updateOrderHeader);
   clientNameInp.addEventListener('input', updateOrderHeader);
@@ -823,8 +822,6 @@
       html += '</div>';
       html += '</div>';
 
-      html += '<div class="p-realtime-box">Tempo de corte real: __________________ min &nbsp;&nbsp;&nbsp; Nº de perfurações (se diferente): __________</div>';
-
       html += '<div class="p-section">';
       html += '<div class="p-costs-title">Custo da encomenda' + (result.valid ? '' : '') + '</div>';
       html += pRow('Peso unitário (1 peça)', result.valid ? (fmtNum(result.weightPerPiece,2)+' kg') : '—');
@@ -899,7 +896,6 @@
     if(!result.valid){
       ['costMaterial','costPreCorte','costCorte','totalValue','avgPerPieceValue'].forEach(id=>$(id).textContent = fmtEUR(0));
       ['valWeightUnit','valWeightTotal'].forEach(id=>$(id).textContent = '—');
-      $('totalOrderName').hidden = true;
       $('matInfoSub').textContent = '—'; $('preCorteSub').textContent = '—'; $('cutTimeSub').textContent = '—'; $('weightTotalSub').textContent = '—';
       $('totalQtyTag').textContent = '';
       $('totalTimeSub').hidden = true;
@@ -942,7 +938,22 @@
     catch(e){ $('orderNumberPreview').value = ''; }
   }
 
+  function updateEditingUI(){
+    const note = $('editingNote'), label = $('saveOrderBtnLabel');
+    if(state.loadedOrderId){
+      note.hidden = false;
+      note.textContent = 'A editar a encomenda ' + (state.loadedOrderNumber||'') + ' — gravar vai atualizar esta mesma encomenda, não criar uma nova.';
+      label.textContent = 'Atualizar encomenda ' + (state.loadedOrderNumber||'');
+    } else {
+      note.hidden = true;
+      label.textContent = 'Guardar encomenda atual';
+    }
+  }
+
   function resetOrderForm(){
+    state.loadedOrderId = null;
+    state.loadedOrderNumber = null;
+    state.loadedOrderCreatedAt = null;
     orderNameInp.value = '';
     clientNameInp.value = '';
     qtyInput.value = 1;
@@ -964,6 +975,7 @@
     applyDrawingTypeUI();
     updateOrderHeader();
     refreshOrderNumberPreview();
+    updateEditingUI();
     setMode('dxf');
   }
   $('newOrderBtn').addEventListener('click', ()=>{
@@ -987,6 +999,9 @@
   /* LOAD ORDER FROM ?loadOrder=ID (comes from encomendas.html)        */
   /* ---------------------------------------------------------------- */
   async function loadOrderIntoForm(o){
+    state.loadedOrderId = o.id;
+    state.loadedOrderNumber = o.orderNumber;
+    state.loadedOrderCreatedAt = o.createdAt;
     orderNameInp.value = o.orderName || '';
     clientNameInp.value = o.client || '';
     qtyInput.value = o.quantity || 1;
@@ -1039,9 +1054,10 @@
 
     updateOrderHeader();
     recalcAndRender();
-    await refreshOrderNumberPreview();
+    $('orderNumberPreview').value = o.orderNumber || '';
+    updateEditingUI();
     saveOrderHint.style.color = 'var(--readout)';
-    saveOrderHint.textContent = 'Encomenda ' + (o.orderNumber ? o.orderNumber+' ' : '') + '"' + (o.orderName||'sem nome') + '" reposta — se guardar de novo, fica com um número novo (' + $('orderNumberPreview').value + ') e valores recalculados com os preços/definições atuais.';
+    saveOrderHint.textContent = 'Encomenda ' + (o.orderNumber ? o.orderNumber+' ' : '') + '"' + (o.orderName||'sem nome') + '" reposta — se guardar de novo, atualiza esta mesma encomenda (mesmo número), com os valores recalculados com os preços/definições atuais.';
     setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
   }
 
@@ -1068,13 +1084,16 @@
     try{
       const result = computeCost();
       const material = getSelectedMaterial();
-      const orderNumber = await computeNextOrderNumber(state.remote, state.orders);
+      const isUpdate = !!state.loadedOrderId;
+      const id = isUpdate ? state.loadedOrderId : ('o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8));
+      const orderNumber = isUpdate ? state.loadedOrderNumber : await computeNextOrderNumber(state.remote, state.orders);
+      const createdAt = isUpdate ? state.loadedOrderCreatedAt : new Date().toISOString();
       const rec = {
-        id: 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+        id,
         client: clientNameInp.value.trim(),
         orderName,
         orderNumber,
-        createdAt: new Date().toISOString(),
+        createdAt,
         mode: state.mode,
         dxfFileName: state.mode==='dxf' ? state.dxfFileName : null,
         dxfText: state.mode==='dxf' ? state.dxfRawText : null,
@@ -1097,21 +1116,33 @@
           },
         } : null,
       };
+      const verb = isUpdate ? 'atualizada' : 'guardada';
       if(state.remote.configured){
         saveOrderHint.style.color = '';
         saveOrderHint.textContent = 'A guardar no servidor…';
         try{
-          await remoteInsertOrder(state.remote, rec);
+          if(isUpdate) await remoteUpdateFullOrder(state.remote, id, rec);
+          else await remoteInsertOrder(state.remote, rec);
         }catch(err){
           saveOrderHint.style.color = 'var(--danger)';
           saveOrderHint.textContent = 'Não foi possível guardar no servidor: ' + err.message;
           return;
         }
-        state.orders.unshift(rec);
+        if(isUpdate){
+          const idx = state.orders.findIndex(o=>o.id===id);
+          if(idx>=0) state.orders[idx] = rec; else state.orders.unshift(rec);
+        } else {
+          state.orders.unshift(rec);
+        }
         saveOrderHint.style.color = 'var(--readout)';
-        saveOrderHint.textContent = 'Encomenda ' + orderNumber + ' guardada no servidor central, em "' + (rec.client || 'Sem cliente') + '".';
+        saveOrderHint.textContent = 'Encomenda ' + orderNumber + ' ' + verb + ' no servidor central, em "' + (rec.client || 'Sem cliente') + '".';
       } else {
-        state.orders.unshift(rec);
+        if(isUpdate){
+          const idx = state.orders.findIndex(o=>o.id===id);
+          if(idx>=0) state.orders[idx] = rec; else state.orders.unshift(rec);
+        } else {
+          state.orders.unshift(rec);
+        }
         await window.LC.saveOrders(state.orders);
         // Verify the write actually persisted (catches silent storage failures: quota exceeded,
         // browser storage blocked, private-mode restrictions, etc.)
@@ -1123,14 +1154,18 @@
           return;
         }
         saveOrderHint.style.color = 'var(--readout)';
-        saveOrderHint.textContent = 'Encomenda ' + orderNumber + ' guardada em "' + (rec.client || 'Sem cliente') + '".';
+        saveOrderHint.textContent = 'Encomenda ' + orderNumber + ' ' + verb + ' em "' + (rec.client || 'Sem cliente') + '".';
       }
+      state.loadedOrderId = id;
+      state.loadedOrderNumber = orderNumber;
+      state.loadedOrderCreatedAt = createdAt;
+      updateEditingUI();
       if(state.localFolder.ready){
         const folderResult = await writeOrderToLocalFolder(state.localFolder.handle, rec);
         if(folderResult.ok) saveOrderHint.textContent += ' Também guardada na pasta local.';
         else if(!folderResult.skipped) saveOrderHint.textContent += ' (falhou a gravação na pasta local: ' + folderResult.error + ')';
       }
-      await refreshOrderNumberPreview();
+      $('orderNumberPreview').value = orderNumber;
       if(saveOrderHint.style.color !== 'var(--danger)'){
         setTimeout(()=>{ saveOrderHint.textContent=''; }, 5000);
       }

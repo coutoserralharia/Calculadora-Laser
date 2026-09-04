@@ -327,6 +327,16 @@
     });
     if(!res.ok) throw await remoteRequestError(res);
   };
+  LC.remoteUpdateFullOrder = async function(remoteCfg, id, rec){
+    const row = orderToRow(rec);
+    delete row.id;
+    const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: remoteHeaders(remoteCfg, { 'Content-Type':'application/json', Prefer:'return=minimal' }),
+      body: JSON.stringify(row),
+    });
+    if(!res.ok) throw await remoteRequestError(res);
+  };
   LC.remoteDeleteOrder = async function(remoteCfg, id){
     const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?id=eq.' + encodeURIComponent(id), {
       method: 'DELETE', headers: remoteHeaders(remoteCfg),
@@ -360,7 +370,7 @@
       }catch(e){ /* fall back to whatever is already loaded locally */ }
     }
     scan(ordersList);
-    return year + '_' + String(maxSeq+1).padStart(4,'0');
+    return year + '_' + String(maxSeq+1).padStart(5,'0');
   };
 
   /* ---------------------------------------------------------------- */
