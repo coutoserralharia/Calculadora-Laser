@@ -275,6 +275,7 @@
     loadedOrderId: null,
     loadedOrderNumber: null,
     loadedOrderCreatedAt: null,
+    loadedCostSnapshot: null,
   };
 
   /* ---------------------------------------------------------------- */
@@ -568,7 +569,8 @@
     const realTimeVal = parseFloat(realTimeRaw);
     const isFinalTime = realTimeRaw !== '' && Number.isFinite(realTimeVal) && realTimeVal >= 0;
     const speed = Math.max(material.speed, 1);
-    const cuttingTimeMin = isFinalTime ? realTimeVal : (geo.perimeterMm / speed);
+    const estimatedCuttingTimeMin = geo.perimeterMm / speed;
+    const cuttingTimeMin = isFinalTime ? realTimeVal : estimatedCuttingTimeMin;
     const cuttingCost = cuttingTimeMin * (state.machine.hourlyRate/60);
     const pierceCostTotal = geo.pierces * state.machine.pierceTime * (state.machine.hourlyRate/3600);
 
@@ -608,7 +610,7 @@
     const avgPerPiece = totalCost / qty;
     return {
       valid:true, geo, material, qty,
-      cuttingTimeMin, cuttingCost, pierceCostTotal, materialCost, weightPerPiece, weightTotal, byWeight,
+      cuttingTimeMin, estimatedCuttingTimeMin, cuttingCost, pierceCostTotal, materialCost, weightPerPiece, weightTotal, byWeight,
       drawingType, designTimeMin, setupTimeMin, designCost,
       pierceTimeMin, totalTimeMin,
       preCorteCost: preCorteCost*marginMult,
@@ -1000,6 +1002,7 @@
     state.loadedOrderId = null;
     state.loadedOrderNumber = null;
     state.loadedOrderCreatedAt = null;
+    state.loadedCostSnapshot = null;
     realCuttingTimeInput.value = '';
     orderNameInp.value = '';
     clientNameInp.value = '';
@@ -1050,6 +1053,7 @@
     state.loadedOrderId = o.id;
     state.loadedOrderNumber = o.orderNumber;
     state.loadedOrderCreatedAt = o.createdAt;
+    state.loadedCostSnapshot = o.costSnapshot || null;
     realCuttingTimeInput.value = (o.costSnapshot && o.costSnapshot.isFinal && isFinite(o.costSnapshot.cuttingTimeMin)) ? o.costSnapshot.cuttingTimeMin : '';
     orderNameInp.value = o.orderName || '';
     clientNameInp.value = o.client || '';
@@ -1161,6 +1165,17 @@
           materialCost: result.materialCost, weightPerPiece: result.weightPerPiece, weightTotal: result.weightTotal,
           designCost: result.designCost, setupCost: result.setupCost, preCorteCost: result.preCorteCost,
           isFinal: result.isFinalDisplay,
+          // Estimativa original de tempo de corte — fica fixa desde a 1ª gravação, mesmo que
+          // depois se corrija com o tempo real, para se poder comparar estimado vs real mais tarde.
+          estimadoCuttingTimeMin: (state.loadedCostSnapshot && state.loadedCostSnapshot.estimadoCuttingTimeMin != null)
+            ? state.loadedCostSnapshot.estimadoCuttingTimeMin
+            : result.estimatedCuttingTimeMin,
+          // Geometria em bruto — permite recalcular esta encomenda do zero mais tarde (ex: em
+          // Encomendas guardadas) sempre com os preços/taxas atuais, sem depender de valores presos.
+          geoSnapshot: {
+            widthMm: result.geo.width, heightMm: result.geo.height,
+            perimeterMm: result.geo.perimeterMm, netAreaMm2: result.geo.netAreaMm2,
+          },
           setupInputs: {
             drawingType: drawingTypeSel.value,
             designTimeMin: parseFloat(designTimeInput.value)||0,

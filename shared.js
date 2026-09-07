@@ -376,37 +376,115 @@
   };
 
   /* ---------------------------------------------------------------- */
-  /* FINAL COST — recompute from the real cutting time reported after  */
-  /* the piece was actually cut (replaces the estimate; material,      */
-  /* pierce cost, and pré-corte stay as originally quoted).             */
+  /* PRECISÃO DAS ESTIMATIVAS — compara tempo estimado vs tempo real,   */
+  /* agrupado por material/espessura, para ajudar a calibrar a tabela.  */
   /* ---------------------------------------------------------------- */
-  LC.recomputeFinalCost = function(rec, realCuttingTimeMin){
+  LC.summarizeAccuracy = function(orders){
+    const groups = {};
+    (orders||[]).forEach(o=>{
+      const cs = o.costSnapshot;
+      if(!cs || !cs.isFinal) return;
+      if(cs.estimadoCuttingTimeMin==null || !isFinite(cs.estimadoCuttingTimeMin)) return;
+      if(!isFinite(cs.cuttingTimeMin)) return;
+      if(cs.estimadoCuttingTimeMin <= 0) return; // avoid divide-by-zero on the deviation %
+      const ms = o.materialSnapshot;
+      const key = ms ? (ms.name + ' — ' + ms.thickness + 'mm') : 'Material desconhecido';
+      if(!groups[key]) groups[key] = { key, count:0, sumEstimado:0, sumReal:0, sumDeviationPct:0 };
+      const g = groups[key];
+      g.count++;
+      g.sumEstimado += cs.estimadoCuttingTimeMin;
+      g.sumReal += cs.cuttingTimeMin;
+      g.sumDeviationPct += ((cs.cuttingTimeMin - cs.estimadoCuttingTimeMin) / cs.estimadoCuttingTimeMin) * 100;
+    });
+    return Object.values(groups).map(g => ({
+      key: g.key,
+      count: g.count,
+      avgEstimado: g.sumEstimado / g.count,
+      avgReal: g.sumReal / g.count,
+      avgDeviationPct: g.sumDeviationPct / g.count,
+    })).sort((a,b) => b.count - a.count);
+  };
+
+  /* ---------------------------------------------------------------- */
+  /* FINAL COST — recompute from the real cutting time reported after  */
+  /* the piece was actually cut. Recalcula sempre material, taxas e margem com os valores ATUAIS   */
+  /* das Definições (só o tempo de corte fica fixo) — usa a geometria em bruto gravada com a       */
+  /* encomenda para o conseguir fazer do zero. Encomendas antigas sem essa geometria (gravadas      */
+  /* antes desta versão) caem no método anterior, que reaproveita os valores da cotação original.   */
+  /* ---------------------------------------------------------------- */
+  LC.recomputeFinalCost = async function(rec, realCuttingTimeMin){
     const cs = rec.costSnapshot || {};
+    const geoSnap = cs.geoSnapshot;
+    const qty = rec.quantity || 1;
+
+    if(geoSnap && geoSnap.perimeterMm){
+      try{
+        const materials = await LC.loadMaterials();
+        const machine = await LC.loadMachine();
+        const material = materials.find(m => m.id === rec.materialId);
+        if(material){
+          const hourlyRate = machine.hourlyRate || 0;
+          const pierces = cs.pierces || 0;
+          const pierceCostTotal = pierces * (machine.pierceTime||0) * hourlyRate / 3600;
+          const corteCost = (realCuttingTimeMin/60) * hourlyRate + pierceCostTotal;
+
+          const marginMm = machine.wasteMarginMm || 0;
+          let areaMm2;
+          if(machine.areaBasis==='net'){
+            areaMm2 = geoSnap.netAreaMm2 || 0;
+          } else if(geoSnap.widthMm!=null && geoSnap.heightMm!=null){
+            areaMm2 = (geoSnap.widthMm+marginMm) * (geoSnap.heightMm+marginMm);
+          } else {
+            areaMm2 = geoSnap.netAreaMm2 || 0;
+          }
+          const areaM2 = areaMm2/1e6;
+          const weightPerPiece = areaM2 * (material.thickness||0) * (material.density||0);
+          const weightTotal = weightPerPiece * qty;
+          const byWeight = machine.materialCostMode==='weight';
+          const materialCost = byWeight ? weightPerPiece*(material.pricePerKg||0) : areaM2*(material.price||0);
+
+          const si = cs.setupInputs || {};
+          const designTimeMin = si.designTimeMin || 0;
+          const setupTimeMin = si.setupTimeMin || 0;
+          const designCost = (designTimeMin/60) * (machine.designRate||0);
+          const setupCost = (setupTimeMin/60) * (machine.setupRate||0);
+          const marginMult = 1 + ((machine.margin||0)/100);
+          const preCorteCost = (designCost + setupCost) * marginMult;
+
+          const perPartCost = corteCost + materialCost;
+          const perPartSell = perPartCost * marginMult;
+          const totalCost = perPartSell * qty + preCorteCost;
+          const avgPerPiece = totalCost / qty;
+
+          return Object.assign({}, cs, {
+            cuttingTimeMin: realCuttingTimeMin,
+            corteCost, materialCost, weightPerPiece, weightTotal,
+            designCost, setupCost, preCorteCost,
+            perPartCost: perPartSell, totalCost, avgPerPiece,
+            isFinal: true,
+          });
+        }
+        // material desta encomenda já não existe na tabela — cai para o método antigo abaixo
+      }catch(e){ /* falha a ir buscar materiais/máquina atuais — cai para o método antigo abaixo */ }
+    }
+
+    // Método antigo (encomendas sem geometria gravada, ou material entretanto removido):
+    // reaproveita os valores tal como estavam na cotação original.
     const ms = rec.machineSnapshot || {};
     const hourlyRate = ms.hourlyRate || 0;
     const marginMult = 1 + ((ms.margin||0)/100);
-    const qty = rec.quantity || 1;
-
     const pierceCostTotal = cs.pierceCostTotal || 0;
     const materialCost = cs.materialCost || 0;
-    const preCorteCost = cs.preCorteCost || 0; // already includes marginMult from the original quote
-
+    const preCorteCost = cs.preCorteCost || 0;
     const corteCost = (realCuttingTimeMin/60) * hourlyRate + pierceCostTotal;
     const perPartCost = corteCost + materialCost;
     const perPartSell = perPartCost * marginMult;
     const totalCost = perPartSell * qty + preCorteCost;
     const avgPerPiece = totalCost / qty;
-
-    const estimado = cs.isFinal ? cs.estimado : {
-      cuttingTimeMin: cs.cuttingTimeMin, corteCost: cs.corteCost,
-      totalCost: cs.totalCost, avgPerPiece: cs.avgPerPiece,
-    };
-
     return Object.assign({}, cs, {
       cuttingTimeMin: realCuttingTimeMin,
       corteCost, perPartCost: perPartSell, totalCost, avgPerPiece,
       isFinal: true,
-      estimado,
     });
   };
 

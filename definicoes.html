@@ -176,6 +176,17 @@ create policy "public access"
       </div>
     </details>
 
+    <details class="card" id="accuracyDetails">
+      <summary class="summary-row"><span>Precisão das estimativas (tempo real vs estimado)</span><span class="chev">▸</span></summary>
+      <div class="details-body">
+        <p class="save-hint" style="margin-bottom:10px;">Compara, por material e espessura, o tempo de corte que a app estimava com o tempo real que foste registando nas encomendas Final — ajuda a perceberes onde as velocidades da tabela precisam de ajuste.</p>
+        <div class="mat-actions" style="margin-bottom:12px;">
+          <button class="ghost-btn" id="analyzeAccuracyBtn" type="button">Analisar encomendas</button>
+        </div>
+        <div id="accuracyResults"></div>
+      </div>
+    </details>
+
   </main>
 
   <footer class="disclaimer">
@@ -189,7 +200,8 @@ create policy "public access"
 (function(){
   "use strict";
   const { DEFAULT_MATERIALS, DEFAULT_MACHINE, loadMaterials, saveMaterials, loadMachine, saveMachine,
-    loadRemoteConfig, saveRemoteConfig, testRemoteConnection, idbGet, idbSet, idbDelete, registerServiceWorker } = window.LC;
+    loadRemoteConfig, saveRemoteConfig, testRemoteConnection, idbGet, idbSet, idbDelete,
+    loadOrders, remoteLoadOrders, summarizeAccuracy, escapeHtml, fmtNum, registerServiceWorker } = window.LC;
 
   const $ = id => document.getElementById(id);
   const state = {
@@ -457,6 +469,50 @@ create policy "public access"
     else $('saveHint').textContent = 'Armazenamento indisponível — as alterações só duram enquanto a página estiver aberta. Use "Exportar definições" para as guardar num ficheiro.';
   }
   init();
+
+  /* ---------------------------------------------------------------- */
+  /* PRECISÃO DAS ESTIMATIVAS                                          */
+  /* ---------------------------------------------------------------- */
+  $('analyzeAccuracyBtn').addEventListener('click', async ()=>{
+    const btn = $('analyzeAccuracyBtn');
+    const resultsEl = $('accuracyResults');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'A analisar…';
+    resultsEl.innerHTML = '';
+    try{
+      let orders;
+      if(state.remote.configured){
+        orders = await remoteLoadOrders(state.remote);
+      } else {
+        orders = await loadOrders();
+      }
+      const summary = summarizeAccuracy(orders);
+      if(!summary.length){
+        resultsEl.innerHTML = '<p class="orders-empty">Ainda não há encomendas suficientes para analisar — precisas de encomendas marcadas como "Final" (com tempo de corte real registado).</p>';
+      } else {
+        let html = '<div class="mat-table-wrap"><table class="mat-table"><thead><tr><th>Material</th><th>Nº encomendas</th><th>Estimado médio</th><th>Real médio</th><th>Desvio médio</th></tr></thead><tbody>';
+        summary.forEach(row=>{
+          const absDev = Math.abs(row.avgDeviationPct);
+          const devColor = absDev>15 ? 'var(--danger)' : (absDev>5 ? '#f0b429' : 'var(--readout)');
+          html += '<tr>' +
+            '<td>'+escapeHtml(row.key)+'</td>' +
+            '<td>'+row.count+'</td>' +
+            '<td>'+fmtNum(row.avgEstimado,1)+' min</td>' +
+            '<td>'+fmtNum(row.avgReal,1)+' min</td>' +
+            '<td style="color:'+devColor+'; font-weight:600;">'+(row.avgDeviationPct>=0?'+':'')+fmtNum(row.avgDeviationPct,0)+'%</td>' +
+          '</tr>';
+        });
+        html += '</tbody></table></div>';
+        html += '<p class="save-hint" style="margin-top:10px;">Desvio positivo = o corte real demorou mais do que a estimativa (considera baixar a velocidade desse material). Desvio negativo = demorou menos (considera subir a velocidade).</p>';
+        resultsEl.innerHTML = html;
+      }
+    }catch(err){
+      resultsEl.innerHTML = '<p class="warn">Não foi possível analisar as encomendas: ' + err.message + '</p>';
+    }
+    btn.disabled = false;
+    btn.textContent = originalText;
+  });
 
   registerServiceWorker();
 })();
