@@ -554,8 +554,12 @@
     if(!geo || !material || !geo.perimeterMm){
       return { valid:false, geo, material };
     }
+    // Se uma encomenda com tempo de corte real já registado estiver carregada, esse tempo (só ele)
+    // substitui a estimativa pela velocidade — tudo o resto (preço de material, taxas, margem)
+    // usa sempre os valores atuais das Definições, para nunca ficar desatualizado.
+    const isFinalTime = !!state.loadedFinalCostSnapshot;
     const speed = Math.max(material.speed, 1);
-    const cuttingTimeMin = geo.perimeterMm / speed;
+    const cuttingTimeMin = isFinalTime ? state.loadedFinalCostSnapshot.cuttingTimeMin : (geo.perimeterMm / speed);
     const cuttingCost = cuttingTimeMin * (state.machine.hourlyRate/60);
     const pierceCostTotal = geo.pierces * state.machine.pierceTime * (state.machine.hourlyRate/3600);
 
@@ -602,30 +606,12 @@
       setupCost, corteCost,
       perPartCost: perPartSell,
       totalCost, avgPerPiece,
+      isFinalDisplay: isFinalTime,
     };
   }
 
-  // Se uma encomenda com tempo de corte real já registado estiver carregada, os valores finais
-  // gravados têm prioridade sobre um novo cálculo estimado — até o utilizador alterar algo
-  // (material, quantidade, tempos, ficheiro), altura em que volta ao cálculo ao vivo normal.
   function getEffectiveCostResult(){
-    const liveResult = computeCost();
-    const cs = state.loadedFinalCostSnapshot;
-    if(cs && liveResult.valid){
-      return Object.assign({}, liveResult, {
-        cuttingTimeMin: cs.cuttingTimeMin,
-        corteCost: cs.corteCost,
-        materialCost: cs.materialCost,
-        preCorteCost: cs.preCorteCost,
-        weightPerPiece: cs.weightPerPiece,
-        weightTotal: cs.weightTotal,
-        perPartCost: cs.perPartCost,
-        totalCost: cs.totalCost,
-        avgPerPiece: cs.avgPerPiece,
-        isFinalDisplay: true,
-      });
-    }
-    return liveResult;
+    return computeCost();
   }
   function clearFinalOverride(){
     state.loadedFinalCostSnapshot = null;
