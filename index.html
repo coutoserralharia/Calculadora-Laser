@@ -1115,9 +1115,10 @@
       saveOrderHint.textContent = 'Carregue um ficheiro DXF válido antes de guardar esta encomenda.';
       return;
     }
-    const originalLabel = saveOrderBtn.innerHTML;
+    const saveLabelEl = $('saveOrderBtnLabel');
+    const originalLabelText = saveLabelEl.textContent;
     saveOrderBtn.disabled = true;
-    saveOrderBtn.textContent = 'A guardar…';
+    saveLabelEl.textContent = 'A guardar…';
     try{
       const result = getEffectiveCostResult();
       const material = getSelectedMaterial();
@@ -1213,7 +1214,7 @@
       saveOrderHint.textContent = 'Ocorreu um erro inesperado ao guardar: ' + err.message + '. Nada foi gravado — tente novamente.';
     } finally {
       saveOrderBtn.disabled = false;
-      saveOrderBtn.innerHTML = originalLabel;
+      if(saveLabelEl.textContent === 'A guardar…') saveLabelEl.textContent = originalLabelText;
     }
   });
 
