@@ -211,9 +211,16 @@
 
       <div class="card">
         <h2 class="card-title"><span class="dot"></span>Custo da encomenda <small id="costFinalBadge" style="margin-left:auto;"></small></h2>
+        <div class="field" style="margin-bottom:14px;">
+          <label for="realCuttingTimeInput">Tempo de corte real (opcional — substitui a estimativa abaixo)</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <div class="unit-suffix" style="flex:1;"><input type="number" id="realCuttingTimeInput" min="0" step="0.1" placeholder="deixe vazio para usar a estimativa"><span>min</span></div>
+            <button class="ghost-btn sm" id="clearRealTimeBtn" type="button">Repor estimativa</button>
+          </div>
+        </div>
         <div class="breakdown-row"><span class="lbl">Peso unitário (1 peça)</span><span class="val" id="valWeightUnit">—</span></div>
         <div class="breakdown-row"><span class="lbl">Peso total<small id="weightTotalSub">—</small></span><span class="val" id="valWeightTotal">—</span></div>
-        <div class="breakdown-row"><span class="lbl">Custo do material<small id="matInfoSub">—</small></span><span class="val" id="costMaterial">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo total do material<small id="matInfoSub">—</small></span><span class="val" id="costMaterial">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo pré-corte<small id="preCorteSub">—</small></span><span class="val" id="costPreCorte">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo do corte<small id="cutTimeSub">—</small></span><span class="val" id="costCorte">€0,00</span></div>
         <div class="breakdown-row" style="border-top:1.5px solid var(--border); margin-top:4px; padding-top:12px;"><span class="lbl" style="font-weight:600; color:var(--text);">Custo total da encomenda <small>(sem IVA)<span id="totalQtyTag"></span></small></span><span class="val" id="totalValue" style="font-size:16px; color:var(--readout);">€0,00</span></div>
@@ -268,7 +275,6 @@
     loadedOrderId: null,
     loadedOrderNumber: null,
     loadedOrderCreatedAt: null,
-    loadedFinalCostSnapshot: null,
   };
 
   /* ---------------------------------------------------------------- */
@@ -286,6 +292,7 @@
   const materialTypeSelect = $('materialTypeSelect'), materialThicknessSelect = $('materialThicknessSelect');
   const drawingTypeSel = $('drawingType'), designTimeField = $('designTimeField'), designTimeInput = $('designTimeInput');
   const setupTimeInput = $('setupTimeInput');
+  const realCuttingTimeInput = $('realCuttingTimeInput'), clearRealTimeBtn = $('clearRealTimeBtn');
   const qtyInput = $('qtyInput');
   const canvas = $('preview'), previewEmpty = $('previewEmpty'), previewMeta = $('previewMeta');
   const metaDim = $('metaDim'), metaPerim = $('metaPerim'), metaPierces = $('metaPierces');
@@ -341,7 +348,7 @@
   });
 
   function handleFile(file){
-    clearFinalOverride();
+    realCuttingTimeInput.value = '';
     fileNameEl.textContent = file.name;
     dxfMsg.innerHTML = '';
     const reader = new FileReader();
@@ -379,10 +386,9 @@
     reader.readAsText(file);
   }
 
-  pierceOverrideInput.addEventListener('input', ()=>{ clearFinalOverride(); recalcAndRender(); });
+  pierceOverrideInput.addEventListener('input', recalcAndRender);
   pierceResetBtn.addEventListener('click', ()=>{
     pierceOverrideInput.value = state.dxfDetectedPierces;
-    clearFinalOverride();
     recalcAndRender();
   });
 
@@ -393,11 +399,13 @@
     shapeRect.hidden = shapeSelect.value!=='rect';
     shapeCircle.hidden = shapeSelect.value!=='circle';
     shapeCustom.hidden = shapeSelect.value!=='custom';
+    realCuttingTimeInput.value = '';
     recalcAndRender();
   });
-  ['rectW','rectH','circleD','customPerim','customArea','manualHoles'].forEach(id=>{
-    $(id).addEventListener('input', ()=>{ clearFinalOverride(); recalcAndRender(); });
+  ['rectW','rectH','circleD','customPerim','customArea'].forEach(id=>{
+    $(id).addEventListener('input', ()=>{ realCuttingTimeInput.value = ''; recalcAndRender(); });
   });
+  $('manualHoles').addEventListener('input', recalcAndRender);
 
   function getManualGeometry(){
     const shape = shapeSelect.value;
@@ -485,8 +493,8 @@
     });
     rebuildVisibleMaterialSelectors();
   }
-  materialSelect.addEventListener('change', ()=>{ clearFinalOverride(); recalcAndRender(); });
-  qtyInput.addEventListener('input', ()=>{ clearFinalOverride(); recalcAndRender(); });
+  materialSelect.addEventListener('change', recalcAndRender);
+  qtyInput.addEventListener('input', recalcAndRender);
   function getSelectedMaterial(){
     return state.materials.find(m=>m.id===materialSelect.value) || state.materials[0] || null;
   }
@@ -508,11 +516,10 @@
   drawingTypeSel.addEventListener('change', ()=>{
     applyDrawingTypeUI();
     if(!designTimeField.hidden) designTimeInput.focus();
-    clearFinalOverride();
     recalcAndRender();
   });
   [designTimeInput, setupTimeInput].forEach(inp=>{
-    inp.addEventListener('input', ()=>{ updateSetupBadge(); clearFinalOverride(); recalcAndRender(); });
+    inp.addEventListener('input', ()=>{ updateSetupBadge(); recalcAndRender(); });
   });
 
   /* ---------------------------------------------------------------- */
@@ -554,12 +561,14 @@
     if(!geo || !material || !geo.perimeterMm){
       return { valid:false, geo, material };
     }
-    // Se uma encomenda com tempo de corte real já registado estiver carregada, esse tempo (só ele)
-    // substitui a estimativa pela velocidade — tudo o resto (preço de material, taxas, margem)
-    // usa sempre os valores atuais das Definições, para nunca ficar desatualizado.
-    const isFinalTime = !!state.loadedFinalCostSnapshot;
+    // Se o campo "Tempo de corte real" tiver um valor, esse tempo (só ele) substitui a estimativa
+    // pela velocidade — tudo o resto (preço de material, taxas, margem) usa sempre os valores
+    // atuais das Definições, para nunca ficar desatualizado.
+    const realTimeRaw = realCuttingTimeInput.value.trim();
+    const realTimeVal = parseFloat(realTimeRaw);
+    const isFinalTime = realTimeRaw !== '' && Number.isFinite(realTimeVal) && realTimeVal >= 0;
     const speed = Math.max(material.speed, 1);
-    const cuttingTimeMin = isFinalTime ? state.loadedFinalCostSnapshot.cuttingTimeMin : (geo.perimeterMm / speed);
+    const cuttingTimeMin = isFinalTime ? realTimeVal : (geo.perimeterMm / speed);
     const cuttingCost = cuttingTimeMin * (state.machine.hourlyRate/60);
     const pierceCostTotal = geo.pierces * state.machine.pierceTime * (state.machine.hourlyRate/3600);
 
@@ -613,9 +622,11 @@
   function getEffectiveCostResult(){
     return computeCost();
   }
-  function clearFinalOverride(){
-    state.loadedFinalCostSnapshot = null;
-  }
+  realCuttingTimeInput.addEventListener('input', recalcAndRender);
+  clearRealTimeBtn.addEventListener('click', ()=>{
+    realCuttingTimeInput.value = '';
+    recalcAndRender();
+  });
 
   /* ---------------------------------------------------------------- */
   /* CANVAS PREVIEW                                                    */
@@ -847,7 +858,7 @@
       html += '<div class="p-costs-title">Custo da encomenda' + (result.valid ? '' : '') + '</div>';
       html += pRow('Peso unitário (1 peça)', result.valid ? (fmtNum(result.weightPerPiece,2)+' kg') : '—');
       html += pRow('Peso total', result.valid ? (fmtNum(result.weightTotal,2)+' kg') : '—');
-      html += pRow('Custo do material', result.valid ? fmtEUR(result.materialCost) : '—');
+      html += pRow('Custo total do material', result.valid ? fmtEUR(result.materialCost * result.qty) : '—');
       html += pRow('Custo pré-corte', result.valid ? fmtEUR(result.preCorteCost) : '—');
       if(result.valid){
         const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[result.drawingType] || result.drawingType;
@@ -934,13 +945,15 @@
     $('valWeightTotal').textContent = fmtNum(result.weightTotal,2)+' kg';
     $('weightTotalSub').textContent = result.qty>1 ? (result.qty+' × '+fmtNum(result.weightPerPiece,2)+' kg') : 'igual ao unitário (1 peça)';
 
-    $('matInfoSub').textContent = result.material.name+' '+result.material.thickness+'mm · '+(result.byWeight ? '€/kg' : '€/m²');
-    $('costMaterial').textContent = fmtEUR(result.materialCost);
+    $('matInfoSub').textContent = result.material.name+' '+result.material.thickness+'mm · '+(result.byWeight ? '€/kg' : '€/m²')+(result.qty>1 ? ' · '+fmtEUR(result.materialCost)+'/peça' : '');
+    $('costMaterial').textContent = fmtEUR(result.materialCost * result.qty);
 
     $('preCorteSub').textContent = 'Desenho '+fmtNum(result.designTimeMin,0)+'min ('+fmtEUR(result.designCost)+') + Setup '+fmtNum(result.setupTimeMin,0)+'min ('+fmtEUR(result.setupCost)+')';
     $('costPreCorte').textContent = fmtEUR(result.preCorteCost);
 
-    $('cutTimeSub').textContent = fmtNum(result.cuttingTimeMin,2)+' min a '+fmtNum(result.material.speed,0)+' mm/min · '+result.geo.pierces+' perfuração(ões)';
+    $('cutTimeSub').textContent = result.isFinalDisplay
+      ? (fmtNum(result.cuttingTimeMin,2)+' min (tempo real) · '+result.geo.pierces+' perfuração(ões)')
+      : (fmtNum(result.cuttingTimeMin,2)+' min a '+fmtNum(result.material.speed,0)+' mm/min (estimado) · '+result.geo.pierces+' perfuração(ões)');
     $('costCorte').textContent = fmtEUR(result.corteCost);
 
     $('totalValue').textContent = fmtEUR(result.totalCost);
@@ -987,7 +1000,7 @@
     state.loadedOrderId = null;
     state.loadedOrderNumber = null;
     state.loadedOrderCreatedAt = null;
-    state.loadedFinalCostSnapshot = null;
+    realCuttingTimeInput.value = '';
     orderNameInp.value = '';
     clientNameInp.value = '';
     orderCommentsInp.value = '';
@@ -1037,7 +1050,7 @@
     state.loadedOrderId = o.id;
     state.loadedOrderNumber = o.orderNumber;
     state.loadedOrderCreatedAt = o.createdAt;
-    state.loadedFinalCostSnapshot = (o.costSnapshot && o.costSnapshot.isFinal) ? o.costSnapshot : null;
+    realCuttingTimeInput.value = (o.costSnapshot && o.costSnapshot.isFinal && isFinite(o.costSnapshot.cuttingTimeMin)) ? o.costSnapshot.cuttingTimeMin : '';
     orderNameInp.value = o.orderName || '';
     clientNameInp.value = o.client || '';
     orderCommentsInp.value = o.comments || '';
@@ -1147,8 +1160,7 @@
           pierceCostTotal: result.pierceCostTotal, corteCost: result.corteCost,
           materialCost: result.materialCost, weightPerPiece: result.weightPerPiece, weightTotal: result.weightTotal,
           designCost: result.designCost, setupCost: result.setupCost, preCorteCost: result.preCorteCost,
-          isFinal: !!state.loadedFinalCostSnapshot,
-          estimado: state.loadedFinalCostSnapshot ? state.loadedFinalCostSnapshot.estimado : undefined,
+          isFinal: result.isFinalDisplay,
           setupInputs: {
             drawingType: drawingTypeSel.value,
             designTimeMin: parseFloat(designTimeInput.value)||0,
