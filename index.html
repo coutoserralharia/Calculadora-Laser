@@ -268,6 +268,7 @@
     loadedOrderId: null,
     loadedOrderNumber: null,
     loadedOrderCreatedAt: null,
+    loadedFinalCostSnapshot: null,
   };
 
   /* ---------------------------------------------------------------- */
@@ -340,6 +341,7 @@
   });
 
   function handleFile(file){
+    clearFinalOverride();
     fileNameEl.textContent = file.name;
     dxfMsg.innerHTML = '';
     const reader = new FileReader();
@@ -377,9 +379,10 @@
     reader.readAsText(file);
   }
 
-  pierceOverrideInput.addEventListener('input', recalcAndRender);
+  pierceOverrideInput.addEventListener('input', ()=>{ clearFinalOverride(); recalcAndRender(); });
   pierceResetBtn.addEventListener('click', ()=>{
     pierceOverrideInput.value = state.dxfDetectedPierces;
+    clearFinalOverride();
     recalcAndRender();
   });
 
@@ -393,7 +396,7 @@
     recalcAndRender();
   });
   ['rectW','rectH','circleD','customPerim','customArea','manualHoles'].forEach(id=>{
-    $(id).addEventListener('input', recalcAndRender);
+    $(id).addEventListener('input', ()=>{ clearFinalOverride(); recalcAndRender(); });
   });
 
   function getManualGeometry(){
@@ -482,8 +485,8 @@
     });
     rebuildVisibleMaterialSelectors();
   }
-  materialSelect.addEventListener('change', recalcAndRender);
-  qtyInput.addEventListener('input', recalcAndRender);
+  materialSelect.addEventListener('change', ()=>{ clearFinalOverride(); recalcAndRender(); });
+  qtyInput.addEventListener('input', ()=>{ clearFinalOverride(); recalcAndRender(); });
   function getSelectedMaterial(){
     return state.materials.find(m=>m.id===materialSelect.value) || state.materials[0] || null;
   }
@@ -505,10 +508,11 @@
   drawingTypeSel.addEventListener('change', ()=>{
     applyDrawingTypeUI();
     if(!designTimeField.hidden) designTimeInput.focus();
+    clearFinalOverride();
     recalcAndRender();
   });
   [designTimeInput, setupTimeInput].forEach(inp=>{
-    inp.addEventListener('input', ()=>{ updateSetupBadge(); recalcAndRender(); });
+    inp.addEventListener('input', ()=>{ updateSetupBadge(); clearFinalOverride(); recalcAndRender(); });
   });
 
   /* ---------------------------------------------------------------- */
@@ -599,6 +603,32 @@
       perPartCost: perPartSell,
       totalCost, avgPerPiece,
     };
+  }
+
+  // Se uma encomenda com tempo de corte real já registado estiver carregada, os valores finais
+  // gravados têm prioridade sobre um novo cálculo estimado — até o utilizador alterar algo
+  // (material, quantidade, tempos, ficheiro), altura em que volta ao cálculo ao vivo normal.
+  function getEffectiveCostResult(){
+    const liveResult = computeCost();
+    const cs = state.loadedFinalCostSnapshot;
+    if(cs && liveResult.valid){
+      return Object.assign({}, liveResult, {
+        cuttingTimeMin: cs.cuttingTimeMin,
+        corteCost: cs.corteCost,
+        materialCost: cs.materialCost,
+        preCorteCost: cs.preCorteCost,
+        weightPerPiece: cs.weightPerPiece,
+        weightTotal: cs.weightTotal,
+        perPartCost: cs.perPartCost,
+        totalCost: cs.totalCost,
+        avgPerPiece: cs.avgPerPiece,
+        isFinalDisplay: true,
+      });
+    }
+    return liveResult;
+  }
+  function clearFinalOverride(){
+    state.loadedFinalCostSnapshot = null;
   }
 
   /* ---------------------------------------------------------------- */
@@ -765,7 +795,7 @@
   }
 
   function printSheetHTML(mode){
-    const result = computeCost();
+    const result = getEffectiveCostResult();
     const geo = result.geo;
     const material = result.material;
     const source = state.mode==='dxf' ? (state.dxfFileName || 'Ficheiro DXF') : describeManualShape();
@@ -862,7 +892,7 @@
     return String(s||'').trim().replace(/[\\/:*?"<>|]+/g,'_');
   }
   function doPrint(mode){
-    const result = computeCost();
+    const result = getEffectiveCostResult();
     if(!result.geo || !result.geo.perimeterMm){
       printHint.textContent = 'Adicione um ficheiro DXF ou preencha as dimensões antes de imprimir.';
       printHint.style.color = 'var(--danger)';
@@ -886,7 +916,7 @@
   /* RENDER                                                            */
   /* ---------------------------------------------------------------- */
   function recalcAndRender(){
-    const result = computeCost();
+    const result = getEffectiveCostResult();
     const geo = result.geo;
 
     drawPreview(geo);
@@ -931,7 +961,13 @@
     $('totalQtyTag').textContent = ' — '+result.qty+(result.qty===1 ? ' peça' : ' peças');
     $('avgPerPieceValue').textContent = fmtEUR(result.avgPerPiece);
 
-    $('costFinalBadge').textContent = '(estimado — velocidade da tabela)';
+    if(result.isFinalDisplay){
+      $('costFinalBadge').textContent = '(FINAL — tempo de corte real registado)';
+      $('costFinalBadge').style.color = 'var(--readout)';
+    } else {
+      $('costFinalBadge').textContent = '(estimado — velocidade da tabela)';
+      $('costFinalBadge').style.color = '';
+    }
 
     $('totalTimeSub').hidden = false;
     $('totalTimeSub').textContent = 'Tempo total estimado (1 peça): '+fmtNum(result.totalTimeMin,1)+' min (corte '+fmtNum(result.cuttingTimeMin,1)+' + perfurações '+fmtNum(result.pierceTimeMin,1)+' + preparação '+fmtNum(result.designTimeMin+result.setupTimeMin,0)+')';
@@ -965,6 +1001,7 @@
     state.loadedOrderId = null;
     state.loadedOrderNumber = null;
     state.loadedOrderCreatedAt = null;
+    state.loadedFinalCostSnapshot = null;
     orderNameInp.value = '';
     clientNameInp.value = '';
     orderCommentsInp.value = '';
@@ -1014,6 +1051,7 @@
     state.loadedOrderId = o.id;
     state.loadedOrderNumber = o.orderNumber;
     state.loadedOrderCreatedAt = o.createdAt;
+    state.loadedFinalCostSnapshot = (o.costSnapshot && o.costSnapshot.isFinal) ? o.costSnapshot : null;
     orderNameInp.value = o.orderName || '';
     clientNameInp.value = o.client || '';
     orderCommentsInp.value = o.comments || '';
@@ -1095,7 +1133,7 @@
     saveOrderBtn.disabled = true;
     saveOrderBtn.textContent = 'A guardar…';
     try{
-      const result = computeCost();
+      const result = getEffectiveCostResult();
       const material = getSelectedMaterial();
       const isUpdate = !!state.loadedOrderId;
       const id = isUpdate ? state.loadedOrderId : ('o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8));
@@ -1122,7 +1160,8 @@
           pierceCostTotal: result.pierceCostTotal, corteCost: result.corteCost,
           materialCost: result.materialCost, weightPerPiece: result.weightPerPiece, weightTotal: result.weightTotal,
           designCost: result.designCost, setupCost: result.setupCost, preCorteCost: result.preCorteCost,
-          isFinal: false,
+          isFinal: !!state.loadedFinalCostSnapshot,
+          estimado: state.loadedFinalCostSnapshot ? state.loadedFinalCostSnapshot.estimado : undefined,
           setupInputs: {
             drawingType: drawingTypeSel.value,
             designTimeMin: parseFloat(designTimeInput.value)||0,
