@@ -424,9 +424,9 @@
         const material = materials.find(m => m.id === rec.materialId);
         if(material){
           const hourlyRate = machine.hourlyRate || 0;
-          const pierces = cs.pierces || 0;
-          const pierceCostTotal = pierces * (machine.pierceTime||0) * hourlyRate / 3600;
-          const corteCost = (realCuttingTimeMin/60) * hourlyRate + pierceCostTotal;
+          // O tempo real introduzido é sempre o TOTAL da encomenda (todas as peças, já inclui
+          // perfurações) — não se soma nem se multiplica mais nada a este tempo.
+          const corteCost = (realCuttingTimeMin/60) * hourlyRate;
 
           const marginMm = machine.wasteMarginMm || 0;
           let areaMm2;
@@ -441,7 +441,7 @@
           const weightPerPiece = areaM2 * (material.thickness||0) * (material.density||0);
           const weightTotal = weightPerPiece * qty;
           const byWeight = machine.materialCostMode==='weight';
-          const materialCost = byWeight ? weightPerPiece*(material.pricePerKg||0) : areaM2*(material.price||0);
+          const materialCost = byWeight ? weightPerPiece*(material.pricePerKg||0) : areaM2*(material.price||0); // por peça
 
           const si = cs.setupInputs || {};
           const designTimeMin = si.designTimeMin || 0;
@@ -451,16 +451,15 @@
           const marginMult = 1 + ((machine.margin||0)/100);
           const preCorteCost = (designCost + setupCost) * marginMult;
 
-          const perPartCost = corteCost + materialCost;
-          const perPartSell = perPartCost * marginMult;
-          const totalCost = perPartSell * qty + preCorteCost;
+          // corteCost já é total; materialCost é por peça, por isso só este é vezes qty aqui.
+          const totalCost = (corteCost + materialCost*qty) * marginMult + preCorteCost;
           const avgPerPiece = totalCost / qty;
 
           return Object.assign({}, cs, {
             cuttingTimeMin: realCuttingTimeMin,
             corteCost, materialCost, weightPerPiece, weightTotal,
             designCost, setupCost, preCorteCost,
-            perPartCost: perPartSell, totalCost, avgPerPiece,
+            totalCost, avgPerPiece,
             isFinal: true,
           });
         }
@@ -473,17 +472,14 @@
     const ms = rec.machineSnapshot || {};
     const hourlyRate = ms.hourlyRate || 0;
     const marginMult = 1 + ((ms.margin||0)/100);
-    const pierceCostTotal = cs.pierceCostTotal || 0;
-    const materialCost = cs.materialCost || 0;
+    const materialCost = cs.materialCost || 0; // por peça
     const preCorteCost = cs.preCorteCost || 0;
-    const corteCost = (realCuttingTimeMin/60) * hourlyRate + pierceCostTotal;
-    const perPartCost = corteCost + materialCost;
-    const perPartSell = perPartCost * marginMult;
-    const totalCost = perPartSell * qty + preCorteCost;
+    const corteCost = (realCuttingTimeMin/60) * hourlyRate;
+    const totalCost = (corteCost + materialCost*qty) * marginMult + preCorteCost;
     const avgPerPiece = totalCost / qty;
     return Object.assign({}, cs, {
       cuttingTimeMin: realCuttingTimeMin,
-      corteCost, perPartCost: perPartSell, totalCost, avgPerPiece,
+      corteCost, totalCost, avgPerPiece,
       isFinal: true,
     });
   };
@@ -548,7 +544,7 @@
     lines.push('');
     if(rec.costSnapshot){
       lines.push('Custos no momento de gravação (' + (rec.costSnapshot.isFinal ? 'FINAL' : 'estimado') + '):');
-      lines.push('  Custo material: ' + fmtEUR(rec.costSnapshot.materialCost));
+      lines.push('  Custo total do material: ' + fmtEUR(rec.costSnapshot.materialCost * (rec.quantity||1)));
       lines.push('  Custo pré-corte (desenho + setup): ' + fmtEUR(rec.costSnapshot.preCorteCost));
       if(rec.costSnapshot.setupInputs){
         const si = rec.costSnapshot.setupInputs;
@@ -556,7 +552,7 @@
         lines.push('    · Desenho: ' + drawLabel + (si.designTimeMin ? ' — ' + si.designTimeMin + ' min (' + fmtEUR(rec.costSnapshot.designCost) + ')' : ''));
         lines.push('    · Setup: ' + si.setupTimeMin + ' min (' + fmtEUR(rec.costSnapshot.setupCost) + ')');
       }
-      lines.push('  Custo de corte: ' + fmtEUR(rec.costSnapshot.corteCost) + ' (' + fmtNum(rec.costSnapshot.cuttingTimeMin,2) + ' min · inclui ' + (rec.costSnapshot.pierces ?? '—') + ' perfuração(ões))');
+      lines.push('  Custo total do corte: ' + fmtEUR(rec.costSnapshot.corteCost) + ' (' + fmtNum(rec.costSnapshot.cuttingTimeMin,1) + ' min no total, todas as peças, inclui perfurações)');
       lines.push('  TOTAL da encomenda (sem IVA): ' + fmtEUR(rec.costSnapshot.totalCost));
       lines.push('  TOTAL ÷ nº peças (sem IVA): ' + fmtEUR(rec.costSnapshot.avgPerPiece));
     }

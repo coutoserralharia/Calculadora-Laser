@@ -212,7 +212,7 @@
       <div class="card">
         <h2 class="card-title"><span class="dot"></span>Custo da encomenda <small id="costFinalBadge" style="margin-left:auto;"></small></h2>
         <div class="field" style="margin-bottom:14px;">
-          <label for="realCuttingTimeInput">Tempo de corte real (opcional — substitui a estimativa abaixo)</label>
+          <label for="realCuttingTimeInput">Tempo de corte real — total da encomenda, todas as peças (opcional)</label>
           <div style="display:flex; gap:8px; align-items:center;">
             <div class="unit-suffix" style="flex:1;"><input type="number" id="realCuttingTimeInput" min="0" step="0.1" placeholder="deixe vazio para usar a estimativa"><span>min</span></div>
             <button class="ghost-btn sm" id="clearRealTimeBtn" type="button">Repor estimativa</button>
@@ -222,7 +222,7 @@
         <div class="breakdown-row"><span class="lbl">Peso total<small id="weightTotalSub">—</small></span><span class="val" id="valWeightTotal">—</span></div>
         <div class="breakdown-row"><span class="lbl">Custo total do material<small id="matInfoSub">—</small></span><span class="val" id="costMaterial">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo pré-corte<small id="preCorteSub">—</small></span><span class="val" id="costPreCorte">€0,00</span></div>
-        <div class="breakdown-row"><span class="lbl">Custo do corte<small id="cutTimeSub">—</small></span><span class="val" id="costCorte">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo total do corte<small id="cutTimeSub">—</small></span><span class="val" id="costCorte">€0,00</span></div>
         <div class="breakdown-row" style="border-top:1.5px solid var(--border); margin-top:4px; padding-top:12px;"><span class="lbl" style="font-weight:600; color:var(--text);">Custo total da encomenda <small>(sem IVA)<span id="totalQtyTag"></span></small></span><span class="val" id="totalValue" style="font-size:16px; color:var(--readout);">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo total ÷ nº peças <small>(sem IVA)</small></span><span class="val" id="avgPerPieceValue">€0,00</span></div>
         <div class="total-sub" id="totalTimeSub" hidden style="margin-top:10px; padding-top:10px;"></div>
@@ -562,17 +562,21 @@
     if(!geo || !material || !geo.perimeterMm){
       return { valid:false, geo, material };
     }
-    // Se o campo "Tempo de corte real" tiver um valor, esse tempo (só ele) substitui a estimativa
-    // pela velocidade — tudo o resto (preço de material, taxas, margem) usa sempre os valores
-    // atuais das Definições, para nunca ficar desatualizado.
     const realTimeRaw = realCuttingTimeInput.value.trim();
     const realTimeVal = parseFloat(realTimeRaw);
     const isFinalTime = realTimeRaw !== '' && Number.isFinite(realTimeVal) && realTimeVal >= 0;
     const speed = Math.max(material.speed, 1);
-    const estimatedCuttingTimeMin = geo.perimeterMm / speed;
-    const cuttingTimeMin = isFinalTime ? realTimeVal : estimatedCuttingTimeMin;
-    const cuttingCost = cuttingTimeMin * (state.machine.hourlyRate/60);
-    const pierceCostTotal = geo.pierces * state.machine.pierceTime * (state.machine.hourlyRate/3600);
+
+    // Tempo estimado TOTAL da encomenda: corte + perfurações de 1 peça, multiplicado pela
+    // quantidade — é a estimativa para cortar todas as peças, não só uma.
+    const pierceTimeMinPerPiece = geo.pierces * state.machine.pierceTime / 60;
+    const cuttingTimeMinPerPiece = geo.perimeterMm / speed;
+    const estimatedTotalTimeMin = (cuttingTimeMinPerPiece + pierceTimeMinPerPiece) * qty;
+
+    // O "Tempo de corte real" introduzido é sempre o TOTAL para todas as peças da encomenda
+    // (já inclui as perfurações de todas elas) — nunca é multiplicado pela quantidade.
+    const cuttingTimeMin = isFinalTime ? realTimeVal : estimatedTotalTimeMin;
+    const corteCost = cuttingTimeMin * (state.machine.hourlyRate/60);
 
     // Waste margin: adds to the bounding-box width/height before computing area, to reflect the
     // sheet space around each part that isn't reused (parts aren't nested together). Only applies
@@ -590,32 +594,28 @@
     const weightPerPiece = areaM2 * (material.thickness||0) * (material.density||0);
     const weightTotal = weightPerPiece * qty;
     const byWeight = state.machine.materialCostMode==='weight';
-    const materialCost = byWeight ? weightPerPiece * (material.pricePerKg||0) : areaM2 * (material.price||0);
+    const materialCost = byWeight ? weightPerPiece * (material.pricePerKg||0) : areaM2 * (material.price||0); // por peça
 
     const drawingType = drawingTypeSel.value;
     const designTimeMin = drawingType==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
     const setupTimeMin = parseFloat(setupTimeInput.value)||0;
     const designCost = (designTimeMin/60) * (state.machine.designRate||0);
     const setupCost = (setupTimeMin/60) * (state.machine.setupRate||0);
-    const preCorteCost = designCost + setupCost;
-    const corteCost = cuttingCost + pierceCostTotal;
+    const preCorteCostRaw = designCost + setupCost;
 
-    const perPartCost = corteCost + materialCost;
     const marginMult = 1 + (state.machine.margin/100);
-    const perPartSell = perPartCost*marginMult;
-    const pierceTimeMin = geo.pierces * state.machine.pierceTime / 60;
-    const totalTimeMin = cuttingTimeMin + pierceTimeMin + designTimeMin + setupTimeMin;
-
-    const totalCost = perPartSell*qty + preCorteCost*marginMult;
+    // corteCost já é o total da encomenda; materialCost é por peça, por isso só este é vezes qty aqui.
+    const totalCost = (corteCost + materialCost*qty) * marginMult + preCorteCostRaw * marginMult;
     const avgPerPiece = totalCost / qty;
+    const totalTimeMin = cuttingTimeMin + designTimeMin + setupTimeMin; // cuttingTimeMin já é total e já inclui perfurações
+
     return {
       valid:true, geo, material, qty,
-      cuttingTimeMin, estimatedCuttingTimeMin, cuttingCost, pierceCostTotal, materialCost, weightPerPiece, weightTotal, byWeight,
+      cuttingTimeMin, estimatedCuttingTimeMin: estimatedTotalTimeMin, corteCost, materialCost, weightPerPiece, weightTotal, byWeight,
       drawingType, designTimeMin, setupTimeMin, designCost,
-      pierceTimeMin, totalTimeMin,
-      preCorteCost: preCorteCost*marginMult,
-      setupCost, corteCost,
-      perPartCost: perPartSell,
+      totalTimeMin,
+      preCorteCost: preCorteCostRaw*marginMult,
+      setupCost,
       totalCost, avgPerPiece,
       isFinalDisplay: isFinalTime,
     };
@@ -832,7 +832,7 @@
       if(result.valid && result.weightPerPiece > 0) html += pRow('Peso de 1 peça', fmtNum(result.weightPerPiece,2) + ' kg');
       html += '</div>';
 
-      html += '<div class="p-realtime-box">Tempo de corte real: __________________ min &nbsp;&nbsp;&nbsp; Nº de perfurações (se diferente): __________</div>';
+      html += '<div class="p-realtime-box">Tempo de corte real (TOTAL da encomenda, todas as peças): __________________ min &nbsp;&nbsp;&nbsp; Nº de perfurações (se diferente): __________</div>';
 
     } else {
       const svg = buildPrintSVG(false);
@@ -867,7 +867,7 @@
         html += pRow('　· Desenho', drawLabel + (result.designTimeMin ? ' — '+result.designTimeMin+' min ('+fmtEUR(result.designCost)+')' : ' — sem custo'));
         html += pRow('　· Setup', result.setupTimeMin+' min ('+fmtEUR(result.setupCost)+')');
       }
-      html += pRow('Custo do corte', result.valid ? (fmtEUR(result.corteCost)+' ('+fmtNum(result.cuttingTimeMin,2)+' min, estimado)') : '—');
+      html += pRow('Custo total do corte', result.valid ? (fmtEUR(result.corteCost)+' ('+fmtNum(result.cuttingTimeMin,1)+' min no total, estimado)') : '—');
       if(state.machine.margin>0) html += pRow('Margem aplicada', state.machine.margin + '%');
       html += '</div>';
       html += '<div class="p-totals">';
@@ -954,8 +954,8 @@
     $('costPreCorte').textContent = fmtEUR(result.preCorteCost);
 
     $('cutTimeSub').textContent = result.isFinalDisplay
-      ? (fmtNum(result.cuttingTimeMin,2)+' min (tempo real) · '+result.geo.pierces+' perfuração(ões)')
-      : (fmtNum(result.cuttingTimeMin,2)+' min a '+fmtNum(result.material.speed,0)+' mm/min (estimado) · '+result.geo.pierces+' perfuração(ões)');
+      ? (fmtNum(result.cuttingTimeMin,1)+' min no total (tempo real, todas as peças)')
+      : (fmtNum(result.cuttingTimeMin,1)+' min no total (estimado, '+result.qty+(result.qty===1?' peça':' peças')+' · '+result.geo.pierces+' perfuração(ões)/peça)');
     $('costCorte').textContent = fmtEUR(result.corteCost);
 
     $('totalValue').textContent = fmtEUR(result.totalCost);
@@ -971,7 +971,7 @@
     }
 
     $('totalTimeSub').hidden = false;
-    $('totalTimeSub').textContent = 'Tempo total estimado (1 peça): '+fmtNum(result.totalTimeMin,1)+' min (corte '+fmtNum(result.cuttingTimeMin,1)+' + perfurações '+fmtNum(result.pierceTimeMin,1)+' + preparação '+fmtNum(result.designTimeMin+result.setupTimeMin,0)+')';
+    $('totalTimeSub').textContent = 'Tempo total estimado da encomenda: '+fmtNum(result.totalTimeMin,1)+' min (corte + perfurações de todas as peças: '+fmtNum(result.cuttingTimeMin,1)+' + preparação '+fmtNum(result.designTimeMin+result.setupTimeMin,0)+')';
   }
 
   /* ---------------------------------------------------------------- */
@@ -1187,9 +1187,9 @@
         quantity: Math.max(1, parseInt(qtyInput.value,10)||1),
         machineSnapshot: Object.assign({}, state.machine),
         costSnapshot: result.valid ? {
-          perPartCost: result.perPartCost, totalCost: result.totalCost, avgPerPiece: result.avgPerPiece,
-          cuttingCost: result.cuttingCost, cuttingTimeMin: result.cuttingTimeMin, pierces: result.geo.pierces,
-          pierceCostTotal: result.pierceCostTotal, corteCost: result.corteCost,
+          totalCost: result.totalCost, avgPerPiece: result.avgPerPiece,
+          cuttingTimeMin: result.cuttingTimeMin, pierces: result.geo.pierces,
+          corteCost: result.corteCost,
           materialCost: result.materialCost, weightPerPiece: result.weightPerPiece, weightTotal: result.weightTotal,
           designCost: result.designCost, setupCost: result.setupCost, preCorteCost: result.preCorteCost,
           isFinal: result.isFinalDisplay,
