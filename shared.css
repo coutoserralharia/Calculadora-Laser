@@ -271,6 +271,11 @@
     margin-top:20px; padding:12px 14px; border:1.5px dashed #111; border-radius:4px;
     font-size:13px; font-weight:600; color:#111;
   }
+  .print-sheet .p-notes-box{margin-top:18px; padding:12px 14px; border:1px solid #ccc; border-radius:4px;}
+  .print-sheet .p-notes-title{font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:#666; font-weight:600; margin-bottom:10px;}
+  .print-sheet .p-notes-lines span{display:block; border-bottom:1px solid #ccc; height:22px;}
+  .print-sheet .p-notes-lines span:last-child{border-bottom:none;}
+  .print-sheet .p-notes-text{font-size:12.5px; line-height:1.6; color:#222; white-space:pre-wrap;}
   .print-sheet .p-sign{display:flex; justify-content:space-between; margin-top:40px; font-size:12px; color:#333;}
 
   nav.pagenav{display:flex; gap:6px; background:var(--panel-2); padding:4px; border-radius:9px; border:1px solid var(--border-soft);}

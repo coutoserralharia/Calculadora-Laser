@@ -291,6 +291,7 @@
       mode: o.mode, dxf_file_name: o.dxfFileName || null, dxf_text: o.dxfText || null, manual: o.manual || null,
       material_id: o.materialId || null, material_snapshot: o.materialSnapshot || null, quantity: o.quantity || 1,
       machine_snapshot: o.machineSnapshot || null, cost_snapshot: o.costSnapshot || null,
+      comments: o.comments || null,
     };
   }
   function rowToOrder(r){
@@ -298,6 +299,7 @@
       id: r.id, client: r.client, orderName: r.order_name, orderNumber: r.order_number, createdAt: r.created_at, mode: r.mode,
       dxfFileName: r.dxf_file_name, dxfText: r.dxf_text, manual: r.manual, materialId: r.material_id,
       materialSnapshot: r.material_snapshot, quantity: r.quantity, machineSnapshot: r.machine_snapshot, costSnapshot: r.cost_snapshot,
+      comments: r.comments,
     };
   }
   async function remoteRequestError(res){

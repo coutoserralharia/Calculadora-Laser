@@ -172,6 +172,10 @@
       <div class="card">
         <h2 class="card-title"><span class="dot"></span>Guardar encomenda <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
         <p class="save-hint" id="editingNote" hidden style="color:var(--accent); margin-bottom:10px;"></p>
+        <div class="field">
+          <label for="orderComments">Comentários (internos — aparecem na ficha interna)</label>
+          <textarea id="orderComments" rows="3" placeholder="Notas para esta encomenda…" style="width:100%; resize:vertical; background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:9px 10px; border-radius:7px; font-family:'Inter',sans-serif; font-size:13.5px; outline:none;"></textarea>
+        </div>
         <div class="mat-actions">
           <button class="ghost-btn" id="saveOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M2 2h9l3 3v9H2V2z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M4 2v4h6V2M4 14v-4h8v4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg><span id="saveOrderBtnLabel">Guardar encomenda atual</span></button>
           <a class="ghost-btn sm" href="encomendas.html" style="text-decoration:none;">Ver encomendas guardadas →</a>
@@ -286,6 +290,7 @@
   const metaDim = $('metaDim'), metaPerim = $('metaPerim'), metaPierces = $('metaPierces');
   const dimEmptyEl = $('dimEmpty');
   const orderNameInp = $('orderName'), clientNameInp = $('clientName');
+  const orderCommentsInp = $('orderComments');
   const saveOrderHint = $('saveOrderHint');
 
   function updateOrderHeader(){
@@ -840,6 +845,12 @@
       html += '<div class="p-total-item p-total-main"><span>Total da encomenda (' + qty + (qty===1?' peça':' peças') + ') — sem IVA</span><strong>' + (result.valid?fmtEUR(result.totalCost):'—') + '</strong></div>';
       html += '<div class="p-total-item"><span>Total ÷ nº peças — sem IVA</span><strong>' + (result.valid?fmtEUR(result.avgPerPiece):'—') + '</strong></div>';
       html += '</div>';
+      const commentsText = orderCommentsInp.value.trim();
+      html += '<div class="p-notes-box"><div class="p-notes-title">Comentários</div>' +
+        (commentsText
+          ? '<div class="p-notes-text">' + escapeHtml(commentsText).replace(/\n/g,'<br>') + '</div>'
+          : '<div class="p-notes-lines"><span></span><span></span><span></span></div>')
+        + '</div>';
     }
 
     html += '<div class="p-sign"><div>Operador: ______________________</div><div>Data: ______________</div></div>';
@@ -956,6 +967,7 @@
     state.loadedOrderCreatedAt = null;
     orderNameInp.value = '';
     clientNameInp.value = '';
+    orderCommentsInp.value = '';
     qtyInput.value = 1;
     state.dxfResult = null;
     state.dxfFileName = '';
@@ -1004,6 +1016,7 @@
     state.loadedOrderCreatedAt = o.createdAt;
     orderNameInp.value = o.orderName || '';
     clientNameInp.value = o.client || '';
+    orderCommentsInp.value = o.comments || '';
     qtyInput.value = o.quantity || 1;
 
     if(o.mode==='dxf' && o.dxfText){
@@ -1091,6 +1104,7 @@
       const rec = {
         id,
         client: clientNameInp.value.trim(),
+        comments: orderCommentsInp.value.trim(),
         orderName,
         orderNumber,
         createdAt,
