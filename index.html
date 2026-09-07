@@ -1049,12 +1049,7 @@
   /* ---------------------------------------------------------------- */
   /* LOAD ORDER FROM ?loadOrder=ID (comes from encomendas.html)        */
   /* ---------------------------------------------------------------- */
-  async function loadOrderIntoForm(o){
-    state.loadedOrderId = o.id;
-    state.loadedOrderNumber = o.orderNumber;
-    state.loadedOrderCreatedAt = o.createdAt;
-    state.loadedCostSnapshot = o.costSnapshot || null;
-    realCuttingTimeInput.value = (o.costSnapshot && o.costSnapshot.isFinal && isFinite(o.costSnapshot.cuttingTimeMin)) ? o.costSnapshot.cuttingTimeMin : '';
+  async function populateFormFromOrder(o, sourceNote){
     orderNameInp.value = o.orderName || '';
     clientNameInp.value = o.client || '';
     orderCommentsInp.value = o.comments || '';
@@ -1067,7 +1062,7 @@
         state.dxfFileName = o.dxfFileName || 'ficheiro.dxf';
         state.dxfRawText = o.dxfText;
         fileNameEl.textContent = state.dxfFileName;
-        dxfMsg.innerHTML = '<div class="warn">Ficheiro reposto do histórico de encomendas (guardado em ' + (o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—') + ').</div>';
+        dxfMsg.innerHTML = '<div class="warn">' + sourceNote + '</div>';
         const detected = Math.max(result.closedContours.length, result.contours.length ? 1 : 0);
         state.dxfDetectedPierces = detected;
         pierceDetectedNote.textContent = '(detetado automaticamente: ' + detected + ')';
@@ -1108,10 +1103,39 @@
 
     updateOrderHeader();
     recalcAndRender();
+  }
+
+  async function loadOrderIntoForm(o){
+    state.loadedOrderId = o.id;
+    state.loadedOrderNumber = o.orderNumber;
+    state.loadedOrderCreatedAt = o.createdAt;
+    state.loadedCostSnapshot = o.costSnapshot || null;
+    realCuttingTimeInput.value = (o.costSnapshot && o.costSnapshot.isFinal && isFinite(o.costSnapshot.cuttingTimeMin)) ? o.costSnapshot.cuttingTimeMin : '';
+
+    const sourceNote = 'Ficheiro reposto do histórico de encomendas (guardado em ' + (o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—') + ').';
+    await populateFormFromOrder(o, sourceNote);
+
     $('orderNumberPreview').value = o.orderNumber || '';
     updateEditingUI();
     saveOrderHint.style.color = 'var(--readout)';
     saveOrderHint.textContent = 'Encomenda ' + (o.orderNumber ? o.orderNumber+' ' : '') + '"' + (o.orderName||'sem nome') + '" reposta — se guardar de novo, atualiza esta mesma encomenda (mesmo número), com os valores recalculados com os preços/definições atuais.';
+    setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
+  }
+
+  async function loadOrderAsDuplicate(o){
+    state.loadedOrderId = null;
+    state.loadedOrderNumber = null;
+    state.loadedOrderCreatedAt = null;
+    state.loadedCostSnapshot = null;
+    realCuttingTimeInput.value = ''; // um novo corte ainda não tem tempo real medido
+
+    const sourceNote = 'Ficheiro copiado da encomenda ' + (o.orderNumber||'') + ' — esta vai ficar com um número novo ao gravar.';
+    await populateFormFromOrder(o, sourceNote);
+
+    await refreshOrderNumberPreview();
+    updateEditingUI();
+    saveOrderHint.style.color = 'var(--readout)';
+    saveOrderHint.textContent = 'Dados copiados de "' + (o.orderName||'sem nome') + '" — confirma tudo e grava como encomenda nova (nº ' + $('orderNumberPreview').value + ').';
     setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
   }
 
@@ -1131,6 +1155,10 @@
       saveOrderHint.style.color = 'var(--danger)';
       saveOrderHint.textContent = 'Carregue um ficheiro DXF válido antes de guardar esta encomenda.';
       return;
+    }
+    if(state.loadedOrderId && state.loadedCostSnapshot && state.loadedCostSnapshot.isFinal){
+      const ok = confirm('Esta encomenda (' + (state.loadedOrderNumber||'') + ') já está marcada como Final, com preço fechado. Tens a certeza que queres substituir os dados gravados?');
+      if(!ok) return;
     }
     const saveLabelEl = $('saveOrderBtnLabel');
     const originalLabelText = saveLabelEl.textContent;
@@ -1278,9 +1306,14 @@
 
     const params = new URLSearchParams(location.search);
     const loadId = params.get('loadOrder');
+    const dupId = params.get('duplicateOrder');
     if(loadId){
       const o = state.orders.find(x=>x.id===loadId);
       if(o) await loadOrderIntoForm(o);
+      history.replaceState(null, '', 'index.html');
+    } else if(dupId){
+      const o = state.orders.find(x=>x.id===dupId);
+      if(o) await loadOrderAsDuplicate(o);
       history.replaceState(null, '', 'index.html');
     }
 

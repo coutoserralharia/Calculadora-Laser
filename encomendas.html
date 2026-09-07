@@ -78,6 +78,19 @@
       <p class="save-hint" id="localStorageNote">As encomendas ficam guardadas neste navegador/dispositivo. Exporte periodicamente para ter uma cópia de segurança ou para levar para outro PC/telemóvel. Para ligação automática entre aparelhos, vá a <a href="definicoes.html" style="color:var(--readout);">Definições avançadas</a>.</p>
     </div>
 
+    <div class="card">
+      <h2 class="card-title"><span class="dot"></span>Relatório por período</h2>
+      <div class="field-row">
+        <div class="field"><label for="reportFrom">De</label><input type="date" id="reportFrom"></div>
+        <div class="field"><label for="reportTo">Até</label><input type="date" id="reportTo"></div>
+      </div>
+      <div class="mat-actions">
+        <button class="ghost-btn" id="generateReportBtn" type="button">Gerar relatório</button>
+        <button class="ghost-btn" id="exportReportBtn" type="button" hidden><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Exportar CSV</button>
+      </div>
+      <div id="reportResults"></div>
+    </div>
+
   </main>
 
   <footer class="disclaimer">
@@ -161,6 +174,7 @@
         html += '<div class="order-row-actions">';
         html += '<button class="ghost-btn sm" data-realtime="' + o.id + '">Tempo real</button>';
         html += '<button class="ghost-btn sm" data-load="' + o.id + '">Carregar</button>';
+        html += '<button class="ghost-btn sm" data-dup="' + o.id + '" title="Criar uma encomenda nova a partir desta">Duplicar</button>';
         html += '<button class="rm-btn" data-del="' + o.id + '" title="Eliminar">✕</button>';
         html += '</div></div>';
         html += '<div class="realtime-form" id="rtform-' + o.id + '" hidden>';
@@ -181,6 +195,11 @@
     ordersListEl.querySelectorAll('[data-load]').forEach(b=>{
       b.addEventListener('click', ()=>{
         window.location.href = 'index.html?loadOrder=' + encodeURIComponent(b.getAttribute('data-load'));
+      });
+    });
+    ordersListEl.querySelectorAll('[data-dup]').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        window.location.href = 'index.html?duplicateOrder=' + encodeURIComponent(b.getAttribute('data-dup'));
       });
     });
     ordersListEl.querySelectorAll('[data-del]').forEach(b=>{
@@ -305,6 +324,86 @@
     renderOrdersList();
   }
   init();
+
+  /* ---------------------------------------------------------------- */
+  /* RELATÓRIO POR PERÍODO                                             */
+  /* ---------------------------------------------------------------- */
+  let reportOrders = [];
+
+  function renderReport(orders){
+    const resultsEl = $('reportResults');
+    if(!orders.length){
+      resultsEl.innerHTML = '<p class="orders-empty">Nenhuma encomenda neste período.</p>';
+      $('exportReportBtn').hidden = true;
+      return;
+    }
+    const totalRevenue = orders.reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
+    const finalCount = orders.filter(o=>o.costSnapshot && o.costSnapshot.isFinal).length;
+
+    const byClient = {};
+    orders.forEach(o=>{
+      const c = (o.client && o.client.trim()) || 'Sem cliente';
+      byClient[c] = (byClient[c]||0) + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0);
+    });
+    const clientRows = Object.entries(byClient).sort((a,b)=>b[1]-a[1]);
+
+    let html = '<div class="preview-meta" style="padding:14px 0 4px;">';
+    html += '<div class="meta-item"><div class="k">Encomendas</div><div class="v">'+orders.length+'</div></div>';
+    html += '<div class="meta-item"><div class="k">Final / Estimado</div><div class="v">'+finalCount+' / '+(orders.length-finalCount)+'</div></div>';
+    html += '<div class="meta-item"><div class="k">Total faturado (sem IVA)</div><div class="v">'+fmtEUR(totalRevenue)+'</div></div>';
+    html += '</div>';
+    html += '<div class="mat-table-wrap" style="margin-top:14px;"><table class="mat-table"><thead><tr><th>Cliente</th><th>Total (sem IVA)</th></tr></thead><tbody>';
+    clientRows.forEach(([c,total])=>{
+      html += '<tr><td>'+escapeHtml(c)+'</td><td>'+fmtEUR(total)+'</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    resultsEl.innerHTML = html;
+    $('exportReportBtn').hidden = false;
+  }
+
+  $('generateReportBtn').addEventListener('click', ()=>{
+    const fromStr = $('reportFrom').value, toStr = $('reportTo').value;
+    const fromDate = fromStr ? new Date(fromStr+'T00:00:00') : null;
+    const toDate = toStr ? new Date(toStr+'T23:59:59') : null;
+    reportOrders = state.orders.filter(o=>{
+      if(!o.createdAt) return false;
+      const d = new Date(o.createdAt);
+      if(fromDate && d < fromDate) return false;
+      if(toDate && d > toDate) return false;
+      return true;
+    });
+    renderReport(reportOrders);
+  });
+
+  $('exportReportBtn').addEventListener('click', ()=>{
+    const rows = [['Nº Encomenda','Data','Cliente','Peça','Material','Espessura (mm)','Quantidade','Estado','Total sem IVA (€)']];
+    reportOrders.slice().sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||'')).forEach(o=>{
+      const cs = o.costSnapshot;
+      rows.push([
+        o.orderNumber||'',
+        o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '',
+        o.client||'',
+        o.orderName||'',
+        o.materialSnapshot ? o.materialSnapshot.name : '',
+        o.materialSnapshot ? o.materialSnapshot.thickness : '',
+        o.quantity||1,
+        cs && cs.isFinal ? 'Final' : 'Estimado',
+        cs && isFinite(cs.totalCost) ? cs.totalCost.toFixed(2).replace('.',',') : '',
+      ]);
+    });
+    const csv = rows.map(r => r.map(cell=>{
+      const s = String(cell);
+      return /[",;\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+    }).join(';')).join('\r\n');
+    const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fromPart = $('reportFrom').value || 'inicio';
+    const toPart = $('reportTo').value || 'fim';
+    a.href = url; a.download = 'relatorio-encomendas_' + fromPart + '_a_' + toPart + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
 
   registerServiceWorker();
 })();
