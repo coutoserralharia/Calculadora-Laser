@@ -61,14 +61,7 @@
       </div>
       <p class="save-hint" style="margin:-6px 0 12px;">O tempo padrão é o ponto de partida em cada "Nova encomenda" — ajustável depois por encomenda, se necessário.</p>
       <div class="field-row">
-        <div class="field">
-          <label for="materialCostMode">Custo do material calculado por</label>
-          <select id="materialCostMode">
-            <option value="area">Área (€/m²)</option>
-            <option value="weight">Peso (€/kg)</option>
-          </select>
-        </div>
-        <div class="field">
+        <div class="field" style="margin-bottom:0;">
           <label for="areaBasis">Base para área/peso de material</label>
           <select id="areaBasis">
             <option value="bbox">Retângulo envolvente (chapa ocupada)</option>
@@ -90,7 +83,7 @@
       <h2 class="card-title"><span class="dot"></span>Gerir tabela de materiais</h2>
       <div class="mat-table-wrap">
         <table class="mat-table">
-          <thead><tr><th>Material</th><th>Esp. (mm)</th><th>Veloc. (mm/min)</th><th>Densidade (kg/dm³)</th><th>€/m²</th><th>€/kg</th><th></th></tr></thead>
+          <thead><tr><th>Material</th><th>Esp. (mm)</th><th>Veloc. (mm/min)</th><th>Densidade (kg/dm³)</th><th>€/kg base</th><th>% extra</th><th>€/kg final</th><th></th></tr></thead>
           <tbody id="materialsTbody"></tbody>
         </table>
       </div>
@@ -216,7 +209,7 @@ create policy "public access"
   /* ---------------------------------------------------------------- */
   const hourlyRateInp = $('hourlyRate'), designRateInp = $('designRate'), pierceTimeInp = $('pierceTime');
   const setupRateInp = $('setupRate'), defaultSetupMinInp = $('defaultSetupMin'), wasteMarginMmInp = $('wasteMarginMm');
-  const areaBasisSel = $('areaBasis'), marginInp = $('margin'), materialCostModeSel = $('materialCostMode');
+  const areaBasisSel = $('areaBasis'), marginInp = $('margin');
 
   function applyMachineToInputs(){
     hourlyRateInp.value = state.machine.hourlyRate;
@@ -224,19 +217,17 @@ create policy "public access"
     pierceTimeInp.value = state.machine.pierceTime;
     areaBasisSel.value = state.machine.areaBasis;
     marginInp.value = state.machine.margin;
-    materialCostModeSel.value = state.machine.materialCostMode || 'area';
     setupRateInp.value = state.machine.setupRate ?? 30;
     defaultSetupMinInp.value = state.machine.defaultSetupMin ?? 5;
     wasteMarginMmInp.value = state.machine.wasteMarginMm ?? 5;
   }
-  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, marginInp, materialCostModeSel, setupRateInp, defaultSetupMinInp, wasteMarginMmInp].forEach(inp=>{
+  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, marginInp, setupRateInp, defaultSetupMinInp, wasteMarginMmInp].forEach(inp=>{
     inp.addEventListener('input', ()=>{
       state.machine.hourlyRate = parseFloat(hourlyRateInp.value)||0;
       state.machine.designRate = parseFloat(designRateInp.value)||0;
       state.machine.pierceTime = parseFloat(pierceTimeInp.value)||0;
       state.machine.areaBasis = areaBasisSel.value;
       state.machine.margin = parseFloat(marginInp.value)||0;
-      state.machine.materialCostMode = materialCostModeSel.value;
       state.machine.setupRate = parseFloat(setupRateInp.value)||0;
       state.machine.defaultSetupMin = parseFloat(defaultSetupMinInp.value)||0;
       state.machine.wasteMarginMm = parseFloat(wasteMarginMmInp.value)||0;
@@ -253,18 +244,21 @@ create policy "public access"
     materialsTbody.innerHTML = '';
     state.materials.forEach((m,i)=>{
       const tr = document.createElement('tr');
+      const finalPrice = (m.pricePerKg||0) * (1 + (m.markupPct||0)/100);
       tr.innerHTML =
         '<td><input type="text" data-i="'+i+'" data-f="name" value="'+m.name.replace(/"/g,'&quot;')+'"></td>' +
         '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="thickness" value="'+m.thickness+'"></td>' +
         '<td><input type="number" step="10" min="1" data-i="'+i+'" data-f="speed" value="'+m.speed+'"></td>' +
         '<td><input type="number" step="0.01" min="0" data-i="'+i+'" data-f="density" value="'+(m.density||0)+'"></td>' +
-        '<td><input type="number" step="0.5" min="0" data-i="'+i+'" data-f="price" value="'+m.price+'"></td>' +
         '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="pricePerKg" value="'+(m.pricePerKg||0)+'"></td>' +
+        '<td><input type="number" step="1" min="0" data-i="'+i+'" data-f="markupPct" value="'+(m.markupPct||0)+'"></td>' +
+        '<td class="mat-final-price">'+finalPrice.toFixed(2).replace('.',',')+' €</td>' +
         '<td><button class="rm-btn" data-i="'+i+'" title="Remover">✕</button></td>';
       materialsTbody.appendChild(tr);
     });
     materialsTbody.querySelectorAll('input').forEach(inp=>{
       inp.addEventListener('change', onMaterialFieldChange);
+      inp.addEventListener('input', onMaterialFieldLivePreview);
     });
     materialsTbody.querySelectorAll('.rm-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
@@ -275,6 +269,18 @@ create policy "public access"
       });
     });
   }
+  function onMaterialFieldLivePreview(e){
+    // Atualiza a coluna "€/kg final" à medida que se escreve, sem esperar por gravar.
+    const i = parseInt(e.target.getAttribute('data-i'),10);
+    const f = e.target.getAttribute('data-f');
+    if(f!=='pricePerKg' && f!=='markupPct') return;
+    const row = e.target.closest('tr');
+    const priceInp = row.querySelector('[data-f="pricePerKg"]');
+    const markupInp = row.querySelector('[data-f="markupPct"]');
+    const price = parseFloat(priceInp.value)||0;
+    const markup = parseFloat(markupInp.value)||0;
+    row.querySelector('.mat-final-price').textContent = (price*(1+markup/100)).toFixed(2).replace('.',',') + ' €';
+  }
   function onMaterialFieldChange(e){
     const i = parseInt(e.target.getAttribute('data-i'),10);
     const f = e.target.getAttribute('data-f');
@@ -284,7 +290,7 @@ create policy "public access"
     saveMaterials(state.materials);
   }
   $('addMaterialBtn').addEventListener('click', ()=>{
-    state.materials.push({id:'m'+Date.now(), name:'Novo material', thickness:1, speed:3000, price:15, density:7.85, pricePerKg:1.5});
+    state.materials.push({id:'m'+Date.now(), name:'Novo material', thickness:1, speed:3000, density:7.85, pricePerKg:1.5, markupPct:0});
     renderMaterialsTable();
     saveMaterials(state.materials);
   });

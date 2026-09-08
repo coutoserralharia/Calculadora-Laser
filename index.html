@@ -609,8 +609,8 @@
     }
     const areaM2 = areaMm2/1e6;
     const weightFromGeometry = areaM2 * (material.thickness||0) * (material.density||0);
-    const byWeight = state.machine.materialCostMode==='weight';
-    const materialCostFromGeometry = byWeight ? weightFromGeometry * (material.pricePerKg||0) : areaM2 * (material.price||0);
+    const effectivePricePerKg = (material.pricePerKg||0) * (1 + (material.markupPct||0)/100);
+    const materialCostFromGeometry = weightFromGeometry * effectivePricePerKg;
     // Em modo "batch" a área/peso calculados já são o total da encomenda; em modo "unit" são de
     // 1 peça e multiplicam-se pela quantidade. O valor "por peça" fica sempre como referência.
     const weightTotal = isBatchGeometry ? weightFromGeometry : weightFromGeometry * qty;
@@ -633,7 +633,7 @@
     return {
       valid:true, geo, material, qty,
       cuttingTimeMin, estimatedCuttingTimeMin: estimatedTotalTimeMin, corteCost,
-      materialCostTotal, materialCostPerPiece, weightPerPiece, weightTotal, byWeight, isBatchGeometry,
+      materialCostTotal, materialCostPerPiece, weightPerPiece, weightTotal, isBatchGeometry,
       drawingType, designTimeMin, setupTimeMin, designCost,
       totalTimeMin,
       preCorteCost: preCorteCostRaw*marginMult,
@@ -977,7 +977,7 @@
       ? 'já é o total (chapa aninhada) · ' + fmtNum(result.weightPerPiece,2) + ' kg/peça em média'
       : (result.qty>1 ? (result.qty+' × '+fmtNum(result.weightPerPiece,2)+' kg') : 'igual ao unitário (1 peça)');
 
-    $('matInfoSub').textContent = result.material.name+' '+result.material.thickness+'mm · '+(result.byWeight ? '€/kg' : '€/m²')+(result.isBatchGeometry ? ' · já é o total' : (result.qty>1 ? ' · '+fmtEUR(result.materialCostPerPiece)+'/peça' : ''));
+    $('matInfoSub').textContent = result.material.name+' '+result.material.thickness+'mm · €/kg'+(result.isBatchGeometry ? ' · já é o total' : (result.qty>1 ? ' · '+fmtEUR(result.materialCostPerPiece)+'/peça' : ''));
     $('costMaterial').textContent = fmtEUR(result.materialCostTotal);
 
     $('preCorteSub').textContent = 'Desenho '+fmtNum(result.designTimeMin,0)+'min ('+fmtEUR(result.designCost)+') + Setup '+fmtNum(result.setupTimeMin,0)+'min ('+fmtEUR(result.setupCost)+')';
@@ -1216,7 +1216,7 @@
         dxfText: state.mode==='dxf' ? state.dxfRawText : null,
         manual: state.mode==='manual' ? collectManualInputs() : null,
         materialId: material ? material.id : null,
-        materialSnapshot: material ? {name:material.name, thickness:material.thickness, speed:material.speed, price:material.price, density:material.density, pricePerKg:material.pricePerKg} : null,
+        materialSnapshot: material ? {name:material.name, thickness:material.thickness, speed:material.speed, density:material.density, pricePerKg:material.pricePerKg, markupPct:material.markupPct} : null,
         quantity: Math.max(1, parseInt(qtyInput.value,10)||1),
         machineSnapshot: Object.assign({}, state.machine),
         costSnapshot: result.valid ? {

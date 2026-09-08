@@ -187,28 +187,28 @@
   /* DEFAULTS                                                          */
   /* ---------------------------------------------------------------- */
   LC.DEFAULT_MATERIALS = [
-    {id:'m1',  name:'Aço Carbono', thickness:1,  speed:6000, price:9,  density:7.85, pricePerKg:1.3},
-    {id:'m2',  name:'Aço Carbono', thickness:2,  speed:4500, price:12, density:7.85, pricePerKg:1.3},
-    {id:'m3',  name:'Aço Carbono', thickness:3,  speed:3500, price:15, density:7.85, pricePerKg:1.3},
-    {id:'m4',  name:'Aço Carbono', thickness:4,  speed:2500, price:19, density:7.85, pricePerKg:1.3},
-    {id:'m5',  name:'Aço Carbono', thickness:5,  speed:1800, price:23, density:7.85, pricePerKg:1.3},
-    {id:'m6',  name:'Aço Carbono', thickness:6,  speed:1400, price:27, density:7.85, pricePerKg:1.3},
-    {id:'m7',  name:'Aço Carbono', thickness:8,  speed:900,  price:35, density:7.85, pricePerKg:1.3},
-    {id:'m8',  name:'Aço Carbono', thickness:10, speed:650,  price:44, density:7.85, pricePerKg:1.3},
-    {id:'m9',  name:'Aço Inox',    thickness:1,  speed:5000, price:16, density:8.00, pricePerKg:4.5},
-    {id:'m10', name:'Aço Inox',    thickness:2,  speed:3500, price:22, density:8.00, pricePerKg:4.5},
-    {id:'m11', name:'Aço Inox',    thickness:3,  speed:2200, price:29, density:8.00, pricePerKg:4.5},
-    {id:'m12', name:'Aço Inox',    thickness:4,  speed:1500, price:37, density:8.00, pricePerKg:4.5},
-    {id:'m13', name:'Aço Inox',    thickness:5,  speed:1000, price:45, density:8.00, pricePerKg:4.5},
-    {id:'m14', name:'Aço Inox',    thickness:6,  speed:700,  price:54, density:8.00, pricePerKg:4.5},
-    {id:'m15', name:'Alumínio',    thickness:1,  speed:5500, price:11, density:2.70, pricePerKg:3.8},
-    {id:'m16', name:'Alumínio',    thickness:2,  speed:4000, price:15, density:2.70, pricePerKg:3.8},
-    {id:'m17', name:'Alumínio',    thickness:3,  speed:3000, price:19, density:2.70, pricePerKg:3.8},
-    {id:'m18', name:'Alumínio',    thickness:4,  speed:2000, price:24, density:2.70, pricePerKg:3.8},
-    {id:'m19', name:'Alumínio',    thickness:5,  speed:1400, price:29, density:2.70, pricePerKg:3.8},
-    {id:'m20', name:'Alumínio',    thickness:6,  speed:1000, price:35, density:2.70, pricePerKg:3.8},
+    {id:'m1',  name:'Aço Carbono', thickness:1,  speed:6000, density:7.85, pricePerKg:1.3, markupPct:0},
+    {id:'m2',  name:'Aço Carbono', thickness:2,  speed:4500, density:7.85, pricePerKg:1.3, markupPct:0},
+    {id:'m3',  name:'Aço Carbono', thickness:3,  speed:3500, density:7.85, pricePerKg:1.3, markupPct:0},
+    {id:'m4',  name:'Aço Carbono', thickness:4,  speed:2500, density:7.85, pricePerKg:1.3, markupPct:0},
+    {id:'m5',  name:'Aço Carbono', thickness:5,  speed:1800, density:7.85, pricePerKg:1.3, markupPct:0},
+    {id:'m6',  name:'Aço Carbono', thickness:6,  speed:1400, density:7.85, pricePerKg:1.3, markupPct:0},
+    {id:'m7',  name:'Aço Carbono', thickness:8,  speed:900,  density:7.85, pricePerKg:1.3, markupPct:0},
+    {id:'m8',  name:'Aço Carbono', thickness:10, speed:650,  density:7.85, pricePerKg:1.3, markupPct:0},
+    {id:'m9',  name:'Aço Inox',    thickness:1,  speed:5000, density:8.00, pricePerKg:4.5, markupPct:0},
+    {id:'m10', name:'Aço Inox',    thickness:2,  speed:3500, density:8.00, pricePerKg:4.5, markupPct:0},
+    {id:'m11', name:'Aço Inox',    thickness:3,  speed:2200, density:8.00, pricePerKg:4.5, markupPct:0},
+    {id:'m12', name:'Aço Inox',    thickness:4,  speed:1500, density:8.00, pricePerKg:4.5, markupPct:0},
+    {id:'m13', name:'Aço Inox',    thickness:5,  speed:1000, density:8.00, pricePerKg:4.5, markupPct:0},
+    {id:'m14', name:'Aço Inox',    thickness:6,  speed:700,  density:8.00, pricePerKg:4.5, markupPct:0},
+    {id:'m15', name:'Alumínio',    thickness:1,  speed:5500, density:2.70, pricePerKg:3.8, markupPct:0},
+    {id:'m16', name:'Alumínio',    thickness:2,  speed:4000, density:2.70, pricePerKg:3.8, markupPct:0},
+    {id:'m17', name:'Alumínio',    thickness:3,  speed:3000, density:2.70, pricePerKg:3.8, markupPct:0},
+    {id:'m18', name:'Alumínio',    thickness:4,  speed:2000, density:2.70, pricePerKg:3.8, markupPct:0},
+    {id:'m19', name:'Alumínio',    thickness:5,  speed:1400, density:2.70, pricePerKg:3.8, markupPct:0},
+    {id:'m20', name:'Alumínio',    thickness:6,  speed:1000, density:2.70, pricePerKg:3.8, markupPct:0},
   ];
-  LC.DEFAULT_MACHINE = { hourlyRate:45, designRate:30, setupRate:30, pierceTime:0.8, margin:0, areaBasis:'bbox', materialCostMode:'area', defaultSetupMin:5, wasteMarginMm:5 };
+  LC.DEFAULT_MACHINE = { hourlyRate:45, designRate:30, setupRate:30, pierceTime:0.8, margin:0, areaBasis:'bbox', defaultSetupMin:5, wasteMarginMm:5 };
 
   /* ---------------------------------------------------------------- */
   /* STORAGE (Claude artifact storage -> localStorage -> memory only)  */
@@ -440,8 +440,8 @@
           const areaM2 = areaMm2/1e6;
           const weightPerPiece = areaM2 * (material.thickness||0) * (material.density||0);
           const weightTotal = weightPerPiece * qty;
-          const byWeight = machine.materialCostMode==='weight';
-          const materialCost = byWeight ? weightPerPiece*(material.pricePerKg||0) : areaM2*(material.price||0); // por peça
+          const effectivePricePerKg = (material.pricePerKg||0) * (1 + (material.markupPct||0)/100);
+          const materialCost = weightPerPiece * effectivePricePerKg; // por peça
 
           const si = cs.setupInputs || {};
           const designTimeMin = si.designTimeMin || 0;

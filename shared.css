@@ -125,6 +125,7 @@
   table.mat-table{min-width:560px;}
   table.mat-table th{text-align:left; color:var(--text-dim); font-weight:500; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; padding:0 6px 8px; border-bottom:1px solid var(--border-soft);}
   table.mat-table td{padding:4px 6px; border-bottom:1px solid var(--border-soft);}
+  table.mat-table td.mat-final-price{font-family:'JetBrains Mono', monospace; color:var(--readout); font-weight:600; white-space:nowrap;}
   table.mat-table input{padding:6px 7px; font-size:12.5px; width:100%;}
   table.mat-table .rm-btn{background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:15px; padding:2px 6px;}
   table.mat-table .rm-btn:hover{color:var(--danger);}
