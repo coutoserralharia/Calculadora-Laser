@@ -74,6 +74,15 @@
           <button class="tab-btn" id="tabManualBtn" type="button">Dimensões manuais</button>
         </div>
 
+        <div class="field" style="margin-bottom:14px;">
+          <label for="geometryScopeSelect">O que representa este ficheiro/estas dimensões</label>
+          <select id="geometryScopeSelect">
+            <option value="unit">1 peça só (multiplicar pela quantidade)</option>
+            <option value="batch">Já é a chapa/corte de todas as peças juntas (não multiplicar)</option>
+          </select>
+          <p class="save-hint" id="geometryScopeHint" style="margin-top:6px;">Usa a 2ª opção quando aninhas várias peças lado a lado no mesmo ficheiro/chapa para poupar material — a área e o tempo de corte já contam tudo, sem serem multiplicados pela quantidade.</p>
+        </div>
+
         <!-- DXF PANEL -->
         <div id="panelDxf">
           <div class="dropzone" id="dropzone">
@@ -294,6 +303,7 @@
   const drawingTypeSel = $('drawingType'), designTimeField = $('designTimeField'), designTimeInput = $('designTimeInput');
   const setupTimeInput = $('setupTimeInput');
   const realCuttingTimeInput = $('realCuttingTimeInput'), clearRealTimeBtn = $('clearRealTimeBtn');
+  const geometryScopeSelect = $('geometryScopeSelect');
   const qtyInput = $('qtyInput');
   const canvas = $('preview'), previewEmpty = $('previewEmpty'), previewMeta = $('previewMeta');
   const metaDim = $('metaDim'), metaPerim = $('metaPerim'), metaPierces = $('metaPierces');
@@ -392,6 +402,8 @@
     pierceOverrideInput.value = state.dxfDetectedPierces;
     recalcAndRender();
   });
+
+  geometryScopeSelect.addEventListener('change', recalcAndRender);
 
   /* ---------------------------------------------------------------- */
   /* MANUAL SHAPE                                                      */
@@ -566,12 +578,17 @@
     const realTimeVal = parseFloat(realTimeRaw);
     const isFinalTime = realTimeRaw !== '' && Number.isFinite(realTimeVal) && realTimeVal >= 0;
     const speed = Math.max(material.speed, 1);
+    // "unit" = o ficheiro/dimensões são de 1 peça só, multiplica-se pela quantidade (padrão).
+    // "batch" = já representam a chapa/corte de todas as peças juntas (aninhadas), não se multiplica.
+    const isBatchGeometry = geometryScopeSelect.value === 'batch';
 
-    // Tempo estimado TOTAL da encomenda: corte + perfurações de 1 peça, multiplicado pela
-    // quantidade — é a estimativa para cortar todas as peças, não só uma.
+    // Tempo estimado TOTAL da encomenda: corte + perfurações, multiplicado pela quantidade só
+    // quando o ficheiro/dimensões são de 1 peça — se já forem de todas juntas, usa-se tal qual.
     const pierceTimeMinPerPiece = geo.pierces * state.machine.pierceTime / 60;
     const cuttingTimeMinPerPiece = geo.perimeterMm / speed;
-    const estimatedTotalTimeMin = (cuttingTimeMinPerPiece + pierceTimeMinPerPiece) * qty;
+    const estimatedTotalTimeMin = isBatchGeometry
+      ? (cuttingTimeMinPerPiece + pierceTimeMinPerPiece)
+      : (cuttingTimeMinPerPiece + pierceTimeMinPerPiece) * qty;
 
     // O "Tempo de corte real" introduzido é sempre o TOTAL para todas as peças da encomenda
     // (já inclui as perfurações de todas elas) — nunca é multiplicado pela quantidade.
@@ -591,10 +608,15 @@
       areaMm2 = geo.bboxAreaMm2; // manual "custom" shape: no width/height to add margin to
     }
     const areaM2 = areaMm2/1e6;
-    const weightPerPiece = areaM2 * (material.thickness||0) * (material.density||0);
-    const weightTotal = weightPerPiece * qty;
+    const weightFromGeometry = areaM2 * (material.thickness||0) * (material.density||0);
     const byWeight = state.machine.materialCostMode==='weight';
-    const materialCost = byWeight ? weightPerPiece * (material.pricePerKg||0) : areaM2 * (material.price||0); // por peça
+    const materialCostFromGeometry = byWeight ? weightFromGeometry * (material.pricePerKg||0) : areaM2 * (material.price||0);
+    // Em modo "batch" a área/peso calculados já são o total da encomenda; em modo "unit" são de
+    // 1 peça e multiplicam-se pela quantidade. O valor "por peça" fica sempre como referência.
+    const weightTotal = isBatchGeometry ? weightFromGeometry : weightFromGeometry * qty;
+    const weightPerPiece = weightTotal / qty;
+    const materialCostTotal = isBatchGeometry ? materialCostFromGeometry : materialCostFromGeometry * qty;
+    const materialCostPerPiece = materialCostTotal / qty;
 
     const drawingType = drawingTypeSel.value;
     const designTimeMin = drawingType==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
@@ -604,14 +626,14 @@
     const preCorteCostRaw = designCost + setupCost;
 
     const marginMult = 1 + (state.machine.margin/100);
-    // corteCost já é o total da encomenda; materialCost é por peça, por isso só este é vezes qty aqui.
-    const totalCost = (corteCost + materialCost*qty) * marginMult + preCorteCostRaw * marginMult;
+    const totalCost = (corteCost + materialCostTotal) * marginMult + preCorteCostRaw * marginMult;
     const avgPerPiece = totalCost / qty;
     const totalTimeMin = cuttingTimeMin + designTimeMin + setupTimeMin; // cuttingTimeMin já é total e já inclui perfurações
 
     return {
       valid:true, geo, material, qty,
-      cuttingTimeMin, estimatedCuttingTimeMin: estimatedTotalTimeMin, corteCost, materialCost, weightPerPiece, weightTotal, byWeight,
+      cuttingTimeMin, estimatedCuttingTimeMin: estimatedTotalTimeMin, corteCost,
+      materialCostTotal, materialCostPerPiece, weightPerPiece, weightTotal, byWeight, isBatchGeometry,
       drawingType, designTimeMin, setupTimeMin, designCost,
       totalTimeMin,
       preCorteCost: preCorteCostRaw*marginMult,
@@ -860,7 +882,7 @@
       html += '<div class="p-costs-title">Custo da encomenda' + (result.valid ? '' : '') + '</div>';
       html += pRow('Peso unitário (1 peça)', result.valid ? (fmtNum(result.weightPerPiece,2)+' kg') : '—');
       html += pRow('Peso total', result.valid ? (fmtNum(result.weightTotal,2)+' kg') : '—');
-      html += pRow('Custo total do material', result.valid ? fmtEUR(result.materialCost * result.qty) : '—');
+      html += pRow('Custo total do material', result.valid ? fmtEUR(result.materialCostTotal) : '—');
       html += pRow('Custo pré-corte', result.valid ? fmtEUR(result.preCorteCost) : '—');
       if(result.valid){
         const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[result.drawingType] || result.drawingType;
@@ -902,7 +924,8 @@
     printSheetEl.innerHTML = printSheetHTML(mode);
     const orderNumber = $('orderNumberPreview').value.trim();
     const orderName = orderNameInp.value.trim();
-    const fileName = sanitizeFileNamePart((orderNumber ? orderNumber+' - ' : '') + (orderName || 'encomenda'));
+    const numberPart = orderNumber ? (mode==='internal' ? orderNumber+' (custos) - ' : orderNumber+' - ') : '';
+    const fileName = sanitizeFileNamePart(numberPart + (orderName || 'encomenda'));
     document.title = fileName || originalDocTitle;
     window.print();
   }
@@ -945,10 +968,12 @@
 
     $('valWeightUnit').textContent = fmtNum(result.weightPerPiece,2)+' kg';
     $('valWeightTotal').textContent = fmtNum(result.weightTotal,2)+' kg';
-    $('weightTotalSub').textContent = result.qty>1 ? (result.qty+' × '+fmtNum(result.weightPerPiece,2)+' kg') : 'igual ao unitário (1 peça)';
+    $('weightTotalSub').textContent = result.isBatchGeometry
+      ? 'já é o total (chapa aninhada) · ' + fmtNum(result.weightPerPiece,2) + ' kg/peça em média'
+      : (result.qty>1 ? (result.qty+' × '+fmtNum(result.weightPerPiece,2)+' kg') : 'igual ao unitário (1 peça)');
 
-    $('matInfoSub').textContent = result.material.name+' '+result.material.thickness+'mm · '+(result.byWeight ? '€/kg' : '€/m²')+(result.qty>1 ? ' · '+fmtEUR(result.materialCost)+'/peça' : '');
-    $('costMaterial').textContent = fmtEUR(result.materialCost * result.qty);
+    $('matInfoSub').textContent = result.material.name+' '+result.material.thickness+'mm · '+(result.byWeight ? '€/kg' : '€/m²')+(result.isBatchGeometry ? ' · já é o total' : (result.qty>1 ? ' · '+fmtEUR(result.materialCostPerPiece)+'/peça' : ''));
+    $('costMaterial').textContent = fmtEUR(result.materialCostTotal);
 
     $('preCorteSub').textContent = 'Desenho '+fmtNum(result.designTimeMin,0)+'min ('+fmtEUR(result.designCost)+') + Setup '+fmtNum(result.setupTimeMin,0)+'min ('+fmtEUR(result.setupCost)+')';
     $('costPreCorte').textContent = fmtEUR(result.preCorteCost);
@@ -1004,6 +1029,7 @@
     state.loadedOrderCreatedAt = null;
     state.loadedCostSnapshot = null;
     realCuttingTimeInput.value = '';
+    geometryScopeSelect.value = 'unit';
     orderNameInp.value = '';
     clientNameInp.value = '';
     orderCommentsInp.value = '';
@@ -1054,6 +1080,7 @@
     clientNameInp.value = o.client || '';
     orderCommentsInp.value = o.comments || '';
     qtyInput.value = o.quantity || 1;
+    geometryScopeSelect.value = o.geometryScope || 'unit';
 
     if(o.mode==='dxf' && o.dxfText){
       try{
@@ -1179,6 +1206,7 @@
         orderNumber,
         createdAt,
         mode: state.mode,
+        geometryScope: geometryScopeSelect.value,
         dxfFileName: state.mode==='dxf' ? state.dxfFileName : null,
         dxfText: state.mode==='dxf' ? state.dxfRawText : null,
         manual: state.mode==='manual' ? collectManualInputs() : null,
@@ -1190,7 +1218,7 @@
           totalCost: result.totalCost, avgPerPiece: result.avgPerPiece,
           cuttingTimeMin: result.cuttingTimeMin, pierces: result.geo.pierces,
           corteCost: result.corteCost,
-          materialCost: result.materialCost, weightPerPiece: result.weightPerPiece, weightTotal: result.weightTotal,
+          materialCost: result.materialCostPerPiece, weightPerPiece: result.weightPerPiece, weightTotal: result.weightTotal,
           designCost: result.designCost, setupCost: result.setupCost, preCorteCost: result.preCorteCost,
           isFinal: result.isFinalDisplay,
           // Estimativa original de tempo de corte — fica fixa desde a 1ª gravação, mesmo que
