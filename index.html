@@ -669,7 +669,10 @@
     let contoursToDraw = [];
     let bbox;
 
-    if(state.mode==='dxf' && state.dxfResult){
+    // Mostra sempre o desenho do DXF, se houver um carregado — mesmo que o cálculo esteja a usar
+    // dimensões manuais. O operador precisa de ver a peça real que vai cortar, independentemente
+    // de onde vêm os números usados no custo.
+    if(state.dxfResult){
       contoursToDraw = state.dxfResult.contours;
       bbox = state.dxfResult.bbox;
     } else if(state.mode==='manual'){
@@ -777,7 +780,9 @@
 
   function buildPrintSVG(big){
     let contours = [], bbox = null;
-    if(state.mode==='dxf' && state.dxfResult){
+    // Mostra sempre o desenho do DXF na ficha, se houver um carregado — o operador precisa de ver
+    // a peça real, mesmo que o cálculo do custo esteja a usar dimensões manuais.
+    if(state.dxfResult){
       contours = state.dxfResult.contours;
       bbox = state.dxfResult.bbox;
     } else if(state.mode==='manual'){
@@ -819,7 +824,7 @@
     const result = getEffectiveCostResult();
     const geo = result.geo;
     const material = result.material;
-    const source = state.mode==='dxf' ? (state.dxfFileName || 'Ficheiro DXF') : describeManualShape();
+    const source = state.dxfResult ? (state.dxfFileName || 'Ficheiro DXF') : describeManualShape();
     const orderName = orderNameInp.value.trim() || '—';
     const client = clientNameInp.value.trim() || '—';
     const qty = Math.max(1, parseInt(qtyInput.value,10) || 1);
