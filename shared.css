@@ -323,6 +323,30 @@
   }
   @media (max-width:640px){ nav.pagenav a{font-size:12px; padding:8px 6px;} }
 
+
+  /* Histórico em tabela */
+  .hist-filters{display:flex; gap:12px; flex-wrap:wrap;}
+  .hist-wrap{overflow-x:auto; margin:0 -18px; padding:0 18px;}
+  table.hist-table{width:100%; border-collapse:collapse; font-size:12.5px; min-width:840px;}
+  table.hist-table th{
+    text-align:left; color:var(--text-dim); font-weight:500; font-size:10px;
+    text-transform:uppercase; letter-spacing:.05em; padding:0 10px 10px;
+    border-bottom:1px solid var(--border); white-space:nowrap;
+  }
+  table.hist-table th.num, table.hist-table td.num{text-align:right;}
+  table.hist-table td{padding:11px 10px; border-bottom:1px solid var(--border-soft); vertical-align:middle;}
+  table.hist-table tbody tr:not(.rt-row):hover{background:rgba(255,255,255,0.025);}
+  table.hist-table tr.rt-row td{padding:0 10px 12px; border-bottom:1px solid var(--border-soft);}
+  .hist-num{font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--text); white-space:nowrap;}
+  .hist-dim{color:var(--text-muted); white-space:nowrap;}
+  .hist-mono{font-family:'JetBrains Mono',monospace; white-space:nowrap;}
+  .hist-price{color:var(--readout); font-weight:600;}
+  .hist-ref{display:block; font-size:10.5px; color:var(--text-dim); margin-top:2px;}
+  .hist-final{color:var(--readout); font-weight:700;}
+  .hist-est{color:var(--text-dim); font-weight:700;}
+  .hist-actions{white-space:nowrap; text-align:right;}
+  .hist-actions button{margin-left:4px;}
+
   /* Estado da ordem: orçamentado / em produção / concluído */
   .state-badge{
     display:inline-flex; align-items:center; gap:5px;

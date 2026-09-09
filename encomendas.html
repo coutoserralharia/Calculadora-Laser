@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared.css">
 <style>
-  .layout-single{max-width:760px; margin:0 auto;}
+  .layout-single{max-width:1100px; margin:0 auto;}
   .realtime-form{
     background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px;
     padding:12px; margin:2px 0 8px;
@@ -46,21 +46,40 @@
         </svg>
         <div class="brand-text">
           <p class="eyebrow">Corte Laser // Histórico</p>
-          <h1>Encomendas Guardadas</h1>
+          <h1>Histórico</h1>
         </div>
       </div>
-      <p class="top-note">Pesquise, reveja ou volte a carregar uma encomenda já orçamentada.</p>
+      <p class="top-note">Orçamentos, ordens de produção e trabalhos concluídos.</p>
     </div>
   </header>
 
   <main class="layout-single">
 
     <div class="card">
-      <h2 class="card-title"><span class="dot"></span>Encomendas <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
-      <div class="field" style="margin-bottom:10px;">
-        <input type="text" id="orderSearch" placeholder="Procurar por cliente, encomenda ou ficheiro…">
+      <div class="hist-filters">
+        <div class="field" style="margin:0; flex:2; min-width:200px;">
+          <label for="orderSearch">Pesquisar</label>
+          <input type="text" id="orderSearch" placeholder="Cliente, peça, nº ou referência">
+        </div>
+        <div class="field" style="margin:0; flex:1; min-width:150px;">
+          <label for="filterState">Estado</label>
+          <select id="filterState">
+            <option value="">Todos</option>
+            <option value="quote">Orçamentado</option>
+            <option value="production">Em produção</option>
+            <option value="done">Concluído</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0; flex:1; min-width:150px;">
+          <label for="filterMaterial">Material</label>
+          <select id="filterMaterial"><option value="">Todos</option></select>
+        </div>
       </div>
-      <div id="ordersList" class="orders-list" style="max-height:none;"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title"><span class="dot"></span>Encomendas <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
+      <div id="ordersList"></div>
     </div>
 
     <div class="card">
@@ -106,6 +125,7 @@
   const state = { orders: [], remote: { configured:false, url:'', key:'' } };
 
   const orderSearchInp = $('orderSearch'), ordersListEl = $('ordersList'), saveOrderHint = $('saveOrderHint');
+  const filterStateSel = $('filterState'), filterMaterialSel = $('filterMaterial');
   const localStorageNoteEl = $('localStorageNote');
 
   function updateConnBadge(){
@@ -125,67 +145,89 @@
     ordersListEl.innerHTML = '<p class="orders-empty">' + escapeHtml(msg) + '</p>';
   }
 
-  function renderOrdersList(){
-    const q = (orderSearchInp.value||'').toLowerCase().trim();
-    const filtered = state.orders.filter(o=>{
-      if(!q) return true;
-      return (o.client||'').toLowerCase().includes(q) || (o.orderName||'').toLowerCase().includes(q) || (o.dxfFileName||'').toLowerCase().includes(q);
+  function populateFilterOptions(){
+    const mats = [];
+    state.orders.forEach(o=>{
+      const n = o.materialSnapshot ? o.materialSnapshot.name : null;
+      if(n && !mats.includes(n)) mats.push(n);
     });
+    mats.sort((a,b)=>a.localeCompare(b,'pt'));
+    const cur = filterMaterialSel.value;
+    filterMaterialSel.innerHTML = '<option value="">Todos</option>' +
+      mats.map(n=>'<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>').join('');
+    if(cur && mats.includes(cur)) filterMaterialSel.value = cur;
+  }
+
+  function getFilteredOrders(){
+    const q = (orderSearchInp.value||'').toLowerCase().trim();
+    const fState = filterStateSel.value;
+    const fMat = filterMaterialSel.value;
+    return state.orders.filter(o=>{
+      if(q){
+        const hay = (o.client||'') + ' ' + (o.orderName||'') + ' ' + (o.orderNumber||'') + ' ' + (o.clientRef||'') + ' ' + (o.dxfFileName||'');
+        if(!hay.toLowerCase().includes(q)) return false;
+      }
+      if(fState && (o.orderState||'production') !== fState) return false;
+      if(fMat && (!o.materialSnapshot || o.materialSnapshot.name !== fMat)) return false;
+      return true;
+    }).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  }
+
+  function renderOrdersList(){
+    const filtered = getFilteredOrders();
     if(!filtered.length){
-      ordersListEl.innerHTML = '<p class="orders-empty">' + (state.orders.length ? 'Nenhuma encomenda encontrada.' : 'Ainda não guardou nenhuma encomenda.') + '</p>';
+      ordersListEl.innerHTML = '<p class="orders-empty">' + (state.orders.length ? 'Nenhuma encomenda corresponde aos filtros.' : 'Ainda não guardou nenhuma encomenda.') + '</p>';
       return;
     }
-    const groups = {};
+    let html = '<div class="hist-wrap"><table class="hist-table">';
+    html += '<thead><tr>' +
+      '<th>Nº</th><th>Data</th><th>Cliente</th><th>Peça</th><th>Material</th>' +
+      '<th class="num">Qt.</th><th class="num">Custo</th><th class="num">Preço</th>' +
+      '<th>Estado</th><th></th></tr></thead><tbody>';
+
     filtered.forEach(o=>{
-      const key = (o.client && o.client.trim()) ? o.client.trim() : 'Sem cliente';
-      (groups[key] = groups[key] || []).push(o);
-    });
-    const clientNames = Object.keys(groups).sort((a,b)=>{
-      if(a==='Sem cliente') return 1;
-      if(b==='Sem cliente') return -1;
-      return a.localeCompare(b, 'pt');
-    });
-    let html = '';
-    clientNames.forEach(cn=>{
-      const orders = groups[cn].slice().sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''));
-      html += '<div class="client-group">';
-      html += '<div class="client-group-head">' + escapeHtml(cn) + ' <span class="count">(' + orders.length + ')</span></div>';
-      orders.forEach(o=>{
-        const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
-        const matStr = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' ' + o.materialSnapshot.thickness + 'mm') : '—';
-        const cs = o.costSnapshot;
-        const isFinal = !!(cs && cs.isFinal);
-        const costStr = cs ? fmtEUR(cs.totalCost) : '—';
-        const statusBadge = cs ? ('<span class="status-badge ' + (isFinal?'status-final':'status-est') + '">' + (isFinal?'Final':'Estimado') + '</span>') : '';
-        let metaExtra = '';
-        if(isFinal && cs.estimadoCuttingTimeMin != null && isFinite(cs.cuttingTimeMin)){
-          metaExtra = ' <span class="order-row-compare">(estimado: ' + fmtNum(cs.estimadoCuttingTimeMin,1) + ' min → real: ' + fmtNum(cs.cuttingTimeMin,1) + ' min)</span>';
-        }
-        html += '<div class="order-item">';
-        html += '<div class="order-row">';
-        html += '<div class="order-row-main">';
-        html += '<div class="order-row-name">' + (o.orderNumber ? '<span class="order-num">'+escapeHtml(o.orderNumber)+'</span> ' : '') + escapeHtml(o.orderName || 'Sem nome') + ' ' + stateBadgeHTML(o.orderState) + ' ' + statusBadge + '</div>';
-        html += '<div class="order-row-meta">' + dateStr + ' · ' + matStr + ' · ' + (o.quantity||1) + 'x · ' + costStr + metaExtra + '</div>';
-        html += '</div>';
-        html += '<div class="order-row-actions">';
-        html += '<button class="ghost-btn sm" data-realtime="' + o.id + '">Tempo real</button>';
-        html += '<button class="ghost-btn sm" data-load="' + o.id + '">Carregar</button>';
-        html += '<button class="ghost-btn sm" data-dup="' + o.id + '" title="Criar uma encomenda nova a partir desta">Duplicar</button>';
-        html += '<button class="rm-btn" data-del="' + o.id + '" title="Eliminar">✕</button>';
-        html += '</div></div>';
-        html += '<div class="realtime-form" id="rtform-' + o.id + '" hidden>';
-        html += '<label for="rtinput-' + o.id + '">Tempo de corte real (o colega deu depois do corte)</label>';
-        html += '<div style="display:flex; gap:8px; align-items:center;">';
-        html += '<div class="unit-suffix" style="flex:1;"><input type="number" min="0" step="0.1" id="rtinput-' + o.id + '" value="' + (cs && isFinite(cs.cuttingTimeMin) ? cs.cuttingTimeMin.toFixed(1) : '') + '"><span>min</span></div>';
-        html += '<button class="ghost-btn sm" data-rt-save="' + o.id + '">Guardar e recalcular</button>';
-        html += '<button class="ghost-btn sm" data-rt-cancel="' + o.id + '">Cancelar</button>';
-        html += '</div>';
-        html += '<p class="save-hint" id="rthint-' + o.id + '" style="margin-top:6px;"></p>';
-        html += '</div>';
-        html += '</div>';
-      });
+      const cs = o.costSnapshot;
+      const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
+      const matStr = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' ' + o.materialSnapshot.thickness + 'mm') : '—';
+      const subtotal = cs && isFinite(cs.subtotal) ? cs.subtotal : (cs ? cs.totalCost : null);
+      const isFinal = !!(cs && cs.isFinal);
+      const finalTag = isFinal
+        ? '<span class="hist-final" title="Custo fechado com tempo real de corte">✓</span>'
+        : '<span class="hist-est" title="Ainda com tempo estimado">~</span>';
+
+      html += '<tr>';
+      html += '<td class="hist-num">' + escapeHtml(o.orderNumber||'—') + '</td>';
+      html += '<td class="hist-dim">' + dateStr + '</td>';
+      html += '<td>' + escapeHtml(o.client||'—') + '</td>';
+      html += '<td>' + escapeHtml(o.orderName||'—') + (o.clientRef ? '<span class="hist-ref">'+escapeHtml(o.clientRef)+'</span>' : '') + '</td>';
+      html += '<td class="hist-dim">' + matStr + '</td>';
+      html += '<td class="num">' + (o.quantity||1) + '</td>';
+      html += '<td class="num hist-mono">' + (subtotal!=null ? fmtEUR(subtotal) : '—') + '</td>';
+      html += '<td class="num hist-mono hist-price">' + (cs ? fmtEUR(cs.totalCost) : '—') + ' ' + finalTag + '</td>';
+      html += '<td>' + stateBadgeHTML(o.orderState) + '</td>';
+      html += '<td class="hist-actions">' +
+        '<button class="ghost-btn sm" data-load="'+o.id+'">Abrir</button>' +
+        '<button class="ghost-btn sm" data-realtime="'+o.id+'" title="Registar tempo de corte real">Tempo</button>' +
+        '<button class="ghost-btn sm" data-dup="'+o.id+'" title="Criar encomenda nova a partir desta">Duplicar</button>' +
+        '<button class="rm-btn" data-del="'+o.id+'" title="Eliminar">✕</button>' +
+      '</td>';
+      html += '</tr>';
+
+      html += '<tr class="rt-row" id="rtform-'+o.id+'" hidden><td colspan="10">';
+      html += '<div class="realtime-form" style="margin:0;">';
+      html += '<label for="rtinput-'+o.id+'">Tempo de corte real — total da encomenda, todas as peças</label>';
+      html += '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">';
+      html += '<div class="unit-suffix" style="flex:1; min-width:140px;"><input type="number" min="0" step="0.1" id="rtinput-'+o.id+'" value="' + (cs && isFinite(cs.cuttingTimeMin) ? cs.cuttingTimeMin.toFixed(1) : '') + '"><span>min</span></div>';
+      html += '<button class="ghost-btn sm" data-rt-save="'+o.id+'">Guardar e recalcular</button>';
+      html += '<button class="ghost-btn sm" data-rt-cancel="'+o.id+'">Cancelar</button>';
       html += '</div>';
+      if(isFinal && cs.estimadoCuttingTimeMin != null && isFinite(cs.cuttingTimeMin)){
+        html += '<p class="save-hint" style="margin-top:6px;">Estimado na altura: ' + fmtNum(cs.estimadoCuttingTimeMin,1) + ' min → real registado: ' + fmtNum(cs.cuttingTimeMin,1) + ' min</p>';
+      }
+      html += '<p class="save-hint" id="rthint-'+o.id+'" style="margin-top:6px;"></p>';
+      html += '</div></td></tr>';
     });
+    html += '</tbody></table></div>';
     ordersListEl.innerHTML = html;
 
     ordersListEl.querySelectorAll('[data-load]').forEach(b=>{
@@ -260,6 +302,8 @@
   }
 
   orderSearchInp.addEventListener('input', renderOrdersList);
+  filterStateSel.addEventListener('change', renderOrdersList);
+  filterMaterialSel.addEventListener('change', renderOrdersList);
 
   $('exportOrdersBtn').addEventListener('click', ()=>{
     const blob = new Blob([JSON.stringify(state.orders, null, 2)], {type:'application/json'});
@@ -317,6 +361,7 @@
     } else {
       state.orders = await loadOrders();
     }
+    populateFilterOptions();
     renderOrdersList();
   }
   init();
