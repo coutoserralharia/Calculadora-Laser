@@ -57,7 +57,13 @@
         </h2>
         <div class="field-row">
           <div class="field"><label for="orderName">Nome da encomenda / peça</label><input type="text" id="orderName" placeholder="Ex: Suporte L-240"></div>
-          <div class="field"><label for="clientName">Cliente</label><input type="text" id="clientName" placeholder="Ex: Metalúrgica Silva, Lda."></div>
+          <div class="field">
+            <label for="clientName">Cliente</label>
+            <div class="autocomplete-wrap">
+              <input type="text" id="clientName" placeholder="Ex: Metalúrgica Silva, Lda." autocomplete="off">
+              <div class="autocomplete-list" id="clientSuggestions" hidden></div>
+            </div>
+          </div>
         </div>
         <div class="field-row" style="margin-bottom:0;">
           <div class="field" style="margin-bottom:0;">
@@ -349,6 +355,7 @@
   const orderNameInp = $('orderName'), clientNameInp = $('clientName');
   const orderCommentsInp = $('orderComments');
   const statePicker = $('statePicker');
+  const clientSuggestionsEl = $('clientSuggestions');
   const adjustmentValueInput = $('adjustmentValueInput'), adjustmentReasonSelect = $('adjustmentReasonSelect');
   const saveOrderHint = $('saveOrderHint');
 
@@ -1017,6 +1024,75 @@
   printOperatorBtn.addEventListener('click', ()=>doPrint('operator'));
   printQuoteBtn.addEventListener('click', ()=>doPrint('quote'));
   printInternalBtn.addEventListener('click', ()=>doPrint('internal'));
+
+  /* ---------------------------------------------------------------- */
+  /* SUGESTÕES DE CLIENTE (evita duplicar o mesmo cliente mal escrito)  */
+  /* ---------------------------------------------------------------- */
+  let suggestIndex = -1;
+
+  function knownClients(){
+    const seen = new Map(); // chave normalizada -> nome como foi escrito
+    state.orders.forEach(o=>{
+      const n = (o.client||'').trim();
+      if(!n) return;
+      const key = n.toLowerCase();
+      if(!seen.has(key)) seen.set(key, n);
+    });
+    return Array.from(seen.values()).sort((a,b)=>a.localeCompare(b,'pt'));
+  }
+
+  function hideClientSuggestions(){
+    clientSuggestionsEl.hidden = true;
+    clientSuggestionsEl.innerHTML = '';
+    suggestIndex = -1;
+  }
+
+  function renderClientSuggestions(){
+    const q = clientNameInp.value.trim().toLowerCase();
+    if(!q){ hideClientSuggestions(); return; }
+    const matches = knownClients().filter(n=>{
+      const ln = n.toLowerCase();
+      return ln.includes(q) && ln !== q;
+    }).slice(0, 6);
+    if(!matches.length){ hideClientSuggestions(); return; }
+    clientSuggestionsEl.innerHTML = matches.map((n,i)=>{
+      const idx = n.toLowerCase().indexOf(q);
+      const html = escapeHtml(n.slice(0,idx)) + '<mark>' + escapeHtml(n.slice(idx, idx+q.length)) + '</mark>' + escapeHtml(n.slice(idx+q.length));
+      return '<button type="button" class="autocomplete-item" data-i="'+i+'" data-name="'+escapeHtml(n)+'">'+html+'</button>';
+    }).join('');
+    clientSuggestionsEl.hidden = false;
+    suggestIndex = -1;
+    clientSuggestionsEl.querySelectorAll('.autocomplete-item').forEach(b=>{
+      b.addEventListener('mousedown', e=>{ // mousedown corre antes do blur
+        e.preventDefault();
+        clientNameInp.value = b.getAttribute('data-name');
+        hideClientSuggestions();
+        recalcAndRender();
+      });
+    });
+  }
+
+  function moveSuggestion(delta){
+    const items = clientSuggestionsEl.querySelectorAll('.autocomplete-item');
+    if(!items.length) return;
+    suggestIndex = (suggestIndex + delta + items.length) % items.length;
+    items.forEach((it,i)=> it.classList.toggle('active', i===suggestIndex));
+  }
+
+  clientNameInp.addEventListener('input', renderClientSuggestions);
+  clientNameInp.addEventListener('focus', renderClientSuggestions);
+  clientNameInp.addEventListener('blur', ()=> setTimeout(hideClientSuggestions, 120));
+  clientNameInp.addEventListener('keydown', e=>{
+    if(clientSuggestionsEl.hidden) return;
+    if(e.key==='ArrowDown'){ e.preventDefault(); moveSuggestion(1); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); moveSuggestion(-1); }
+    else if(e.key==='Enter' && suggestIndex>=0){
+      e.preventDefault();
+      const it = clientSuggestionsEl.querySelectorAll('.autocomplete-item')[suggestIndex];
+      if(it){ clientNameInp.value = it.getAttribute('data-name'); hideClientSuggestions(); recalcAndRender(); }
+    }
+    else if(e.key==='Escape'){ hideClientSuggestions(); }
+  });
 
   /* ---------------------------------------------------------------- */
   /* ESTADO DA ORDEM                                                   */

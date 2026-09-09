@@ -334,6 +334,23 @@
   @media (max-width:640px){ nav.pagenav a{font-size:12px; padding:8px 6px;} }
 
 
+
+  /* Sugestões de cliente */
+  .autocomplete-wrap{position:relative;}
+  .autocomplete-list{
+    position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:40;
+    background:var(--panel); border:1px solid var(--border); border-radius:8px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.45); overflow:hidden; max-height:220px; overflow-y:auto;
+  }
+  .autocomplete-item{
+    display:block; width:100%; text-align:left; cursor:pointer;
+    background:none; border:none; border-bottom:1px solid var(--border-soft);
+    color:var(--text); font-family:'Inter',sans-serif; font-size:13.5px; padding:9px 12px;
+  }
+  .autocomplete-item:last-child{border-bottom:none;}
+  .autocomplete-item:hover, .autocomplete-item.active{background:rgba(255,255,255,0.06);}
+  .autocomplete-item mark{background:none; color:var(--accent); font-weight:600;}
+
   /* Histórico em tabela */
   .hist-filters{display:flex; gap:12px; flex-wrap:wrap;}
   .hist-wrap{overflow-x:auto; margin:0 -18px; padding:0 18px;}
