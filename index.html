@@ -360,6 +360,7 @@
 
   function handleFile(file){
     realCuttingTimeInput.value = '';
+    geometryScopeSelect.value = 'unit';
     fileNameEl.textContent = file.name;
     dxfMsg.innerHTML = '';
     const reader = new FileReader();
@@ -413,6 +414,7 @@
     shapeCircle.hidden = shapeSelect.value!=='circle';
     shapeCustom.hidden = shapeSelect.value!=='custom';
     realCuttingTimeInput.value = '';
+    geometryScopeSelect.value = 'unit';
     recalcAndRender();
   });
   ['rectW','rectH','circleD','customPerim','customArea'].forEach(id=>{
