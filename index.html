@@ -23,7 +23,7 @@
       <div class="nav-brand">JGPVC<span>LASER</span></div>
       <a href="dashboard.html">Dashboard</a>
       <a href="index.html" class="active">Produção</a>
-      <a href="encomendas.html">Encomendas guardadas</a>
+      <a href="encomendas.html">Histórico</a>
       <a href="definicoes.html">Definições</a>
     </nav>
 
@@ -58,9 +58,6 @@
         <div class="field-row">
           <div class="field"><label for="orderName">Nome da encomenda / peça</label><input type="text" id="orderName" placeholder="Ex: Suporte L-240"></div>
           <div class="field"><label for="clientName">Cliente</label><input type="text" id="clientName" placeholder="Ex: Metalúrgica Silva, Lda."></div>
-        </div>
-        <div class="field-row">
-          <div class="field"><label for="clientRef">Referência do cliente (opcional)</label><input type="text" id="clientRef" placeholder="Ex: REF-4471 / peça 12"></div>
         </div>
         <div class="field-row" style="margin-bottom:0;">
           <div class="field" style="margin-bottom:0;">
@@ -171,7 +168,7 @@
         <p class="save-hint" style="margin-top:10px;">Preços e velocidades definem-se em <a href="definicoes.html" style="color:var(--readout);">Definições avançadas</a>.</p>
       </div>
 
-      <details class="card" id="setupDetails">
+      <details class="card" id="setupDetails" open>
         <summary class="summary-row"><span>Preparação (setup) <span class="conn-badge conn-local" id="setupBadge"></span></span><span class="chev">▸</span></summary>
         <div class="details-body">
           <div class="field">
@@ -281,6 +278,7 @@
         <div class="print-btns">
           <button class="ghost-btn print-btn" id="printOperatorBtn" type="button">Ficha do operador</button>
           <button class="ghost-btn print-btn" id="printInternalBtn" type="button">Ficha interna (com custos)</button>
+          <button class="ghost-btn print-btn" id="printQuoteBtn" type="button">Orçamento p/ cliente</button>
         </div>
         <p class="save-hint">A ficha do operador não mostra preços. A ficha interna inclui a decomposição de custos.</p>
         <p class="save-hint" id="printHint"></p>
@@ -350,7 +348,6 @@
   const dimEmptyEl = $('dimEmpty');
   const orderNameInp = $('orderName'), clientNameInp = $('clientName');
   const orderCommentsInp = $('orderComments');
-  const clientRefInp = $('clientRef');
   const statePicker = $('statePicker');
   const adjustmentValueInput = $('adjustmentValueInput'), adjustmentReasonSelect = $('adjustmentReasonSelect');
   const saveOrderHint = $('saveOrderHint');
@@ -817,7 +814,7 @@
   /* ---------------------------------------------------------------- */
   /* PRINT SHEETS                                                      */
   /* ---------------------------------------------------------------- */
-  const printOperatorBtn = $('printOperatorBtn'), printInternalBtn = $('printInternalBtn'), printHint = $('printHint');
+  const printOperatorBtn = $('printOperatorBtn'), printInternalBtn = $('printInternalBtn'), printQuoteBtn = $('printQuoteBtn'), printHint = $('printHint');
   const printSheetEl = $('printSheet');
 
   function describeManualShape(){
@@ -881,8 +878,35 @@
     const dateStr = now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'});
 
     let html = '';
-    html += '<div class="p-title">' + (mode==='internal' ? 'Ficha Interna — Custos de Fabrico' : 'Ordem de Corte — Operador') + '</div>';
+    const titles = { internal:'Ficha Interna — Custos de Fabrico', quote:'Orçamento', operator:'Ordem de Corte — Operador' };
+    html += '<div class="p-title">' + (titles[mode]||titles.operator) + '</div>';
     html += '<div class="p-meta">Gerado em ' + dateStr + '</div>';
+
+    if(mode==='quote'){
+      const svg = buildPrintSVG(true);
+      html += '<div class="p-section">';
+      html += pRow('Cliente', client);
+      html += pRow('Nº da encomenda', $('orderNumberPreview').value || '—');
+      html += pRow('Data', now.toLocaleDateString('pt-PT'));
+      html += pRow('Peça', orderName);
+      html += '</div>';
+
+      html += '<div class="p-preview-big">' + (svg || '<div class="p-noprev">Sem pré-visualização disponível</div>') + '</div>';
+
+      html += '<div class="p-section">';
+      html += pRow('Material', material ? material.name : '—');
+      html += pRow('Espessura', material ? (material.thickness + ' mm') : '—');
+      html += pRow('Quantidade', qty);
+      html += '</div>';
+
+      html += '<div class="p-totals">';
+      html += '<div class="p-total-item p-total-main"><span>Total (' + qty + (qty===1?' peça':' peças') + ') — sem IVA</span><strong>' + (result.valid?fmtEUR(result.totalCost):'—') + '</strong></div>';
+      html += '<div class="p-total-item"><span>Preço por peça — sem IVA</span><strong>' + (result.valid?fmtEUR(result.avgPerPiece):'—') + '</strong></div>';
+      html += '</div>';
+
+      html += '<div class="p-quote-note">Orçamento válido durante os próximos 7 dias.</div>';
+      return html;
+    }
 
     if(mode==='operator'){
       const svg = buildPrintSVG(true);
@@ -981,7 +1005,8 @@
     printSheetEl.innerHTML = printSheetHTML(mode);
     const orderNumber = $('orderNumberPreview').value.trim();
     const orderName = orderNameInp.value.trim();
-    const numberPart = orderNumber ? (mode==='internal' ? orderNumber+' (custos) - ' : orderNumber+' - ') : '';
+    const modeTag = mode==='internal' ? ' (custos)' : (mode==='quote' ? ' (orcamento)' : '');
+    const numberPart = orderNumber ? (orderNumber + modeTag + ' - ') : '';
     const fileName = sanitizeFileNamePart(numberPart + (orderName || 'encomenda'));
     document.title = fileName || originalDocTitle;
     window.print();
@@ -989,6 +1014,7 @@
   window.addEventListener('afterprint', ()=>{ document.title = originalDocTitle; });
 
   printOperatorBtn.addEventListener('click', ()=>doPrint('operator'));
+  printQuoteBtn.addEventListener('click', ()=>doPrint('quote'));
   printInternalBtn.addEventListener('click', ()=>doPrint('internal'));
 
   /* ---------------------------------------------------------------- */
@@ -1120,7 +1146,6 @@
     applyOrderStateUI();
     adjustmentValueInput.value = '';
     adjustmentReasonSelect.value = '';
-    clientRefInp.value = '';
     orderNameInp.value = '';
     clientNameInp.value = '';
     orderCommentsInp.value = '';
@@ -1172,7 +1197,6 @@
     orderCommentsInp.value = o.comments || '';
     qtyInput.value = o.quantity || 1;
     geometryScopeSelect.value = o.geometryScope || 'unit';
-    clientRefInp.value = o.clientRef || '';
     state.orderState = o.orderState || 'production';
     applyOrderStateUI();
     adjustmentValueInput.value = (o.costSnapshot && o.costSnapshot.adjustmentValue) ? o.costSnapshot.adjustmentValue : '';
@@ -1298,7 +1322,6 @@
         id,
         client: clientNameInp.value.trim(),
         comments: orderCommentsInp.value.trim(),
-        clientRef: clientRefInp.value.trim(),
         orderState: state.orderState,
         orderName,
         orderNumber,
