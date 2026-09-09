@@ -182,14 +182,13 @@
     let html = '<div class="hist-wrap"><table class="hist-table">';
     html += '<thead><tr>' +
       '<th>Nº</th><th>Data</th><th>Cliente</th><th>Peça</th><th>Material</th>' +
-      '<th class="num">Qt.</th><th class="num">Custo</th><th class="num">Preço</th>' +
+      '<th class="num">Qt.</th><th class="num">Preço total</th>' +
       '<th>Estado</th><th></th></tr></thead><tbody>';
 
     filtered.forEach(o=>{
       const cs = o.costSnapshot;
       const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
       const matStr = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' ' + o.materialSnapshot.thickness + 'mm') : '—';
-      const subtotal = cs && isFinite(cs.subtotal) ? cs.subtotal : (cs ? cs.totalCost : null);
       const isFinal = !!(cs && cs.isFinal);
       const finalTag = isFinal
         ? '<span class="hist-final" title="Custo fechado com tempo real de corte">✓</span>'
@@ -202,7 +201,6 @@
       html += '<td>' + escapeHtml(o.orderName||'—') + (o.clientRef ? '<span class="hist-ref">'+escapeHtml(o.clientRef)+'</span>' : '') + '</td>';
       html += '<td class="hist-dim">' + matStr + '</td>';
       html += '<td class="num">' + (o.quantity||1) + '</td>';
-      html += '<td class="num hist-mono">' + (subtotal!=null ? fmtEUR(subtotal) : '—') + '</td>';
       html += '<td class="num hist-mono hist-price">' + (cs ? fmtEUR(cs.totalCost) : '—') + ' ' + finalTag + '</td>';
       html += '<td>' + stateBadgeHTML(o.orderState) + '</td>';
       html += '<td class="hist-actions">' +
@@ -213,7 +211,7 @@
       '</td>';
       html += '</tr>';
 
-      html += '<tr class="rt-row" id="rtform-'+o.id+'" hidden><td colspan="10">';
+      html += '<tr class="rt-row" id="rtform-'+o.id+'" hidden><td colspan="9">';
       html += '<div class="realtime-form" style="margin:0;">';
       html += '<label for="rtinput-'+o.id+'">Tempo de corte real — total da encomenda, todas as peças</label>';
       html += '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">';
