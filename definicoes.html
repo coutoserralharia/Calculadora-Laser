@@ -39,9 +39,10 @@
       <p class="top-note">Máquina, materiais, armazenamento central e pasta local. Configura-se uma vez.</p>
     </div>
     <nav class="pagenav">
-      <a href="index.html">Orçamentação</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="index.html">Produção</a>
       <a href="encomendas.html">Encomendas guardadas</a>
-      <a href="definicoes.html" class="active">Definições avançadas</a>
+      <a href="definicoes.html" class="active">Definições</a>
     </nav>
   </header>
 
@@ -74,7 +75,6 @@
           <label>Margem de desperdício de chapa</label>
           <div class="unit-suffix"><input type="number" id="wasteMarginMm" step="0.5" min="0"><span>mm</span></div>
         </div>
-        <div class="field"><label>Margem de venda</label><div class="unit-suffix"><input type="number" id="margin" step="1" min="0" value="0"><span>%</span></div></div>
       </div>
       <p class="save-hint" style="margin:-6px 0 0;">A margem de desperdício soma-se à largura e ao comprimento da peça (retângulo envolvente) antes de calcular a área usada no peso/custo do material — reflete o espaço à volta de cada peça na chapa real. Não afeta o desenho mostrado na pré-visualização nem na ficha do operador, só o cálculo numérico. Só se aplica no modo "Retângulo envolvente".</p>
     </div>
@@ -209,25 +209,23 @@ create policy "public access"
   /* ---------------------------------------------------------------- */
   const hourlyRateInp = $('hourlyRate'), designRateInp = $('designRate'), pierceTimeInp = $('pierceTime');
   const setupRateInp = $('setupRate'), defaultSetupMinInp = $('defaultSetupMin'), wasteMarginMmInp = $('wasteMarginMm');
-  const areaBasisSel = $('areaBasis'), marginInp = $('margin');
+  const areaBasisSel = $('areaBasis');
 
   function applyMachineToInputs(){
     hourlyRateInp.value = state.machine.hourlyRate;
     designRateInp.value = state.machine.designRate;
     pierceTimeInp.value = state.machine.pierceTime;
     areaBasisSel.value = state.machine.areaBasis;
-    marginInp.value = state.machine.margin;
     setupRateInp.value = state.machine.setupRate ?? 30;
     defaultSetupMinInp.value = state.machine.defaultSetupMin ?? 5;
     wasteMarginMmInp.value = state.machine.wasteMarginMm ?? 5;
   }
-  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, marginInp, setupRateInp, defaultSetupMinInp, wasteMarginMmInp].forEach(inp=>{
+  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, setupRateInp, defaultSetupMinInp, wasteMarginMmInp].forEach(inp=>{
     inp.addEventListener('input', ()=>{
       state.machine.hourlyRate = parseFloat(hourlyRateInp.value)||0;
       state.machine.designRate = parseFloat(designRateInp.value)||0;
       state.machine.pierceTime = parseFloat(pierceTimeInp.value)||0;
       state.machine.areaBasis = areaBasisSel.value;
-      state.machine.margin = parseFloat(marginInp.value)||0;
       state.machine.setupRate = parseFloat(setupRateInp.value)||0;
       state.machine.defaultSetupMin = parseFloat(defaultSetupMinInp.value)||0;
       state.machine.wasteMarginMm = parseFloat(wasteMarginMmInp.value)||0;

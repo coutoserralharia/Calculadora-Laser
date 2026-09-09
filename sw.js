@@ -1,7 +1,8 @@
-const CACHE_NAME = 'laser-calc-v4';
+const CACHE_NAME = 'laser-calc-v5';
 const CORE_ASSETS = [
   './',
   './index.html',
+  './dashboard.html',
   './encomendas.html',
   './definicoes.html',
   './shared.js',

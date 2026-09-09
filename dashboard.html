@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Dashboard — Custo de Corte Laser</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111417">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Custo Laser">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<style>
+  .layout-single{max-width:900px; margin:0 auto;}
+  .kpi-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px;}
+  .kpi{
+    background:var(--panel-2); border:1px solid var(--border-soft); border-radius:9px;
+    padding:14px 16px;
+  }
+  .kpi .k{font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim); margin-bottom:6px;}
+  .kpi .v{font-family:'JetBrains Mono', monospace; font-size:22px; font-weight:700; color:var(--text);}
+  .kpi .v.accent{color:var(--accent);}
+  .kpi .v.readout{color:var(--readout);}
+  .kpi .sub{font-size:11px; color:var(--text-dim); margin-top:4px;}
+  .quick-actions{display:flex; gap:10px; flex-wrap:wrap;}
+  .quick-actions a{
+    flex:1; min-width:160px; text-decoration:none; text-align:center;
+    background:var(--panel-2); border:1px solid var(--border); border-radius:9px;
+    padding:16px 14px; color:var(--text); font-weight:600; font-size:14px;
+    transition:all .15s ease;
+  }
+  .quick-actions a:hover{border-color:var(--accent); color:var(--accent);}
+  .quick-actions a .qa-sub{display:block; font-weight:400; font-size:11.5px; color:var(--text-dim); margin-top:4px;}
+  .quick-actions a.primary{background:var(--accent); color:#1a0d06; border-color:var(--accent);}
+  .quick-actions a.primary .qa-sub{color:rgba(26,13,6,0.7);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="top-row">
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+          <rect x="1" y="1" width="32" height="32" rx="8" stroke="#2b3138" stroke-width="1.2"/>
+          <line x1="6" y1="17" x2="22" y2="17" stroke="#ff5a2e" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="25" cy="17" r="3.4" fill="#3fe8d4"/>
+          <path d="M4 24L30 24" stroke="#3a4149" stroke-width="1" stroke-dasharray="1 3"/>
+        </svg>
+        <div class="brand-text">
+          <p class="eyebrow">Corte Laser // Painel</p>
+          <h1>Dashboard</h1>
+        </div>
+      </div>
+      <p class="top-note">Visão geral do que está em curso e do que já foi fechado.</p>
+    </div>
+    <nav class="pagenav">
+      <a href="dashboard.html" class="active">Dashboard</a>
+      <a href="index.html">Produção</a>
+      <a href="encomendas.html">Encomendas guardadas</a>
+      <a href="definicoes.html">Definições</a>
+    </nav>
+  </header>
+
+  <main class="layout-single">
+
+    <div class="card">
+      <h2 class="card-title"><span class="dot"></span>Ações rápidas</h2>
+      <div class="quick-actions">
+        <a href="index.html" class="primary">＋ Nova ordem de produção<span class="qa-sub">Calcular, imprimir ficha, guardar</span></a>
+        <a href="encomendas.html">Ver encomendas<span class="qa-sub">Histórico, tempos reais, relatórios</span></a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title"><span class="dot"></span>Estado atual <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
+      <div class="kpi-grid" id="kpiGrid">
+        <p class="orders-empty" style="grid-column:1/-1;">A carregar…</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title"><span class="dot"></span>A aguardar tempo real de corte</h2>
+      <p class="save-hint" style="margin-bottom:12px;">Encomendas já guardadas mas ainda com custo estimado — falta registar o tempo que a máquina demorou de facto.</p>
+      <div id="pendingList"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title"><span class="dot"></span>Últimas encomendas</h2>
+      <div id="recentList"></div>
+    </div>
+
+  </main>
+
+  <footer class="disclaimer">
+    Os valores apresentados são sem IVA e refletem o que está guardado em cada encomenda.
+  </footer>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+(function(){
+  "use strict";
+  const { fmtEUR, fmtNum, escapeHtml, loadOrders, loadRemoteConfig, remoteLoadOrders, registerServiceWorker } = window.LC;
+
+  const $ = id => document.getElementById(id);
+  const state = { orders: [], remote: { configured:false, url:'', key:'' } };
+
+  function updateConnBadge(){
+    const badge = $('connBadge');
+    if(state.remote.configured){
+      badge.textContent = '● servidor central';
+      badge.className = 'conn-badge conn-online';
+    } else {
+      badge.textContent = '● só este aparelho';
+      badge.className = 'conn-badge conn-local';
+    }
+  }
+
+  function startOfMonth(){
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  }
+
+  function renderKPIs(){
+    const orders = state.orders;
+    const monthStart = startOfMonth();
+    const thisMonth = orders.filter(o => o.createdAt && new Date(o.createdAt) >= monthStart);
+    const pending = orders.filter(o => o.costSnapshot && !o.costSnapshot.isFinal);
+    const monthRevenue = thisMonth.reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
+    const monthWeight = thisMonth.reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.weightTotal||0) : 0), 0);
+
+    const monthLabel = new Date().toLocaleDateString('pt-PT', { month:'long' });
+
+    $('kpiGrid').innerHTML =
+      '<div class="kpi"><div class="k">Encomendas em ' + escapeHtml(monthLabel) + '</div><div class="v">' + thisMonth.length + '</div><div class="sub">' + orders.length + ' no total</div></div>' +
+      '<div class="kpi"><div class="k">Faturado em ' + escapeHtml(monthLabel) + '</div><div class="v readout">' + fmtEUR(monthRevenue) + '</div><div class="sub">sem IVA</div></div>' +
+      '<div class="kpi"><div class="k">Falta tempo real</div><div class="v ' + (pending.length ? 'accent' : '') + '">' + pending.length + '</div><div class="sub">ainda em estimativa</div></div>' +
+      '<div class="kpi"><div class="k">Material em ' + escapeHtml(monthLabel) + '</div><div class="v">' + fmtNum(monthWeight,1) + ' kg</div><div class="sub">peso total cortado</div></div>';
+  }
+
+  function orderRowHTML(o, showPendingTag){
+    const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
+    const matStr = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' ' + o.materialSnapshot.thickness + 'mm') : '—';
+    const cs = o.costSnapshot;
+    const costStr = cs ? fmtEUR(cs.totalCost) : '—';
+    const isFinal = !!(cs && cs.isFinal);
+    const badge = showPendingTag
+      ? '<span class="status-badge status-est">Estimado</span>'
+      : ('<span class="status-badge ' + (isFinal?'status-final':'status-est') + '">' + (isFinal?'Final':'Estimado') + '</span>');
+    return '<div class="order-row">' +
+      '<div class="order-row-main">' +
+        '<div class="order-row-name">' + (o.orderNumber ? '<span class="order-num">'+escapeHtml(o.orderNumber)+'</span> ' : '') + escapeHtml(o.orderName || 'Sem nome') + ' ' + badge + '</div>' +
+        '<div class="order-row-meta">' + escapeHtml((o.client||'Sem cliente')) + ' · ' + dateStr + ' · ' + matStr + ' · ' + (o.quantity||1) + 'x · ' + costStr + '</div>' +
+      '</div>' +
+      '<div class="order-row-actions"><a class="ghost-btn sm" style="text-decoration:none;" href="encomendas.html">Abrir</a></div>' +
+    '</div>';
+  }
+
+  function renderLists(){
+    const pending = state.orders
+      .filter(o => o.costSnapshot && !o.costSnapshot.isFinal)
+      .sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))
+      .slice(0, 8);
+    $('pendingList').innerHTML = pending.length
+      ? pending.map(o=>orderRowHTML(o, true)).join('')
+      : '<p class="orders-empty">Nada pendente — todas as encomendas guardadas já têm tempo real registado.</p>';
+
+    const recent = state.orders.slice()
+      .sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))
+      .slice(0, 8);
+    $('recentList').innerHTML = recent.length
+      ? recent.map(o=>orderRowHTML(o, false)).join('')
+      : '<p class="orders-empty">Ainda não há encomendas guardadas.</p>';
+  }
+
+  async function init(){
+    state.remote = await loadRemoteConfig();
+    updateConnBadge();
+    try{
+      state.orders = state.remote.configured ? await remoteLoadOrders(state.remote) : await loadOrders();
+    }catch(err){
+      state.orders = [];
+      $('kpiGrid').innerHTML = '<p class="orders-empty" style="grid-column:1/-1;">Não foi possível carregar as encomendas: ' + escapeHtml(err.message) + '</p>';
+      $('pendingList').innerHTML = '';
+      $('recentList').innerHTML = '';
+      return;
+    }
+    renderKPIs();
+    renderLists();
+  }
+  init();
+
+  registerServiceWorker();
+})();
+</script>
+</body>
+</html>

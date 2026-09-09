@@ -208,7 +208,7 @@
     {id:'m19', name:'Alumínio',    thickness:5,  speed:1400, density:2.70, pricePerKg:3.8, markupPct:0},
     {id:'m20', name:'Alumínio',    thickness:6,  speed:1000, density:2.70, pricePerKg:3.8, markupPct:0},
   ];
-  LC.DEFAULT_MACHINE = { hourlyRate:45, designRate:30, setupRate:30, pierceTime:0.8, margin:0, areaBasis:'bbox', defaultSetupMin:5, wasteMarginMm:5 };
+  LC.DEFAULT_MACHINE = { hourlyRate:45, designRate:30, setupRate:30, pierceTime:0.8, areaBasis:'bbox', defaultSetupMin:5, wasteMarginMm:5 };
 
   /* ---------------------------------------------------------------- */
   /* STORAGE (Claude artifact storage -> localStorage -> memory only)  */
@@ -448,11 +448,11 @@
           const setupTimeMin = si.setupTimeMin || 0;
           const designCost = (designTimeMin/60) * (machine.designRate||0);
           const setupCost = (setupTimeMin/60) * (machine.setupRate||0);
-          const marginMult = 1 + ((machine.margin||0)/100);
-          const preCorteCost = (designCost + setupCost) * marginMult;
+          const preCorteCost = designCost + setupCost;
 
           // corteCost já é total; materialCost é por peça, por isso só este é vezes qty aqui.
-          const totalCost = (corteCost + materialCost*qty) * marginMult + preCorteCost;
+          const adj = cs.adjustmentValue || 0;
+          const totalCost = corteCost + materialCost*qty + preCorteCost + adj;
           const avgPerPiece = totalCost / qty;
 
           return Object.assign({}, cs, {
@@ -471,11 +471,10 @@
     // reaproveita os valores tal como estavam na cotação original.
     const ms = rec.machineSnapshot || {};
     const hourlyRate = ms.hourlyRate || 0;
-    const marginMult = 1 + ((ms.margin||0)/100);
     const materialCost = cs.materialCost || 0; // por peça
     const preCorteCost = cs.preCorteCost || 0;
     const corteCost = (realCuttingTimeMin/60) * hourlyRate;
-    const totalCost = (corteCost + materialCost*qty) * marginMult + preCorteCost;
+    const totalCost = corteCost + materialCost*qty + preCorteCost + (cs.adjustmentValue||0);
     const avgPerPiece = totalCost / qty;
     return Object.assign({}, cs, {
       cuttingTimeMin: realCuttingTimeMin,

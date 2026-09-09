@@ -36,9 +36,10 @@
       <p class="top-note">Carregue um DXF ou introduza as dimensões manualmente para obter o custo de fabrico em segundos.</p>
     </div>
     <nav class="pagenav">
-      <a href="index.html" class="active">Orçamentação</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="index.html" class="active">Produção</a>
       <a href="encomendas.html">Encomendas guardadas</a>
-      <a href="definicoes.html">Definições avançadas</a>
+      <a href="definicoes.html">Definições</a>
     </nav>
   </header>
 
@@ -55,6 +56,9 @@
         <div class="field-row">
           <div class="field"><label for="orderName">Nome da encomenda / peça</label><input type="text" id="orderName" placeholder="Ex: Suporte L-240"></div>
           <div class="field"><label for="clientName">Cliente</label><input type="text" id="clientName" placeholder="Ex: Metalúrgica Silva, Lda."></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label for="clientRef">Referência do cliente (opcional)</label><input type="text" id="clientRef" placeholder="Ex: REF-4471 / peça 12"></div>
         </div>
         <div class="field-row" style="margin-bottom:0;">
           <div class="field" style="margin-bottom:0;">
@@ -232,6 +236,30 @@
         <div class="breakdown-row"><span class="lbl">Custo total do material<small id="matInfoSub">—</small></span><span class="val" id="costMaterial">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo pré-corte<small id="preCorteSub">—</small></span><span class="val" id="costPreCorte">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo total do corte<small id="cutTimeSub">—</small></span><span class="val" id="costCorte">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Subtotal <small>(antes de ajuste)</small></span><span class="val" id="subtotalValue">€0,00</span></div>
+
+        <div class="field" style="margin:12px 0 4px;">
+          <label for="adjustmentValueInput">Ajuste comercial (opcional — use valor negativo para desconto)</label>
+          <div class="field-row" style="margin-bottom:0;">
+            <div class="field" style="margin-bottom:0;">
+              <div class="unit-suffix"><input type="number" id="adjustmentValueInput" step="0.5" placeholder="0,00"><span>€</span></div>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <select id="adjustmentReasonSelect">
+                <option value="">Motivo do ajuste…</option>
+                <option value="Pequena quantidade">Pequena quantidade</option>
+                <option value="Urgência">Urgência</option>
+                <option value="Cliente habitual">Cliente habitual</option>
+                <option value="Concorrência">Concorrência</option>
+                <option value="Complexidade">Complexidade</option>
+                <option value="Desperdício de chapa">Desperdício de chapa</option>
+                <option value="Outro">Outro</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="breakdown-row" id="adjustmentRow" hidden><span class="lbl">Ajuste comercial<small id="adjustmentSub">—</small></span><span class="val" id="adjustmentValueShown">€0,00</span></div>
+
         <div class="breakdown-row" style="border-top:1.5px solid var(--border); margin-top:4px; padding-top:12px;"><span class="lbl" style="font-weight:600; color:var(--text);">Custo total da encomenda <small>(sem IVA)<span id="totalQtyTag"></span></small></span><span class="val" id="totalValue" style="font-size:16px; color:var(--readout);">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo total ÷ nº peças <small>(sem IVA)</small></span><span class="val" id="avgPerPieceValue">€0,00</span></div>
         <div class="total-sub" id="totalTimeSub" hidden style="margin-top:10px; padding-top:10px;"></div>
@@ -310,6 +338,8 @@
   const dimEmptyEl = $('dimEmpty');
   const orderNameInp = $('orderName'), clientNameInp = $('clientName');
   const orderCommentsInp = $('orderComments');
+  const clientRefInp = $('clientRef');
+  const adjustmentValueInput = $('adjustmentValueInput'), adjustmentReasonSelect = $('adjustmentReasonSelect');
   const saveOrderHint = $('saveOrderHint');
 
   function updateOrderHeader(){
@@ -627,8 +657,9 @@
     const setupCost = (setupTimeMin/60) * (state.machine.setupRate||0);
     const preCorteCostRaw = designCost + setupCost;
 
-    const marginMult = 1 + (state.machine.margin/100);
-    const totalCost = (corteCost + materialCostTotal) * marginMult + preCorteCostRaw * marginMult;
+    const subtotal = corteCost + materialCostTotal + preCorteCostRaw;
+    const adjustmentValue = parseFloat(adjustmentValueInput.value) || 0;
+    const totalCost = subtotal + adjustmentValue;
     const avgPerPiece = totalCost / qty;
     const totalTimeMin = cuttingTimeMin + designTimeMin + setupTimeMin; // cuttingTimeMin já é total e já inclui perfurações
 
@@ -638,7 +669,8 @@
       materialCostTotal, materialCostPerPiece, weightPerPiece, weightTotal, isBatchGeometry,
       drawingType, designTimeMin, setupTimeMin, designCost,
       totalTimeMin,
-      preCorteCost: preCorteCostRaw*marginMult,
+      preCorteCost: preCorteCostRaw, subtotal, adjustmentValue,
+      adjustmentReason: adjustmentReasonSelect.value,
       setupCost,
       totalCost, avgPerPiece,
       isFinalDisplay: isFinalTime,
@@ -649,6 +681,8 @@
     return computeCost();
   }
   realCuttingTimeInput.addEventListener('input', recalcAndRender);
+  adjustmentValueInput.addEventListener('input', recalcAndRender);
+  adjustmentReasonSelect.addEventListener('change', recalcAndRender);
   clearRealTimeBtn.addEventListener('click', ()=>{
     realCuttingTimeInput.value = '';
     recalcAndRender();
@@ -897,7 +931,10 @@
         html += pRow('　· Setup', result.setupTimeMin+' min ('+fmtEUR(result.setupCost)+')');
       }
       html += pRow('Custo total do corte', result.valid ? (fmtEUR(result.corteCost)+' ('+fmtNum(result.cuttingTimeMin,1)+' min no total, estimado)') : '—');
-      if(state.machine.margin>0) html += pRow('Margem aplicada', state.machine.margin + '%');
+      if(result.valid && result.adjustmentValue){
+        html += pRow('Subtotal', fmtEUR(result.subtotal));
+        html += pRow('Ajuste comercial' + (result.adjustmentReason ? ' ('+escapeHtml(result.adjustmentReason)+')' : ''), (result.adjustmentValue>0?'+':'') + fmtEUR(result.adjustmentValue));
+      }
       html += '</div>';
       html += '<div class="p-totals">';
       html += '<div class="p-total-item p-total-main"><span>Total da encomenda (' + qty + (qty===1?' peça':' peças') + ') — sem IVA</span><strong>' + (result.valid?fmtEUR(result.totalCost):'—') + '</strong></div>';
@@ -964,7 +1001,8 @@
     updateOrderHeader();
 
     if(!result.valid){
-      ['costMaterial','costPreCorte','costCorte','totalValue','avgPerPieceValue'].forEach(id=>$(id).textContent = fmtEUR(0));
+      ['costMaterial','costPreCorte','costCorte','totalValue','avgPerPieceValue','subtotalValue'].forEach(id=>$(id).textContent = fmtEUR(0));
+      $('adjustmentRow').hidden = true;
       ['valWeightUnit','valWeightTotal'].forEach(id=>$(id).textContent = '—');
       $('matInfoSub').textContent = '—'; $('preCorteSub').textContent = '—'; $('cutTimeSub').textContent = '—'; $('weightTotalSub').textContent = '—';
       $('totalQtyTag').textContent = '';
@@ -990,6 +1028,15 @@
       : (fmtNum(result.cuttingTimeMin,1)+' min no total (estimado, '+result.qty+(result.qty===1?' peça':' peças')+' · '+result.geo.pierces+' perfuração(ões)/peça)');
     $('costCorte').textContent = fmtEUR(result.corteCost);
 
+    $('subtotalValue').textContent = fmtEUR(result.subtotal);
+    if(result.adjustmentValue){
+      $('adjustmentRow').hidden = false;
+      $('adjustmentValueShown').textContent = (result.adjustmentValue>0?'+':'') + fmtEUR(result.adjustmentValue);
+      $('adjustmentValueShown').style.color = result.adjustmentValue<0 ? 'var(--danger)' : 'var(--readout)';
+      $('adjustmentSub').textContent = result.adjustmentReason || 'sem motivo indicado';
+    } else {
+      $('adjustmentRow').hidden = true;
+    }
     $('totalValue').textContent = fmtEUR(result.totalCost);
     $('totalQtyTag').textContent = ' — '+result.qty+(result.qty===1 ? ' peça' : ' peças');
     $('avgPerPieceValue').textContent = fmtEUR(result.avgPerPiece);
@@ -1037,6 +1084,9 @@
     state.loadedCostSnapshot = null;
     realCuttingTimeInput.value = '';
     geometryScopeSelect.value = 'unit';
+    adjustmentValueInput.value = '';
+    adjustmentReasonSelect.value = '';
+    clientRefInp.value = '';
     orderNameInp.value = '';
     clientNameInp.value = '';
     orderCommentsInp.value = '';
@@ -1088,6 +1138,9 @@
     orderCommentsInp.value = o.comments || '';
     qtyInput.value = o.quantity || 1;
     geometryScopeSelect.value = o.geometryScope || 'unit';
+    clientRefInp.value = o.clientRef || '';
+    adjustmentValueInput.value = (o.costSnapshot && o.costSnapshot.adjustmentValue) ? o.costSnapshot.adjustmentValue : '';
+    adjustmentReasonSelect.value = (o.costSnapshot && o.costSnapshot.adjustmentReason) || '';
 
     if(o.mode==='dxf' && o.dxfText){
       try{
@@ -1209,6 +1262,7 @@
         id,
         client: clientNameInp.value.trim(),
         comments: orderCommentsInp.value.trim(),
+        clientRef: clientRefInp.value.trim(),
         orderName,
         orderNumber,
         createdAt,
@@ -1227,6 +1281,7 @@
           corteCost: result.corteCost,
           materialCost: result.materialCostPerPiece, weightPerPiece: result.weightPerPiece, weightTotal: result.weightTotal,
           designCost: result.designCost, setupCost: result.setupCost, preCorteCost: result.preCorteCost,
+          subtotal: result.subtotal, adjustmentValue: result.adjustmentValue, adjustmentReason: result.adjustmentReason,
           isFinal: result.isFinalDisplay,
           // Estimativa original de tempo de corte — fica fixa desde a 1ª gravação, mesmo que
           // depois se corrija com o tempo real, para se poder comparar estimado vs real mais tarde.
