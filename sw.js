@@ -1,4 +1,4 @@
-const CACHE_NAME = 'laser-calc-v6';
+const CACHE_NAME = 'laser-calc-v7';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,8 @@ const CORE_ASSETS = [
   './definicoes.html',
   './shared.js',
   './shared.css',
+  './logo.svg',
+  './logo-mark.svg',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',

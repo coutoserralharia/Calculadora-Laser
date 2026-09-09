@@ -20,7 +20,7 @@
 <div class="wrap">
 
     <nav class="pagenav">
-      <div class="nav-brand">JGPVC<span>LASER</span></div>
+      <div class="nav-brand"><img src="logo-mark.svg" alt="" class="nav-logo"><span class="nav-name">JGPVC<em>LASER</em></span></div>
       <a href="dashboard.html">Dashboard</a>
       <a href="index.html" class="active">Produção</a>
       <a href="encomendas.html">Histórico</a>
@@ -879,6 +879,7 @@
 
     let html = '';
     const titles = { internal:'Ficha Interna — Custos de Fabrico', quote:'Orçamento', operator:'Ordem de Corte — Operador' };
+    html += '<div class="p-logo"><img src="logo.svg" alt="Serralharia José Gabriel P. V. do Couto"></div>';
     html += '<div class="p-title">' + (titles[mode]||titles.operator) + '</div>';
     html += '<div class="p-meta">Gerado em ' + dateStr + '</div>';
 

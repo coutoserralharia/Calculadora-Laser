@@ -252,6 +252,8 @@
     }
     @page{ margin:14mm; }
   }
+  .print-sheet .p-logo{margin-bottom:14px;}
+  .print-sheet .p-logo img{width:300px; max-width:60%; height:auto; display:block;}
   .print-sheet .p-title{font-family:'Space Grotesk', sans-serif; font-size:20px; font-weight:700; margin:0 0 2px;}
   .print-sheet .p-meta{font-size:11px; color:#666; margin-bottom:18px;}
   .print-sheet .p-section{margin-bottom:16px; page-break-inside:avoid;}
@@ -300,11 +302,15 @@
     padding:22px 12px; overflow-y:auto;
   }
   nav.pagenav .nav-brand{
-    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; color:var(--text);
+    display:flex; align-items:center; gap:9px;
     padding:0 10px 16px; margin-bottom:6px; border-bottom:1px solid var(--border-soft);
-    letter-spacing:-0.01em;
   }
-  nav.pagenav .nav-brand span{color:var(--accent);}
+  nav.pagenav .nav-logo{width:30px; height:30px; flex:0 0 auto;}
+  nav.pagenav .nav-name{
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; color:var(--text);
+    letter-spacing:-0.01em; line-height:1.1;
+  }
+  nav.pagenav .nav-name em{color:var(--accent); font-style:normal;}
   nav.pagenav a{
     text-align:left; text-decoration:none; color:var(--text-muted); padding:10px 12px; border-radius:7px;
     font-family:'Inter',sans-serif; font-weight:600; font-size:13.5px; transition:all .15s ease;
