@@ -17,6 +17,8 @@
 <link rel="stylesheet" href="shared.css">
 </head>
 <body>
+<div class="loading-veil" id="loadingVeil"><div class="lv-inner"><span class="lv-spin"></span>A carregar materiais e definições…</div></div>
+
 <div class="wrap">
 
     <nav class="pagenav">
@@ -208,6 +210,14 @@
           <a class="ghost-btn sm" href="encomendas.html" style="text-decoration:none;">Ver encomendas guardadas →</a>
         </div>
         <p class="save-hint" id="saveOrderHint"></p>
+        <div class="next-steps" id="nextSteps" hidden>
+          <div class="ns-head"><span id="nextStepsMsg"></span><button type="button" class="ns-close" id="nsClose" title="Fechar">✕</button></div>
+          <div class="ns-actions">
+            <button class="ghost-btn sm" id="nsPrintOperator" type="button">Ficha do operador</button>
+            <button class="ghost-btn sm" id="nsPrintQuote" type="button">Orçamento</button>
+            <button class="ghost-btn sm" id="nsNew" type="button">Nova encomenda</button>
+          </div>
+        </div>
       </div>
 
     </section>
@@ -299,6 +309,21 @@
 
 </div>
 
+<div class="action-bar" id="actionBar">
+  <div class="action-bar-inner">
+    <div class="ab-status">
+      <span class="dirty-dot" id="dirtyDot" hidden title="Tem alterações por gravar"></span>
+      <span id="abOrderNum">—</span>
+      <span class="ab-total" id="abTotal">€0,00</span>
+    </div>
+    <div class="ab-buttons">
+      <button class="ghost-btn sm" id="barNewBtn" type="button">Nova</button>
+      <button class="ghost-btn sm" id="barPrintOperatorBtn" type="button">Ficha operador</button>
+      <button class="ghost-btn sm accent" id="barSaveBtn" type="button"><span id="barSaveLabel">Guardar encomenda atual</span></button>
+    </div>
+  </div>
+</div>
+
 <div id="printSheet" class="print-sheet"></div>
 
 <script src="shared.js"></script>
@@ -329,6 +354,7 @@
     loadedOrderCreatedAt: null,
     loadedCostSnapshot: null,
     orderState: 'production',
+    dirty: false,
   };
 
   /* ---------------------------------------------------------------- */
@@ -1026,6 +1052,33 @@
   printInternalBtn.addEventListener('click', ()=>doPrint('internal'));
 
   /* ---------------------------------------------------------------- */
+  /* ALTERAÇÕES POR GRAVAR                                             */
+  /* ---------------------------------------------------------------- */
+  function markDirty(){
+    if(!state.dirty){
+      state.dirty = true;
+      updateEditingUI();
+    }
+  }
+  function markClean(){
+    state.dirty = false;
+    updateEditingUI();
+  }
+  // Qualquer alteração num campo do formulário marca a encomenda como não gravada.
+  document.addEventListener('input', e=>{
+    if(e.target.closest('.layout')) markDirty();
+  });
+  document.addEventListener('change', e=>{
+    if(e.target.closest('.layout')) markDirty();
+  });
+  window.addEventListener('beforeunload', e=>{
+    if(state.dirty && (orderNameInp.value.trim() || state.dxfResult)){
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  /* ---------------------------------------------------------------- */
   /* SUGESTÕES DE CLIENTE (evita duplicar o mesmo cliente mal escrito)  */
   /* ---------------------------------------------------------------- */
   let suggestIndex = -1;
@@ -1173,6 +1226,8 @@
       $('adjustmentRow').hidden = true;
     }
     $('totalValue').textContent = fmtEUR(result.totalCost);
+    $('abTotal').textContent = fmtEUR(result.totalCost);
+    $('abOrderNum').textContent = ($('orderNumberPreview').value || '—') + (orderNameInp.value.trim() ? ' · ' + orderNameInp.value.trim() : '');
     $('totalQtyTag').textContent = ' — '+result.qty+(result.qty===1 ? ' peça' : ' peças');
     $('avgPerPieceValue').textContent = fmtEUR(result.avgPerPiece);
 
@@ -1210,6 +1265,10 @@
       note.hidden = true;
       label.textContent = 'Guardar encomenda atual';
     }
+    const dirtyDot = $('dirtyDot');
+    if(dirtyDot) dirtyDot.hidden = !state.dirty;
+    const barLabel = $('barSaveLabel');
+    if(barLabel) barLabel.textContent = label.textContent;
   }
 
   function resetOrderForm(){
@@ -1245,7 +1304,7 @@
     applyDrawingTypeUI();
     updateOrderHeader();
     refreshOrderNumberPreview();
-    updateEditingUI();
+    markClean();
     setMode('dxf');
   }
   $('newOrderBtn').addEventListener('click', ()=>{
@@ -1340,7 +1399,7 @@
     await populateFormFromOrder(o, sourceNote);
 
     $('orderNumberPreview').value = o.orderNumber || '';
-    updateEditingUI();
+    markClean();
     saveOrderHint.style.color = 'var(--readout)';
     saveOrderHint.textContent = 'Encomenda ' + (o.orderNumber ? o.orderNumber+' ' : '') + '"' + (o.orderName||'sem nome') + '" reposta — se guardar de novo, atualiza esta mesma encomenda (mesmo número), com os valores recalculados com os preços/definições atuais.';
     setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
@@ -1357,7 +1416,7 @@
     await populateFormFromOrder(o, sourceNote);
 
     await refreshOrderNumberPreview();
-    updateEditingUI();
+    markClean();
     saveOrderHint.style.color = 'var(--readout)';
     saveOrderHint.textContent = 'Dados copiados de "' + (o.orderName||'sem nome') + '" — confirma tudo e grava como encomenda nova (nº ' + $('orderNumberPreview').value + ').';
     setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
@@ -1488,8 +1547,9 @@
         else if(!folderResult.skipped) saveOrderHint.textContent += ' (falhou a gravação na pasta local: ' + folderResult.error + ')';
       }
       $('orderNumberPreview').value = orderNumber;
+      markClean();
       if(saveOrderHint.style.color !== 'var(--danger)'){
-        setTimeout(()=>{ saveOrderHint.textContent=''; }, 5000);
+        showNextSteps(orderNumber);
       }
     }catch(err){
       saveOrderHint.style.color = 'var(--danger)';
@@ -1547,8 +1607,38 @@
 
     window.addEventListener('resize', ()=>drawPreview(getGeometry()));
     recalcAndRender();
+    markClean();
+    $('loadingVeil').classList.add('done');
   }
   init();
+
+  /* ---------------------------------------------------------------- */
+  /* PASSO SEGUINTE DEPOIS DE GRAVAR                                   */
+  /* ---------------------------------------------------------------- */
+  function showNextSteps(orderNumber){
+    const box = $('nextSteps');
+    $('nextStepsMsg').innerHTML = 'Encomenda <strong>' + escapeHtml(orderNumber) + '</strong> guardada.';
+    box.hidden = false;
+    box.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+  $('nsPrintOperator').addEventListener('click', ()=>doPrint('operator'));
+  $('nsPrintQuote').addEventListener('click', ()=>doPrint('quote'));
+  $('nsNew').addEventListener('click', ()=>{ $('nextSteps').hidden = true; $('newOrderBtn').click(); });
+  $('nsClose').addEventListener('click', ()=>{ $('nextSteps').hidden = true; });
+
+  /* ---------------------------------------------------------------- */
+  /* BARRA DE AÇÕES FIXA + ATALHOS                                     */
+  /* ---------------------------------------------------------------- */
+  $('barSaveBtn').addEventListener('click', ()=> saveOrderBtn.click());
+  $('barNewBtn').addEventListener('click', ()=> $('newOrderBtn').click());
+  $('barPrintOperatorBtn').addEventListener('click', ()=> doPrint('operator'));
+
+  document.addEventListener('keydown', e=>{
+    const mod = e.ctrlKey || e.metaKey;
+    if(!mod) return;
+    if(e.key === 's'){ e.preventDefault(); saveOrderBtn.click(); }
+    else if(e.key === 'p'){ e.preventDefault(); doPrint('operator'); }
+  });
 
   registerServiceWorker();
 })();
