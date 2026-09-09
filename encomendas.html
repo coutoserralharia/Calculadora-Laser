@@ -27,6 +27,14 @@
 <body>
 <div class="wrap">
 
+    <nav class="pagenav">
+      <div class="nav-brand">JGPVC<span>LASER</span></div>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="index.html">Produção</a>
+      <a href="encomendas.html" class="active">Encomendas guardadas</a>
+      <a href="definicoes.html">Definições</a>
+    </nav>
+
   <header class="top">
     <div class="top-row">
       <div class="brand">
@@ -43,12 +51,6 @@
       </div>
       <p class="top-note">Pesquise, reveja ou volte a carregar uma encomenda já orçamentada.</p>
     </div>
-    <nav class="pagenav">
-      <a href="dashboard.html">Dashboard</a>
-      <a href="index.html">Produção</a>
-      <a href="encomendas.html" class="active">Encomendas guardadas</a>
-      <a href="definicoes.html">Definições</a>
-    </nav>
   </header>
 
   <main class="layout-single">
@@ -97,7 +99,7 @@
 <script>
 (function(){
   "use strict";
-  const { fmtEUR, fmtNum, escapeHtml, loadOrders, saveOrders, loadRemoteConfig,
+  const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, saveOrders, loadRemoteConfig,
     remoteLoadOrders, remoteInsertOrder, remoteUpdateOrder, remoteDeleteOrder, recomputeFinalCost, registerServiceWorker } = window.LC;
 
   const $ = id => document.getElementById(id);
@@ -162,7 +164,7 @@
         html += '<div class="order-item">';
         html += '<div class="order-row">';
         html += '<div class="order-row-main">';
-        html += '<div class="order-row-name">' + (o.orderNumber ? '<span class="order-num">'+escapeHtml(o.orderNumber)+'</span> ' : '') + escapeHtml(o.orderName || 'Sem nome') + ' ' + statusBadge + '</div>';
+        html += '<div class="order-row-name">' + (o.orderNumber ? '<span class="order-num">'+escapeHtml(o.orderNumber)+'</span> ' : '') + escapeHtml(o.orderName || 'Sem nome') + ' ' + stateBadgeHTML(o.orderState) + ' ' + statusBadge + '</div>';
         html += '<div class="order-row-meta">' + dateStr + ' · ' + matStr + ' · ' + (o.quantity||1) + 'x · ' + costStr + metaExtra + '</div>';
         html += '</div>';
         html += '<div class="order-row-actions">';

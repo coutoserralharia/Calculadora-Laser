@@ -43,6 +43,14 @@
 <body>
 <div class="wrap">
 
+    <nav class="pagenav">
+      <div class="nav-brand">JGPVC<span>LASER</span></div>
+      <a href="dashboard.html" class="active">Dashboard</a>
+      <a href="index.html">Produção</a>
+      <a href="encomendas.html">Encomendas guardadas</a>
+      <a href="definicoes.html">Definições</a>
+    </nav>
+
   <header class="top">
     <div class="top-row">
       <div class="brand">
@@ -59,12 +67,6 @@
       </div>
       <p class="top-note">Visão geral do que está em curso e do que já foi fechado.</p>
     </div>
-    <nav class="pagenav">
-      <a href="dashboard.html" class="active">Dashboard</a>
-      <a href="index.html">Produção</a>
-      <a href="encomendas.html">Encomendas guardadas</a>
-      <a href="definicoes.html">Definições</a>
-    </nav>
   </header>
 
   <main class="layout-single">
@@ -107,7 +109,7 @@
 <script>
 (function(){
   "use strict";
-  const { fmtEUR, fmtNum, escapeHtml, loadOrders, loadRemoteConfig, remoteLoadOrders, registerServiceWorker } = window.LC;
+  const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, loadRemoteConfig, remoteLoadOrders, registerServiceWorker } = window.LC;
 
   const $ = id => document.getElementById(id);
   const state = { orders: [], remote: { configured:false, url:'', key:'' } };
@@ -134,15 +136,16 @@
     const thisMonth = orders.filter(o => o.createdAt && new Date(o.createdAt) >= monthStart);
     const pending = orders.filter(o => o.costSnapshot && !o.costSnapshot.isFinal);
     const monthRevenue = thisMonth.reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
-    const monthWeight = thisMonth.reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.weightTotal||0) : 0), 0);
+    const inProduction = orders.filter(o => (o.orderState||'production') === 'production').length;
+    const quoted = orders.filter(o => o.orderState === 'quote').length;
 
     const monthLabel = new Date().toLocaleDateString('pt-PT', { month:'long' });
 
     $('kpiGrid').innerHTML =
       '<div class="kpi"><div class="k">Encomendas em ' + escapeHtml(monthLabel) + '</div><div class="v">' + thisMonth.length + '</div><div class="sub">' + orders.length + ' no total</div></div>' +
       '<div class="kpi"><div class="k">Faturado em ' + escapeHtml(monthLabel) + '</div><div class="v readout">' + fmtEUR(monthRevenue) + '</div><div class="sub">sem IVA</div></div>' +
-      '<div class="kpi"><div class="k">Falta tempo real</div><div class="v ' + (pending.length ? 'accent' : '') + '">' + pending.length + '</div><div class="sub">ainda em estimativa</div></div>' +
-      '<div class="kpi"><div class="k">Material em ' + escapeHtml(monthLabel) + '</div><div class="v">' + fmtNum(monthWeight,1) + ' kg</div><div class="sub">peso total cortado</div></div>';
+      '<div class="kpi"><div class="k">Em produção</div><div class="v" style="color:#ff8c3a;">' + inProduction + '</div><div class="sub">' + quoted + ' orçamentado(s)</div></div>' +
+      '<div class="kpi"><div class="k">Falta tempo real</div><div class="v ' + (pending.length ? 'accent' : '') + '">' + pending.length + '</div><div class="sub">ainda em estimativa</div></div>';
   }
 
   function orderRowHTML(o, showPendingTag){
@@ -156,7 +159,7 @@
       : ('<span class="status-badge ' + (isFinal?'status-final':'status-est') + '">' + (isFinal?'Final':'Estimado') + '</span>');
     return '<div class="order-row">' +
       '<div class="order-row-main">' +
-        '<div class="order-row-name">' + (o.orderNumber ? '<span class="order-num">'+escapeHtml(o.orderNumber)+'</span> ' : '') + escapeHtml(o.orderName || 'Sem nome') + ' ' + badge + '</div>' +
+        '<div class="order-row-name">' + (o.orderNumber ? '<span class="order-num">'+escapeHtml(o.orderNumber)+'</span> ' : '') + escapeHtml(o.orderName || 'Sem nome') + ' ' + stateBadgeHTML(o.orderState) + ' ' + badge + '</div>' +
         '<div class="order-row-meta">' + escapeHtml((o.client||'Sem cliente')) + ' · ' + dateStr + ' · ' + matStr + ' · ' + (o.quantity||1) + 'x · ' + costStr + '</div>' +
       '</div>' +
       '<div class="order-row-actions"><a class="ghost-btn sm" style="text-decoration:none;" href="encomendas.html">Abrir</a></div>' +

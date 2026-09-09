@@ -292,6 +292,8 @@
       material_id: o.materialId || null, material_snapshot: o.materialSnapshot || null, quantity: o.quantity || 1,
       machine_snapshot: o.machineSnapshot || null, cost_snapshot: o.costSnapshot || null,
       comments: o.comments || null,
+      client_ref: o.clientRef || null,
+      order_state: o.orderState || null,
     };
   }
   function rowToOrder(r){
@@ -300,6 +302,8 @@
       dxfFileName: r.dxf_file_name, dxfText: r.dxf_text, manual: r.manual, materialId: r.material_id,
       materialSnapshot: r.material_snapshot, quantity: r.quantity, machineSnapshot: r.machine_snapshot, costSnapshot: r.cost_snapshot,
       comments: r.comments,
+      clientRef: r.client_ref,
+      orderState: r.order_state,
     };
   }
   async function remoteRequestError(res){
@@ -605,6 +609,16 @@
         }).catch(()=>{ /* offline install not available on this host, app still works normally */ });
       });
     }
+  };
+
+  LC.ORDER_STATES = {
+    quote:      { label:'Orçamentado', cls:'state-quote' },
+    production: { label:'Em produção', cls:'state-production' },
+    done:       { label:'Concluído',   cls:'state-done' },
+  };
+  LC.stateBadgeHTML = function(orderState){
+    const st = LC.ORDER_STATES[orderState || 'production'] || LC.ORDER_STATES.production;
+    return '<span class="state-badge ' + st.cls + '">' + st.label + '</span>';
   };
 
   window.LC = LC;

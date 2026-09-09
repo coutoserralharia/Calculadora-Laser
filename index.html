@@ -19,6 +19,14 @@
 <body>
 <div class="wrap">
 
+    <nav class="pagenav">
+      <div class="nav-brand">JGPVC<span>LASER</span></div>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="index.html" class="active">Produção</a>
+      <a href="encomendas.html">Encomendas guardadas</a>
+      <a href="definicoes.html">Definições</a>
+    </nav>
+
   <header class="top">
     <div class="top-row">
       <div class="brand">
@@ -35,12 +43,6 @@
       </div>
       <p class="top-note">Carregue um DXF ou introduza as dimensões manualmente para obter o custo de fabrico em segundos.</p>
     </div>
-    <nav class="pagenav">
-      <a href="dashboard.html">Dashboard</a>
-      <a href="index.html" class="active">Produção</a>
-      <a href="encomendas.html">Encomendas guardadas</a>
-      <a href="definicoes.html">Definições</a>
-    </nav>
   </header>
 
   <main class="layout">
@@ -68,6 +70,15 @@
           <div class="field" style="margin-bottom:0;">
             <label for="qtyInput">Quantidade de peças a produzir</label>
             <input type="number" id="qtyInput" value="1" min="1" step="1">
+          </div>
+        </div>
+
+        <div class="field" style="margin:14px 0 0;">
+          <label>Estado da ordem</label>
+          <div class="state-picker" id="statePicker">
+            <button type="button" data-state="quote">Orçamentado</button>
+            <button type="button" data-state="production">Em produção</button>
+            <button type="button" data-state="done">Concluído</button>
           </div>
         </div>
       </div>
@@ -313,6 +324,7 @@
     loadedOrderNumber: null,
     loadedOrderCreatedAt: null,
     loadedCostSnapshot: null,
+    orderState: 'production',
   };
 
   /* ---------------------------------------------------------------- */
@@ -339,6 +351,7 @@
   const orderNameInp = $('orderName'), clientNameInp = $('clientName');
   const orderCommentsInp = $('orderComments');
   const clientRefInp = $('clientRef');
+  const statePicker = $('statePicker');
   const adjustmentValueInput = $('adjustmentValueInput'), adjustmentReasonSelect = $('adjustmentReasonSelect');
   const saveOrderHint = $('saveOrderHint');
 
@@ -979,6 +992,25 @@
   printInternalBtn.addEventListener('click', ()=>doPrint('internal'));
 
   /* ---------------------------------------------------------------- */
+  /* ESTADO DA ORDEM                                                   */
+  /* ---------------------------------------------------------------- */
+  const STATE_CLASS = { quote:'sel-quote', production:'sel-production', done:'sel-done' };
+  function applyOrderStateUI(){
+    statePicker.querySelectorAll('button').forEach(b=>{
+      b.className = '';
+      if(b.getAttribute('data-state') === state.orderState){
+        b.classList.add(STATE_CLASS[state.orderState]);
+      }
+    });
+  }
+  statePicker.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      state.orderState = b.getAttribute('data-state');
+      applyOrderStateUI();
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
   /* RENDER                                                            */
   /* ---------------------------------------------------------------- */
   function recalcAndRender(){
@@ -1084,6 +1116,8 @@
     state.loadedCostSnapshot = null;
     realCuttingTimeInput.value = '';
     geometryScopeSelect.value = 'unit';
+    state.orderState = 'production';
+    applyOrderStateUI();
     adjustmentValueInput.value = '';
     adjustmentReasonSelect.value = '';
     clientRefInp.value = '';
@@ -1139,6 +1173,8 @@
     qtyInput.value = o.quantity || 1;
     geometryScopeSelect.value = o.geometryScope || 'unit';
     clientRefInp.value = o.clientRef || '';
+    state.orderState = o.orderState || 'production';
+    applyOrderStateUI();
     adjustmentValueInput.value = (o.costSnapshot && o.costSnapshot.adjustmentValue) ? o.costSnapshot.adjustmentValue : '';
     adjustmentReasonSelect.value = (o.costSnapshot && o.costSnapshot.adjustmentReason) || '';
 
@@ -1263,6 +1299,7 @@
         client: clientNameInp.value.trim(),
         comments: orderCommentsInp.value.trim(),
         clientRef: clientRefInp.value.trim(),
+        orderState: state.orderState,
         orderName,
         orderNumber,
         createdAt,
@@ -1374,6 +1411,7 @@
     populateMaterialSelect();
     setupTimeInput.value = state.machine.defaultSetupMin ?? 5;
     applyDrawingTypeUI();
+    applyOrderStateUI();
 
     if(state.remote.configured){
       try{ state.orders = await remoteLoadOrders(state.remote); }
