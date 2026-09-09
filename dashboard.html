@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="shared.css">
 <style>
   .layout-single{max-width:900px; margin:0 auto;}
+  #pendingList .order-num, #recentList .order-num{color:var(--text);}
   .kpi-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px;}
   .kpi{
     background:var(--panel-2); border:1px solid var(--border-soft); border-radius:9px;
@@ -87,8 +88,8 @@
     </div>
 
     <div class="card">
-      <h2 class="card-title"><span class="dot"></span>A aguardar tempo real de corte</h2>
-      <p class="save-hint" style="margin-bottom:12px;">Encomendas já guardadas mas ainda com custo estimado — falta registar o tempo que a máquina demorou de facto.</p>
+      <h2 class="card-title"><span class="dot"></span>Em produção</h2>
+      <p class="save-hint" style="margin-bottom:12px;">Encomendas ainda com custo estimado — falta registar o tempo real de corte.</p>
       <div id="pendingList"></div>
     </div>
 
