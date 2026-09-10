@@ -77,15 +77,6 @@
             <input type="number" id="qtyInput" value="1" min="1" step="1">
           </div>
         </div>
-
-        <div class="field" style="margin:14px 0 0;">
-          <label>Estado da ordem</label>
-          <div class="state-picker" id="statePicker">
-            <button type="button" data-state="quote">Orçamentado</button>
-            <button type="button" data-state="production">Em produção</button>
-            <button type="button" data-state="done">Concluído</button>
-          </div>
-        </div>
       </div>
 
       <div class="card">
@@ -315,6 +306,11 @@
       <span class="dirty-dot" id="dirtyDot" hidden title="Tem alterações por gravar"></span>
       <span id="abOrderNum">—</span>
       <span class="ab-total" id="abTotal">€0,00</span>
+    </div>
+    <div class="state-picker ab-state" id="statePicker">
+      <button type="button" data-state="quote">Orçamentado</button>
+      <button type="button" data-state="production">Em produção</button>
+      <button type="button" data-state="done">Concluído</button>
     </div>
     <div class="ab-buttons">
       <button class="ghost-btn sm" id="barNewBtn" type="button">Nova</button>
