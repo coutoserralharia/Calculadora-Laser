@@ -376,22 +376,30 @@
       $('exportReportBtn').hidden = true;
       return;
     }
-    const totalRevenue = orders.reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
+    // Faturado real exclui orçamentos ainda por confirmar — esses contam à parte.
+    const val = o => (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0);
+    const isQuote = o => o.orderState === 'quote';
+    const invoiced = orders.filter(o=>!isQuote(o));
+    const quotes = orders.filter(isQuote);
+    const totalRevenue = invoiced.reduce((s,o)=> s + val(o), 0);
+    const totalQuoted = quotes.reduce((s,o)=> s + val(o), 0);
     const finalCount = orders.filter(o=>o.costSnapshot && o.costSnapshot.isFinal).length;
 
     const byClient = {};
-    orders.forEach(o=>{
+    invoiced.forEach(o=>{
       const c = (o.client && o.client.trim()) || 'Sem cliente';
-      byClient[c] = (byClient[c]||0) + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0);
+      byClient[c] = (byClient[c]||0) + val(o);
     });
     const clientRows = Object.entries(byClient).sort((a,b)=>b[1]-a[1]);
 
     let html = '<div class="preview-meta" style="padding:14px 0 4px;">';
-    html += '<div class="meta-item"><div class="k">Encomendas</div><div class="v">'+orders.length+'</div></div>';
+    html += '<div class="meta-item"><div class="k">Encomendas</div><div class="v">'+invoiced.length+'</div></div>';
     html += '<div class="meta-item"><div class="k">Final / Estimado</div><div class="v">'+finalCount+' / '+(orders.length-finalCount)+'</div></div>';
-    html += '<div class="meta-item"><div class="k">Total faturado (sem IVA)</div><div class="v">'+fmtEUR(totalRevenue)+'</div></div>';
+    html += '<div class="meta-item"><div class="k">Faturado (sem IVA)</div><div class="v">'+fmtEUR(totalRevenue)+'</div></div>';
+    html += '<div class="meta-item"><div class="k">Em orçamento</div><div class="v">'+fmtEUR(totalQuoted)+'</div></div>';
     html += '</div>';
-    html += '<div class="mat-table-wrap" style="margin-top:14px;"><table class="mat-table"><thead><tr><th>Cliente</th><th>Total (sem IVA)</th></tr></thead><tbody>';
+    html += '<p class="save-hint" style="margin-top:10px;">Faturado conta apenas ordens em produção ou concluídas. Os '+quotes.length+' orçamento(s) por confirmar aparecem à parte e não entram no total.</p>';
+    html += '<div class="mat-table-wrap" style="margin-top:14px;"><table class="mat-table"><thead><tr><th>Cliente</th><th>Faturado (sem IVA)</th></tr></thead><tbody>';
     clientRows.forEach(([c,total])=>{
       html += '<tr><td>'+escapeHtml(c)+'</td><td>'+fmtEUR(total)+'</td></tr>';
     });
@@ -415,7 +423,8 @@
   });
 
   $('exportReportBtn').addEventListener('click', ()=>{
-    const rows = [['Nº Encomenda','Data','Cliente','Peça','Material','Espessura (mm)','Quantidade','Estado','Total sem IVA (€)']];
+    const STATE_LABEL = { quote:'Orçamentado', production:'Em produção', done:'Concluído' };
+    const rows = [['Nº Encomenda','Data','Cliente','Peça','Material','Espessura (mm)','Quantidade','Estado','Custo fechado','Subtotal (€)','Ajuste (€)','Motivo do ajuste','Total sem IVA (€)']];
     reportOrders.slice().sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||'')).forEach(o=>{
       const cs = o.costSnapshot;
       rows.push([
@@ -426,7 +435,11 @@
         o.materialSnapshot ? o.materialSnapshot.name : '',
         o.materialSnapshot ? o.materialSnapshot.thickness : '',
         o.quantity||1,
-        cs && cs.isFinal ? 'Final' : 'Estimado',
+        STATE_LABEL[o.orderState||'production'] || 'Em produção',
+        cs && cs.isFinal ? 'Sim (tempo real)' : 'Não (estimado)',
+        cs && isFinite(cs.subtotal) ? cs.subtotal.toFixed(2).replace('.',',') : '',
+        cs && cs.adjustmentValue ? cs.adjustmentValue.toFixed(2).replace('.',',') : '',
+        (cs && cs.adjustmentReason) || '',
         cs && isFinite(cs.totalCost) ? cs.totalCost.toFixed(2).replace('.',',') : '',
       ]);
     });

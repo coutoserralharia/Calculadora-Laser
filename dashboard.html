@@ -136,7 +136,13 @@
     const monthStart = startOfMonth();
     const thisMonth = orders.filter(o => o.createdAt && new Date(o.createdAt) >= monthStart);
     const pending = orders.filter(o => o.costSnapshot && !o.costSnapshot.isFinal);
-    const monthRevenue = thisMonth.reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
+    // Faturado real = só o que foi mesmo produzido (Em produção + Concluído).
+    // Orçamentos ainda por confirmar contam à parte, para não inflacionar o valor do mês.
+    const isQuote = o => o.orderState === 'quote';
+    const monthRevenue = thisMonth.filter(o=>!isQuote(o))
+      .reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
+    const quotedValue = orders.filter(isQuote)
+      .reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
     const inProduction = orders.filter(o => (o.orderState||'production') === 'production').length;
     const quoted = orders.filter(o => o.orderState === 'quote').length;
 
@@ -144,7 +150,8 @@
 
     $('kpiGrid').innerHTML =
       '<div class="kpi"><div class="k">Encomendas em ' + escapeHtml(monthLabel) + '</div><div class="v">' + thisMonth.length + '</div><div class="sub">' + orders.length + ' no total</div></div>' +
-      '<div class="kpi"><div class="k">Faturado em ' + escapeHtml(monthLabel) + '</div><div class="v readout">' + fmtEUR(monthRevenue) + '</div><div class="sub">sem IVA</div></div>' +
+      '<div class="kpi"><div class="k">Faturado em ' + escapeHtml(monthLabel) + '</div><div class="v readout">' + fmtEUR(monthRevenue) + '</div><div class="sub">sem IVA · exclui orçamentos</div></div>' +
+      '<div class="kpi"><div class="k">Em orçamento</div><div class="v" style="color:#f0b429;">' + fmtEUR(quotedValue) + '</div><div class="sub">' + quoted + ' por confirmar</div></div>' +
       '<div class="kpi"><div class="k">Em produção</div><div class="v" style="color:#ff8c3a;">' + inProduction + '</div><div class="sub">' + quoted + ' orçamentado(s)</div></div>' +
       '<div class="kpi"><div class="k">Falta tempo real</div><div class="v ' + (pending.length ? 'accent' : '') + '">' + pending.length + '</div><div class="sub">ainda em estimativa</div></div>';
   }
