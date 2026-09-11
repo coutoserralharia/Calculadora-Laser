@@ -488,3 +488,4 @@
     padding:9px 8px; border-bottom:1px solid #ddd; color:#111;
   }
   .print-sheet table.p-group-table tbody tr:last-child td{border-bottom:1px solid #999;}
+  .print-sheet .p-group-note{margin-top:10px; font-size:11.5px; color:#555;}

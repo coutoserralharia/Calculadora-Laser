@@ -87,7 +87,7 @@
         </div>
         <div class="sb-actions">
           <button class="ghost-btn sm" id="clearSelBtn" type="button">Limpar seleção</button>
-          <button class="ghost-btn sm accent" id="groupPdfBtn" type="button">Gerar orçamento agrupado</button>
+          <button class="ghost-btn sm accent" id="groupPdfBtn" type="button">Gerar resumo em PDF</button>
         </div>
       </div>
       <div id="ordersList"></div>
@@ -358,45 +358,51 @@
       .sort((a,b)=>(a.orderNumber||'').localeCompare(b.orderNumber||''));
     if(!chosen.length) return;
 
+    const STATE_LABEL = { quote:'Orçamentado', production:'Em produção', done:'Concluído' };
     const clientNames = Array.from(new Set(chosen.map(o=>(o.client||'').trim()).filter(Boolean)));
-    const clientLabel = clientNames.length === 1 ? clientNames[0] : clientNames.join(' / ') || '—';
+    const clientLabel = clientNames.length === 1 ? clientNames[0] : (clientNames.join(' / ') || '—');
     const now = new Date();
     const total = chosen.reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
+    const anyEstimated = chosen.some(o=>!(o.costSnapshot && o.costSnapshot.isFinal));
 
     let html = '<div class="p-logo"><img src="logo.svg" alt="Serralharia José Gabriel P. V. do Couto"></div>';
-    html += '<div class="p-title">Orçamento</div>';
-    html += '<div class="p-meta">Gerado em ' + now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) + '</div>';
-    html += '<div class="p-section">';
-    html += '<div class="p-row"><span class="p-label">Cliente</span><span class="p-value">' + escapeHtml(clientLabel) + '</span></div>';
-    html += '<div class="p-row"><span class="p-label">Data</span><span class="p-value">' + now.toLocaleDateString('pt-PT') + '</span></div>';
-    html += '<div class="p-row"><span class="p-label">Nº de peças orçamentadas</span><span class="p-value">' + chosen.length + '</span></div>';
-    html += '</div>';
+    html += '<div class="p-title">Resumo de Encomendas</div>';
+    html += '<div class="p-meta">' + escapeHtml(clientLabel) + ' · ' + chosen.length + (chosen.length===1?' encomenda':' encomendas') + ' · gerado em ' + now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) + '</div>';
 
     html += '<table class="p-group-table"><thead><tr>' +
-      '<th>Nº</th><th>Peça</th><th>Material</th><th class="num">Qt.</th><th class="num">Total s/ IVA</th>' +
+      '<th>Nº</th><th>Data</th><th>Peça</th><th>Material</th>' +
+      '<th class="num">Qt.</th><th>Estado</th><th class="num">Total s/ IVA</th>' +
       '</tr></thead><tbody>';
     chosen.forEach(o=>{
       const cs = o.costSnapshot;
-      const mat = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' — ' + o.materialSnapshot.thickness + ' mm') : '—';
+      const mat = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' ' + o.materialSnapshot.thickness + 'mm') : '—';
+      const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
+      const isFinal = !!(cs && cs.isFinal);
       html += '<tr>' +
         '<td>' + escapeHtml(o.orderNumber||'—') + '</td>' +
+        '<td>' + dateStr + '</td>' +
         '<td>' + escapeHtml(o.orderName||'—') + '</td>' +
         '<td>' + mat + '</td>' +
         '<td class="num">' + (o.quantity||1) + '</td>' +
+        '<td>' + (STATE_LABEL[o.orderState||'production']||'') + (isFinal ? '' : ' *') + '</td>' +
         '<td class="num">' + (cs ? fmtEUR(cs.totalCost) : '—') + '</td>' +
       '</tr>';
     });
     html += '</tbody></table>';
 
     html += '<div class="p-totals">';
-    html += '<div class="p-total-item p-total-main"><span>Total do orçamento — sem IVA</span><strong>' + fmtEUR(total) + '</strong></div>';
+    html += '<div class="p-total-item p-total-main"><span>Total das ' + chosen.length + ' encomendas — sem IVA</span><strong>' + fmtEUR(total) + '</strong></div>';
     html += '</div>';
-    html += '<div class="p-quote-note">Orçamento válido durante os próximos 7 dias.</div>';
+
+    if(anyEstimated){
+      html += '<div class="p-group-note">* Preço ainda estimado — sem tempo real de corte registado.</div>';
+    }
+    html += '<div class="p-group-note">Documento de consulta interna. Os valores são sem IVA.</div>';
 
     $('printSheet').innerHTML = html;
     const originalTitle = document.title;
     const safeClient = (clientNames.length===1 ? clientNames[0] : 'varios-clientes').replace(/[\\/:*?"<>|]+/g,'_');
-    document.title = 'Orcamento ' + safeClient + ' - ' + now.toISOString().slice(0,10);
+    document.title = 'Resumo ' + safeClient + ' - ' + now.toISOString().slice(0,10);
     window.print();
     setTimeout(()=>{ document.title = originalTitle; }, 500);
   });
