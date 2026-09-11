@@ -79,6 +79,17 @@
 
     <div class="card">
       <h2 class="card-title"><span class="dot"></span>Encomendas <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
+      <div class="selection-bar" id="selectionBar" hidden>
+        <div class="sb-info">
+          <strong id="selCount">0 encomendas</strong>
+          <span class="sb-total" id="selTotal">€0,00</span>
+          <span class="sb-warn" id="selWarn" hidden>⚠ clientes diferentes</span>
+        </div>
+        <div class="sb-actions">
+          <button class="ghost-btn sm" id="clearSelBtn" type="button">Limpar seleção</button>
+          <button class="ghost-btn sm accent" id="groupPdfBtn" type="button">Gerar orçamento agrupado</button>
+        </div>
+      </div>
       <div id="ordersList"></div>
     </div>
 
@@ -114,6 +125,8 @@
 
 </div>
 
+<div id="printSheet" class="print-sheet"></div>
+
 <script src="shared.js"></script>
 <script>
 (function(){
@@ -123,6 +136,7 @@
 
   const $ = id => document.getElementById(id);
   const state = { orders: [], remote: { configured:false, url:'', key:'' } };
+  const selectedIds = new Set();
 
   const orderSearchInp = $('orderSearch'), ordersListEl = $('ordersList'), saveOrderHint = $('saveOrderHint');
   const filterStateSel = $('filterState'), filterMaterialSel = $('filterMaterial');
@@ -181,6 +195,7 @@
     }
     let html = '<div class="hist-wrap"><table class="hist-table">';
     html += '<thead><tr>' +
+      '<th class="sel-col"><input type="checkbox" id="selAll" title="Selecionar todas as visíveis"></th>' +
       '<th>Nº</th><th>Data</th><th>Cliente</th><th>Peça</th><th>Material</th>' +
       '<th class="num">Qt.</th><th class="num">Preço total</th>' +
       '<th>Estado</th><th></th></tr></thead><tbody>';
@@ -195,6 +210,7 @@
         : '<span class="hist-est" title="Ainda com tempo estimado">~</span>';
 
       html += '<tr>';
+      html += '<td class="sel-col"><input type="checkbox" class="row-sel" data-sel="'+o.id+'"' + (selectedIds.has(o.id)?' checked':'') + '></td>';
       html += '<td class="hist-num">' + escapeHtml(o.orderNumber||'—') + '</td>';
       html += '<td class="hist-dim">' + dateStr + '</td>';
       html += '<td>' + escapeHtml(o.client||'—') + '</td>';
@@ -211,7 +227,7 @@
       '</td>';
       html += '</tr>';
 
-      html += '<tr class="rt-row" id="rtform-'+o.id+'" hidden><td colspan="9">';
+      html += '<tr class="rt-row" id="rtform-'+o.id+'" hidden><td colspan="10">';
       html += '<div class="realtime-form" style="margin:0;">';
       html += '<label for="rtinput-'+o.id+'">Tempo de corte real — total da encomenda, todas as peças</label>';
       html += '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">';
@@ -227,6 +243,25 @@
     });
     html += '</tbody></table></div>';
     ordersListEl.innerHTML = html;
+
+    ordersListEl.querySelectorAll('.row-sel').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        const id = cb.getAttribute('data-sel');
+        if(cb.checked) selectedIds.add(id); else selectedIds.delete(id);
+        updateSelectionBar();
+      });
+    });
+    const selAll = $('selAll');
+    if(selAll){
+      const visible = getFilteredOrders().map(o=>o.id);
+      selAll.checked = visible.length>0 && visible.every(id=>selectedIds.has(id));
+      selAll.addEventListener('change', ()=>{
+        visible.forEach(id=>{ if(selAll.checked) selectedIds.add(id); else selectedIds.delete(id); });
+        renderOrdersList();
+        updateSelectionBar();
+      });
+    }
+    updateSelectionBar();
 
     ordersListEl.querySelectorAll('[data-load]').forEach(b=>{
       b.addEventListener('click', ()=>{
@@ -298,6 +333,73 @@
       });
     });
   }
+
+  function updateSelectionBar(){
+    const bar = $('selectionBar');
+    const n = selectedIds.size;
+    if(!n){ bar.hidden = true; return; }
+    const chosen = state.orders.filter(o=>selectedIds.has(o.id));
+    const total = chosen.reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
+    const clients = new Set(chosen.map(o=>(o.client||'').trim().toLowerCase()).filter(Boolean));
+    $('selCount').textContent = n + (n===1 ? ' encomenda' : ' encomendas');
+    $('selTotal').textContent = fmtEUR(total);
+    $('selWarn').hidden = clients.size <= 1;
+    bar.hidden = false;
+  }
+
+  $('clearSelBtn').addEventListener('click', ()=>{
+    selectedIds.clear();
+    renderOrdersList();
+  });
+
+  $('groupPdfBtn').addEventListener('click', ()=>{
+    const chosen = state.orders
+      .filter(o=>selectedIds.has(o.id))
+      .sort((a,b)=>(a.orderNumber||'').localeCompare(b.orderNumber||''));
+    if(!chosen.length) return;
+
+    const clientNames = Array.from(new Set(chosen.map(o=>(o.client||'').trim()).filter(Boolean)));
+    const clientLabel = clientNames.length === 1 ? clientNames[0] : clientNames.join(' / ') || '—';
+    const now = new Date();
+    const total = chosen.reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
+
+    let html = '<div class="p-logo"><img src="logo.svg" alt="Serralharia José Gabriel P. V. do Couto"></div>';
+    html += '<div class="p-title">Orçamento</div>';
+    html += '<div class="p-meta">Gerado em ' + now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) + '</div>';
+    html += '<div class="p-section">';
+    html += '<div class="p-row"><span class="p-label">Cliente</span><span class="p-value">' + escapeHtml(clientLabel) + '</span></div>';
+    html += '<div class="p-row"><span class="p-label">Data</span><span class="p-value">' + now.toLocaleDateString('pt-PT') + '</span></div>';
+    html += '<div class="p-row"><span class="p-label">Nº de peças orçamentadas</span><span class="p-value">' + chosen.length + '</span></div>';
+    html += '</div>';
+
+    html += '<table class="p-group-table"><thead><tr>' +
+      '<th>Nº</th><th>Peça</th><th>Material</th><th class="num">Qt.</th><th class="num">Total s/ IVA</th>' +
+      '</tr></thead><tbody>';
+    chosen.forEach(o=>{
+      const cs = o.costSnapshot;
+      const mat = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' — ' + o.materialSnapshot.thickness + ' mm') : '—';
+      html += '<tr>' +
+        '<td>' + escapeHtml(o.orderNumber||'—') + '</td>' +
+        '<td>' + escapeHtml(o.orderName||'—') + '</td>' +
+        '<td>' + mat + '</td>' +
+        '<td class="num">' + (o.quantity||1) + '</td>' +
+        '<td class="num">' + (cs ? fmtEUR(cs.totalCost) : '—') + '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table>';
+
+    html += '<div class="p-totals">';
+    html += '<div class="p-total-item p-total-main"><span>Total do orçamento — sem IVA</span><strong>' + fmtEUR(total) + '</strong></div>';
+    html += '</div>';
+    html += '<div class="p-quote-note">Orçamento válido durante os próximos 7 dias.</div>';
+
+    $('printSheet').innerHTML = html;
+    const originalTitle = document.title;
+    const safeClient = (clientNames.length===1 ? clientNames[0] : 'varios-clientes').replace(/[\\/:*?"<>|]+/g,'_');
+    document.title = 'Orcamento ' + safeClient + ' - ' + now.toISOString().slice(0,10);
+    window.print();
+    setTimeout(()=>{ document.title = originalTitle; }, 500);
+  });
 
   orderSearchInp.addEventListener('input', renderOrdersList);
   filterStateSel.addEventListener('change', renderOrdersList);
