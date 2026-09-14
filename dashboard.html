@@ -134,14 +134,17 @@
   function renderKPIs(){
     const orders = state.orders;
     const monthStart = startOfMonth();
-    const thisMonth = orders.filter(o => o.createdAt && new Date(o.createdAt) >= monthStart);
-    const pending = orders.filter(o => o.costSnapshot && !o.costSnapshot.isFinal);
+    // Encomendas canceladas ficam registadas no histórico mas saem de todas as contagens e totais.
+    const isCancelled = o => o.orderState === 'cancelled';
+    const live = orders.filter(o => !isCancelled(o));
+    const thisMonth = live.filter(o => o.createdAt && new Date(o.createdAt) >= monthStart);
+    const pending = live.filter(o => o.costSnapshot && !o.costSnapshot.isFinal);
     // Faturado real = só o que foi mesmo produzido (Em produção + Concluído).
     // Orçamentos ainda por confirmar contam à parte, para não inflacionar o valor do mês.
     const isQuote = o => o.orderState === 'quote';
     const monthRevenue = thisMonth.filter(o=>!isQuote(o))
       .reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
-    const quotedValue = orders.filter(isQuote)
+    const quotedValue = live.filter(isQuote)
       .reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
     const inProduction = orders.filter(o => (o.orderState||'production') === 'production').length;
     const quoted = orders.filter(o => o.orderState === 'quote').length;
@@ -176,7 +179,7 @@
 
   function renderLists(){
     const pending = state.orders
-      .filter(o => o.costSnapshot && !o.costSnapshot.isFinal)
+      .filter(o => o.orderState !== 'cancelled' && o.costSnapshot && !o.costSnapshot.isFinal)
       .sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))
       .slice(0, 8);
     $('pendingList').innerHTML = pending.length

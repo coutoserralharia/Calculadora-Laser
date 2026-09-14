@@ -615,6 +615,7 @@
     quote:      { label:'Orçamentado', cls:'state-quote' },
     production: { label:'Em produção', cls:'state-production' },
     done:       { label:'Concluído',   cls:'state-done' },
+    cancelled:  { label:'Cancelada',   cls:'state-cancelled' },
   };
   LC.stateBadgeHTML = function(orderState){
     const st = LC.ORDER_STATES[orderState || 'production'] || LC.ORDER_STATES.production;

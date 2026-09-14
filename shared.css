@@ -387,6 +387,7 @@
   .state-quote{color:#f0b429; background:rgba(240,180,41,0.14);}
   .state-production{color:#ff8c3a; background:rgba(255,140,58,0.14);}
   .state-done{color:#4ade80; background:rgba(74,222,128,0.16);}
+  .state-cancelled{color:#8a929b; background:rgba(138,146,155,0.16); text-decoration:line-through;}
   .state-picker{display:flex; gap:6px; flex-wrap:wrap;}
   .state-picker button{
     flex:1; min-width:110px; cursor:pointer; font-family:'Inter',sans-serif; font-weight:600; font-size:12.5px;
@@ -397,6 +398,7 @@
   .state-picker button.sel-quote{background:rgba(240,180,41,0.16); color:#f0b429; border-color:#f0b429;}
   .state-picker button.sel-production{background:rgba(255,140,58,0.16); color:#ff8c3a; border-color:#ff8c3a;}
   .state-picker button.sel-done{background:rgba(74,222,128,0.16); color:#4ade80; border-color:#4ade80;}
+  .state-picker button.sel-cancelled{background:rgba(138,146,155,0.16); color:#c3c9d1; border-color:#8a929b;}
 
 
   /* ---- Barra de ações fixa (Produção) ---- */

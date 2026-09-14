@@ -311,6 +311,7 @@
       <button type="button" data-state="quote">Orçamentado</button>
       <button type="button" data-state="production">Em produção</button>
       <button type="button" data-state="done">Concluído</button>
+      <button type="button" data-state="cancelled">Cancelada</button>
     </div>
     <div class="ab-buttons">
       <button class="ghost-btn sm" id="barNewBtn" type="button">Nova</button>
@@ -1146,7 +1147,7 @@
   /* ---------------------------------------------------------------- */
   /* ESTADO DA ORDEM                                                   */
   /* ---------------------------------------------------------------- */
-  const STATE_CLASS = { quote:'sel-quote', production:'sel-production', done:'sel-done' };
+  const STATE_CLASS = { quote:'sel-quote', production:'sel-production', done:'sel-done', cancelled:'sel-cancelled' };
   function applyOrderStateUI(){
     statePicker.querySelectorAll('button').forEach(b=>{
       b.className = '';
@@ -1157,8 +1158,13 @@
   }
   statePicker.querySelectorAll('button').forEach(b=>{
     b.addEventListener('click', ()=>{
-      state.orderState = b.getAttribute('data-state');
+      const next = b.getAttribute('data-state');
+      if(next === 'cancelled' && state.orderState !== 'cancelled'){
+        if(!confirm('Marcar esta encomenda como cancelada?\n\nFica registada no histórico com o mesmo número, mas deixa de contar em faturação, orçamentos pendentes e totais.')) return;
+      }
+      state.orderState = next;
       applyOrderStateUI();
+      markDirty();
     });
   });
 
