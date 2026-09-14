@@ -208,7 +208,7 @@
     {id:'m19', name:'Alumínio',    thickness:5,  speed:1400, density:2.70, pricePerKg:3.8, markupPct:0},
     {id:'m20', name:'Alumínio',    thickness:6,  speed:1000, density:2.70, pricePerKg:3.8, markupPct:0},
   ];
-  LC.DEFAULT_MACHINE = { hourlyRate:45, designRate:30, setupRate:30, pierceTime:0.8, areaBasis:'bbox', defaultSetupMin:5, wasteMarginMm:5 };
+  LC.DEFAULT_MACHINE = { hourlyRate:45, designRate:30, setupRate:30, pierceTime:0.8, areaBasis:'bbox', defaultSetupMin:5, wasteMarginMm:5, alertQuoteDays:7, alertRealTimeDays:2 };
 
   /* ---------------------------------------------------------------- */
   /* STORAGE (Claude artifact storage -> localStorage -> memory only)  */
@@ -621,6 +621,107 @@
   LC.stateBadgeHTML = function(orderState){
     const st = LC.ORDER_STATES[orderState || 'production'] || LC.ORDER_STATES.production;
     return '<span class="state-badge ' + st.cls + '">' + st.label + '</span>';
+  };
+
+  /* ---------------------------------------------------------------- */
+  /* SEMANA (segunda a domingo) e RESUMO SEMANAL                        */
+  /* ---------------------------------------------------------------- */
+  LC.weekBounds = function(ref){
+    const d = ref ? new Date(ref) : new Date();
+    const day = (d.getDay() + 6) % 7;            // 0 = segunda
+    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
+    const end = new Date(start); end.setDate(start.getDate() + 7);
+    return { start, end };
+  };
+
+  LC.summarizeWeek = function(orders, ref){
+    const { start, end } = LC.weekBounds(ref);
+    const inWeek = (orders||[]).filter(o=>{
+      if(o.orderState === 'cancelled' || !o.createdAt) return false;
+      const d = new Date(o.createdAt);
+      return d >= start && d < end;
+    });
+
+    const byMaterial = {}, byClient = {};
+    let cuttingMin = 0;
+    inWeek.forEach(o=>{
+      const cs = o.costSnapshot, ms = o.materialSnapshot;
+      if(ms){
+        const k = ms.name + ' ' + ms.thickness + 'mm';
+        byMaterial[k] = (byMaterial[k]||0) + 1;
+      }
+      const c = (o.client||'').trim();
+      if(c){
+        if(!byClient[c]) byClient[c] = { count:0, value:0 };
+        byClient[c].count++;
+        byClient[c].value += cs ? (cs.totalCost||0) : 0;
+      }
+      if(cs && isFinite(cs.cuttingTimeMin)) cuttingMin += cs.cuttingTimeMin;
+    });
+
+    const topMaterial = Object.entries(byMaterial).sort((a,b)=>b[1]-a[1])[0] || null;
+    const topClient = Object.entries(byClient).sort((a,b)=>b[1].count-a[1].count)[0] || null;
+
+    // semana anterior, só para comparar a contagem
+    const prevRef = new Date(start); prevRef.setDate(prevRef.getDate() - 1);
+    const pb = LC.weekBounds(prevRef);
+    const prevCount = (orders||[]).filter(o=>{
+      if(o.orderState === 'cancelled' || !o.createdAt) return false;
+      const d = new Date(o.createdAt);
+      return d >= pb.start && d < pb.end;
+    }).length;
+
+    return {
+      start, end, count: inWeek.length, prevCount, cuttingMin,
+      topMaterial: topMaterial ? { name: topMaterial[0], count: topMaterial[1] } : null,
+      topClient: topClient ? { name: topClient[0], count: topClient[1].count, value: topClient[1].value } : null,
+    };
+  };
+
+  /* ---------------------------------------------------------------- */
+  /* ALERTAS                                                            */
+  /* ---------------------------------------------------------------- */
+  LC.buildAlerts = function(orders, machine, accuracy){
+    const alerts = [];
+    const now = Date.now();
+    const dayMs = 86400000;
+    const quoteDays = machine.alertQuoteDays ?? 7;
+    const realDays = machine.alertRealTimeDays ?? 2;
+
+    const staleQuotes = (orders||[]).filter(o=>
+      o.orderState === 'quote' && o.createdAt &&
+      (now - new Date(o.createdAt).getTime()) > quoteDays*dayMs);
+    if(staleQuotes.length){
+      alerts.push({
+        kind:'warning', title:'Orçamentos parados',
+        detail: staleQuotes.length + (staleQuotes.length===1?' sem resposta há +':' sem resposta há +') + quoteDays + ' dias',
+        action:'Ver lista', href:'encomendas.html?filter=quote',
+      });
+    }
+
+    const missingTime = (orders||[]).filter(o=>
+      (o.orderState||'production') === 'production' && o.createdAt &&
+      o.costSnapshot && !o.costSnapshot.isFinal &&
+      (now - new Date(o.createdAt).getTime()) > realDays*dayMs);
+    if(missingTime.length){
+      alerts.push({
+        kind:'danger', title:'Tempo real em falta',
+        detail: missingTime.length + (missingTime.length===1?' peça em produção há +':' peças em produção há +') + realDays + ' dias',
+        action:'Registar', href:'encomendas.html',
+      });
+    }
+
+    (accuracy||[]).forEach(row=>{
+      if(row.count >= 5 && Math.abs(row.avgDeviationPct) >= 3 && row.materialId){
+        alerts.push({
+          kind:'accent', title:'Velocidade a afinar',
+          detail: row.key + ' · ' + (row.avgDeviationPct>=0?'+':'') + Math.round(row.avgDeviationPct) + '%',
+          action:'Afinar', href:'definicoes.html',
+        });
+      }
+    });
+
+    return alerts;
   };
 
   window.LC = LC;

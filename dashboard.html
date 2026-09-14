@@ -17,6 +17,24 @@
 <link rel="stylesheet" href="shared.css">
 <style>
   .layout-single{max-width:900px; margin:0 auto;}
+  .dash-grid{display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:16px; margin-bottom:16px;}
+  @media (max-width:800px){ .dash-grid{grid-template-columns:1fr;} }
+  .alert-count{margin-left:auto; background:rgba(226,75,74,0.16); color:#e24b4a;
+    font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px;}
+  .alert-item{border-left:3px solid var(--border); padding:2px 0 2px 11px; margin-bottom:14px;}
+  .alert-item:last-child{margin-bottom:0;}
+  .alert-warning{border-left-color:#f0b429;}
+  .alert-danger{border-left-color:#e24b4a;}
+  .alert-accent{border-left-color:var(--accent);}
+  .alert-title{margin:0; font-size:13px; font-weight:600; color:var(--text);}
+  .alert-detail{margin:3px 0 7px; font-size:12px; color:var(--text-muted);}
+  .alert-item .ghost-btn{font-size:12px; padding:4px 10px; text-decoration:none; display:inline-block;}
+  .alerts-clear{color:var(--readout); font-size:13px; margin:0; padding:6px 0;}
+  .week-range{margin-left:auto; font-size:12px; color:var(--text-dim); font-weight:400;}
+  .week-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:16px;}
+  .wk-k{margin:0 0 4px; font-size:11.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.04em;}
+  .wk-v{margin:0; font-size:19px; font-weight:600; color:var(--text); line-height:1.25;}
+  .wk-s{margin:3px 0 0; font-size:11.5px; color:var(--text-muted);}
   #pendingList .order-num, #recentList .order-num{color:var(--text);}
   .kpi-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px;}
   .kpi{
@@ -76,15 +94,27 @@
       <h2 class="card-title"><span class="dot"></span>Ações rápidas</h2>
       <div class="quick-actions">
         <a href="index.html" class="primary">＋ Nova ordem de produção<span class="qa-sub">Calcular, imprimir ficha, guardar</span></a>
-        <a href="encomendas.html">Ver encomendas<span class="qa-sub">Histórico, tempos reais, relatórios</span></a>
+        <a href="encomendas.html">Ver histórico<span class="qa-sub">Encomendas, tempos reais, relatórios</span></a>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="card" style="margin-bottom:0;">
+        <h2 class="card-title"><span class="dot"></span>Estado atual <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
+        <div class="kpi-grid" id="kpiGrid">
+          <p class="orders-empty" style="grid-column:1/-1;">A carregar…</p>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:0;">
+        <h2 class="card-title"><span class="dot"></span>Alertas <span class="alert-count" id="alertCount" hidden></span></h2>
+        <div id="alertsList"><p class="orders-empty">A carregar…</p></div>
       </div>
     </div>
 
     <div class="card">
-      <h2 class="card-title"><span class="dot"></span>Estado atual <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
-      <div class="kpi-grid" id="kpiGrid">
-        <p class="orders-empty" style="grid-column:1/-1;">A carregar…</p>
-      </div>
+      <h2 class="card-title"><span class="dot"></span>Resumo da semana <span class="week-range" id="weekRange"></span></h2>
+      <div class="week-grid" id="weekSummary"></div>
     </div>
 
     <div class="card">
@@ -110,10 +140,11 @@
 <script>
 (function(){
   "use strict";
-  const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, loadRemoteConfig, remoteLoadOrders, registerServiceWorker } = window.LC;
+  const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, loadMachine, loadRemoteConfig,
+    remoteLoadOrders, summarizeAccuracy, summarizeWeek, buildAlerts, registerServiceWorker } = window.LC;
 
   const $ = id => document.getElementById(id);
-  const state = { orders: [], remote: { configured:false, url:'', key:'' } };
+  const state = { orders: [], machine: {}, remote: { configured:false, url:'', key:'' } };
 
   function updateConnBadge(){
     const badge = $('connBadge');
@@ -177,6 +208,45 @@
     '</div>';
   }
 
+  function renderAlerts(){
+    const accuracy = summarizeAccuracy(state.orders);
+    const alerts = buildAlerts(state.orders, state.machine, accuracy);
+    const listEl = $('alertsList'), countEl = $('alertCount');
+
+    if(!alerts.length){
+      listEl.innerHTML = '<p class="alerts-clear">Tudo em dia — nada a precisar de atenção.</p>';
+      countEl.hidden = true;
+      return;
+    }
+    countEl.hidden = false;
+    countEl.textContent = alerts.length;
+    listEl.innerHTML = alerts.map(a =>
+      '<div class="alert-item alert-' + a.kind + '">' +
+        '<p class="alert-title">' + escapeHtml(a.title) + '</p>' +
+        '<p class="alert-detail">' + escapeHtml(a.detail) + '</p>' +
+        '<a class="ghost-btn sm" href="' + a.href + '">' + escapeHtml(a.action) + '</a>' +
+      '</div>'
+    ).join('');
+  }
+
+  function renderWeek(){
+    const w = summarizeWeek(state.orders);
+    const endLabel = new Date(w.end); endLabel.setDate(endLabel.getDate()-1);
+    const fmtD = d => d.toLocaleDateString('pt-PT', {day:'numeric', month:'short'});
+    $('weekRange').textContent = fmtD(w.start) + ' – ' + fmtD(endLabel);
+
+    const diff = w.count - w.prevCount;
+    const trend = diff === 0 ? 'igual à semana anterior'
+      : (diff > 0 ? '+' + diff : diff) + ' vs. semana anterior';
+    const hours = Math.floor(w.cuttingMin/60), mins = Math.round(w.cuttingMin%60);
+
+    $('weekSummary').innerHTML =
+      '<div class="wk"><p class="wk-k">Encomendas</p><p class="wk-v">' + w.count + '</p><p class="wk-s">' + trend + '</p></div>' +
+      '<div class="wk"><p class="wk-k">Material mais usado</p><p class="wk-v">' + (w.topMaterial ? escapeHtml(w.topMaterial.name) : '—') + '</p><p class="wk-s">' + (w.topMaterial ? w.topMaterial.count + (w.topMaterial.count===1?' encomenda':' encomendas') : 'sem dados') + '</p></div>' +
+      '<div class="wk"><p class="wk-k">Cliente com mais encomendas</p><p class="wk-v">' + (w.topClient ? escapeHtml(w.topClient.name) : '—') + '</p><p class="wk-s">' + (w.topClient ? w.topClient.count + ' · ' + fmtEUR(w.topClient.value) : 'sem dados') + '</p></div>' +
+      '<div class="wk"><p class="wk-k">Tempo de máquina</p><p class="wk-v">' + (hours ? hours + ' h ' + String(mins).padStart(2,'0') : Math.round(w.cuttingMin) + ' min') + '</p><p class="wk-s">só corte, sem setup</p></div>';
+  }
+
   function renderLists(){
     const pending = state.orders
       .filter(o => o.orderState !== 'cancelled' && o.costSnapshot && !o.costSnapshot.isFinal)
@@ -196,6 +266,7 @@
 
   async function init(){
     state.remote = await loadRemoteConfig();
+    state.machine = await loadMachine();
     updateConnBadge();
     try{
       state.orders = state.remote.configured ? await remoteLoadOrders(state.remote) : await loadOrders();
@@ -207,6 +278,8 @@
       return;
     }
     renderKPIs();
+    renderAlerts();
+    renderWeek();
     renderLists();
   }
   init();

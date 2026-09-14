@@ -473,6 +473,12 @@
       state.orders = await loadOrders();
     }
     populateFilterOptions();
+    const params = new URLSearchParams(location.search);
+    const f = params.get('filter');
+    if(f && ['quote','production','done','cancelled'].includes(f)){
+      filterStateSel.value = f;
+      history.replaceState(null, '', 'encomendas.html');
+    }
     renderOrdersList();
   }
   init();

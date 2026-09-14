@@ -74,6 +74,17 @@
       </div>
       <div class="field-row">
         <div class="field">
+          <label>Alertar orçamento sem resposta após</label>
+          <div class="unit-suffix"><input type="number" id="alertQuoteDays" step="1" min="1"><span>dias</span></div>
+        </div>
+        <div class="field">
+          <label>Alertar tempo real em falta após</label>
+          <div class="unit-suffix"><input type="number" id="alertRealTimeDays" step="1" min="1"><span>dias</span></div>
+        </div>
+      </div>
+      <p class="save-hint" style="margin:-6px 0 12px;">Controlam os avisos que aparecem no Dashboard.</p>
+      <div class="field-row">
+        <div class="field">
           <label>Margem de desperdício de chapa</label>
           <div class="unit-suffix"><input type="number" id="wasteMarginMm" step="0.5" min="0"><span>mm</span></div>
         </div>
@@ -212,6 +223,7 @@ create policy "public access"
   const hourlyRateInp = $('hourlyRate'), designRateInp = $('designRate'), pierceTimeInp = $('pierceTime');
   const setupRateInp = $('setupRate'), defaultSetupMinInp = $('defaultSetupMin'), wasteMarginMmInp = $('wasteMarginMm');
   const areaBasisSel = $('areaBasis');
+  const alertQuoteDaysInp = $('alertQuoteDays'), alertRealTimeDaysInp = $('alertRealTimeDays');
 
   function applyMachineToInputs(){
     hourlyRateInp.value = state.machine.hourlyRate;
@@ -221,8 +233,10 @@ create policy "public access"
     setupRateInp.value = state.machine.setupRate ?? 30;
     defaultSetupMinInp.value = state.machine.defaultSetupMin ?? 5;
     wasteMarginMmInp.value = state.machine.wasteMarginMm ?? 5;
+    alertQuoteDaysInp.value = state.machine.alertQuoteDays ?? 7;
+    alertRealTimeDaysInp.value = state.machine.alertRealTimeDays ?? 2;
   }
-  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, setupRateInp, defaultSetupMinInp, wasteMarginMmInp].forEach(inp=>{
+  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, setupRateInp, defaultSetupMinInp, wasteMarginMmInp, alertQuoteDaysInp, alertRealTimeDaysInp].forEach(inp=>{
     inp.addEventListener('input', ()=>{
       state.machine.hourlyRate = parseFloat(hourlyRateInp.value)||0;
       state.machine.designRate = parseFloat(designRateInp.value)||0;
@@ -231,6 +245,8 @@ create policy "public access"
       state.machine.setupRate = parseFloat(setupRateInp.value)||0;
       state.machine.defaultSetupMin = parseFloat(defaultSetupMinInp.value)||0;
       state.machine.wasteMarginMm = parseFloat(wasteMarginMmInp.value)||0;
+      state.machine.alertQuoteDays = parseInt(alertQuoteDaysInp.value,10)||7;
+      state.machine.alertRealTimeDays = parseInt(alertRealTimeDaysInp.value,10)||2;
       saveMachine(state.machine);
     });
   });
