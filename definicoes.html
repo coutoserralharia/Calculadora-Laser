@@ -511,6 +511,7 @@ create policy "public access"
           'Só afeta cálculos novos — encomendas já guardadas não mudam.';
         if(!confirm(msg)) return;
         mat.speed = newSpeed;
+        mat.speedCalibratedAt = new Date().toISOString();
         saveMaterials(state.materials);
         renderMaterialsTable();
         btn.outerHTML = '<span class="acc-ok">aplicado ✓</span>';
@@ -532,9 +533,9 @@ create policy "public access"
       } else {
         orders = await loadOrders();
       }
-      const summary = summarizeAccuracy(orders);
+      const summary = summarizeAccuracy(orders, state.materials);
       if(!summary.length){
-        resultsEl.innerHTML = '<p class="orders-empty">Ainda não há encomendas suficientes para analisar — precisas de encomendas marcadas como "Final" (com tempo de corte real registado).</p>';
+        resultsEl.innerHTML = '<p class="orders-empty">Ainda não há dados para analisar — são precisas encomendas com tempo de corte real registado. Materiais afinados recentemente só voltam a aparecer depois de novas encomendas cortadas à velocidade nova.</p>';
       } else {
         const MIN_SAMPLES = 5;
         lastSummary = summary;
@@ -548,7 +549,9 @@ create policy "public access"
           if(!mat){
             suggestion = '<span class="acc-dim">material removido</span>';
           } else if(row.count < MIN_SAMPLES){
-            suggestion = '<span class="acc-dim">faltam '+(MIN_SAMPLES-row.count)+' registo(s)</span>';
+            const falta = MIN_SAMPLES - row.count;
+            suggestion = '<span class="acc-dim">faltam ' + falta + ' registo(s)' +
+              (row.calibratedAt ? ' desde a última afinação' : '') + '</span>';
           } else if(absDev < 3){
             suggestion = '<span class="acc-ok">já está afinado</span>';
           } else {
@@ -569,6 +572,7 @@ create policy "public access"
         });
         html += '</tbody></table></div>';
         html += '<p class="save-hint" style="margin-top:10px;">Desvio positivo = o corte real demorou mais do que a estimativa. A velocidade sugerida só aparece com '+MIN_SAMPLES+' ou mais encomendas registadas, para não afinar com base em casos isolados.</p>';
+        html += '<p class="save-hint">Depois de afinar um material, as encomendas anteriores deixam de contar — a análise recomeça com as encomendas cortadas já à velocidade nova.</p>';
         html += '<p class="save-hint">Nota: o tempo real inclui as perfurações, por isso em peças com muitos furos parte do desvio pode vir daí e não da velocidade de corte.</p>';
         resultsEl.innerHTML = html;
         bindApplyButtons();

@@ -113,11 +113,6 @@
     </div>
 
     <div class="card">
-      <h2 class="card-title"><span class="dot"></span>Resumo da semana <span class="week-range" id="weekRange"></span></h2>
-      <div class="week-grid" id="weekSummary"></div>
-    </div>
-
-    <div class="card">
       <h2 class="card-title"><span class="dot"></span>Em produção</h2>
       <p class="save-hint" style="margin-bottom:12px;">Encomendas ainda com custo estimado — falta registar o tempo real de corte.</p>
       <div id="pendingList"></div>
@@ -126,6 +121,11 @@
     <div class="card">
       <h2 class="card-title"><span class="dot"></span>Últimas encomendas</h2>
       <div id="recentList"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title"><span class="dot"></span>Resumo da semana <span class="week-range" id="weekRange"></span></h2>
+      <div class="week-grid" id="weekSummary"></div>
     </div>
 
   </main>
@@ -140,11 +140,11 @@
 <script>
 (function(){
   "use strict";
-  const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, loadMachine, loadRemoteConfig,
+  const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, loadMachine, loadMaterials, loadRemoteConfig,
     remoteLoadOrders, summarizeAccuracy, summarizeWeek, buildAlerts, registerServiceWorker } = window.LC;
 
   const $ = id => document.getElementById(id);
-  const state = { orders: [], machine: {}, remote: { configured:false, url:'', key:'' } };
+  const state = { orders: [], machine: {}, materials: [], remote: { configured:false, url:'', key:'' } };
 
   function updateConnBadge(){
     const badge = $('connBadge');
@@ -209,7 +209,7 @@
   }
 
   function renderAlerts(){
-    const accuracy = summarizeAccuracy(state.orders);
+    const accuracy = summarizeAccuracy(state.orders, state.materials);
     const alerts = buildAlerts(state.orders, state.machine, accuracy);
     const listEl = $('alertsList'), countEl = $('alertCount');
 
@@ -267,6 +267,7 @@
   async function init(){
     state.remote = await loadRemoteConfig();
     state.machine = await loadMachine();
+    state.materials = await loadMaterials();
     updateConnBadge();
     try{
       state.orders = state.remote.configured ? await remoteLoadOrders(state.remote) : await loadOrders();

@@ -383,7 +383,13 @@
   /* PRECISÃO DAS ESTIMATIVAS — compara tempo estimado vs tempo real,   */
   /* agrupado por material/espessura, para ajudar a calibrar a tabela.  */
   /* ---------------------------------------------------------------- */
-  LC.summarizeAccuracy = function(orders){
+  LC.summarizeAccuracy = function(orders, materials){
+    // Depois de se afinar a velocidade de um material, as encomendas anteriores deixam de contar:
+    // foram estimadas com a velocidade antiga e voltariam a sugerir a mesma correção.
+    const calibratedAt = {};
+    (materials||[]).forEach(m=>{
+      if(m.speedCalibratedAt) calibratedAt[m.id] = new Date(m.speedCalibratedAt).getTime();
+    });
     const groups = {};
     (orders||[]).forEach(o=>{
       const cs = o.costSnapshot;
@@ -391,9 +397,11 @@
       if(cs.estimadoCuttingTimeMin==null || !isFinite(cs.estimadoCuttingTimeMin)) return;
       if(!isFinite(cs.cuttingTimeMin)) return;
       if(cs.estimadoCuttingTimeMin <= 0) return; // avoid divide-by-zero on the deviation %
+      const cal = o.materialId ? calibratedAt[o.materialId] : null;
+      if(cal && o.createdAt && new Date(o.createdAt).getTime() <= cal) return;
       const ms = o.materialSnapshot;
       const key = ms ? (ms.name + ' — ' + ms.thickness + 'mm') : 'Material desconhecido';
-      if(!groups[key]) groups[key] = { key, materialId:o.materialId||null, count:0, sumEstimado:0, sumReal:0, sumDeviationPct:0 };
+      if(!groups[key]) groups[key] = { key, materialId:o.materialId||null, calibratedAt: (o.materialId ? calibratedAt[o.materialId] : null) || null, count:0, sumEstimado:0, sumReal:0, sumDeviationPct:0 };
       const g = groups[key];
       g.count++;
       g.sumEstimado += cs.estimadoCuttingTimeMin;
@@ -403,6 +411,7 @@
     return Object.values(groups).map(g => ({
       key: g.key,
       materialId: g.materialId,
+      calibratedAt: g.calibratedAt,
       count: g.count,
       avgEstimado: g.sumEstimado / g.count,
       avgReal: g.sumReal / g.count,
