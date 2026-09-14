@@ -393,7 +393,7 @@
       if(cs.estimadoCuttingTimeMin <= 0) return; // avoid divide-by-zero on the deviation %
       const ms = o.materialSnapshot;
       const key = ms ? (ms.name + ' — ' + ms.thickness + 'mm') : 'Material desconhecido';
-      if(!groups[key]) groups[key] = { key, count:0, sumEstimado:0, sumReal:0, sumDeviationPct:0 };
+      if(!groups[key]) groups[key] = { key, materialId:o.materialId||null, count:0, sumEstimado:0, sumReal:0, sumDeviationPct:0 };
       const g = groups[key];
       g.count++;
       g.sumEstimado += cs.estimadoCuttingTimeMin;
@@ -402,6 +402,7 @@
     });
     return Object.values(groups).map(g => ({
       key: g.key,
+      materialId: g.materialId,
       count: g.count,
       avgEstimado: g.sumEstimado / g.count,
       avgReal: g.sumReal / g.count,
