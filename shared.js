@@ -208,7 +208,13 @@
     {id:'m19', name:'Alumínio',    thickness:5,  speed:1400, density:2.70, pricePerKg:3.8, markupPct:0},
     {id:'m20', name:'Alumínio',    thickness:6,  speed:1000, density:2.70, pricePerKg:3.8, markupPct:0},
   ];
-  LC.DEFAULT_MACHINE = { hourlyRate:45, designRate:30, setupRate:30, pierceTime:0.8, areaBasis:'bbox', defaultSetupMin:5, wasteMarginMm:5, alertQuoteDays:7, alertRealTimeDays:2 };
+  LC.DEFAULT_MACHINE = { hourlyRate:45, designRate:30, setupRate:30, pierceTime:0.8, areaBasis:'bbox', defaultSetupMin:5, wasteMarginMm:5, alertQuoteDays:7, alertRealTimeDays:2, angleCutFactor:1.4 };
+
+  LC.DEFAULT_TUBE_PROFILES = [
+    {id:'t1', name:'Quadrado 40x40x2mm', perimeterMm:160, speed:4000, kgPerM:2.31, pricePerKg:1.4, markupPct:0, defaultWastePct:10, barLengthMm:6000},
+    {id:'t2', name:'Retangular 60x40x2mm', perimeterMm:200, speed:3500, kgPerM:2.90, pricePerKg:1.4, markupPct:0, defaultWastePct:10, barLengthMm:6000},
+    {id:'t3', name:'Redondo Ø33.7x2mm', perimeterMm:106, speed:4200, kgPerM:1.56, pricePerKg:1.4, markupPct:0, defaultWastePct:10, barLengthMm:6000},
+  ];
 
   /* ---------------------------------------------------------------- */
   /* STORAGE (Claude artifact storage -> localStorage -> memory only)  */
@@ -243,6 +249,15 @@
   }
   LC.storageGet = storageGet;
   LC.storageSet = storageSet;
+
+  LC.loadTubeProfiles = async function(){
+    const raw = await storageGet('laser_tube_profiles_v1');
+    if(raw){ try{ return JSON.parse(raw); }catch(e){} }
+    return JSON.parse(JSON.stringify(LC.DEFAULT_TUBE_PROFILES));
+  };
+  LC.saveTubeProfiles = async function(list){
+    await storageSet('laser_tube_profiles_v1', JSON.stringify(list));
+  };
 
   LC.loadMaterials = async function(){
     const raw = await storageGet('laser_materials_v1');
@@ -294,6 +309,8 @@
       comments: o.comments || null,
       client_ref: o.clientRef || null,
       order_state: o.orderState || null,
+      piece_type: o.pieceType || 'sheet',
+      tube_inputs: o.tubeInputs || null,
     };
   }
   function rowToOrder(r){
@@ -304,6 +321,8 @@
       comments: r.comments,
       clientRef: r.client_ref,
       orderState: r.order_state,
+      pieceType: r.piece_type || 'sheet',
+      tubeInputs: r.tube_inputs,
     };
   }
   async function remoteRequestError(res){

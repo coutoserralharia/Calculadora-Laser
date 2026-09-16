@@ -30,7 +30,8 @@
     <nav class="pagenav">
       <div class="nav-brand"><img src="logo-mark.svg" alt="" class="nav-logo"><span class="nav-name">JGPVC<em>LASER</em></span></div>
       <a href="dashboard.html">Dashboard</a>
-      <a href="index.html">Produção</a>
+      <a href="index.html">Produção Chapa</a>
+      <a href="tubo.html">Produção Tubo</a>
       <a href="encomendas.html" class="active">Histórico</a>
       <a href="definicoes.html">Definições</a>
     </nav>
@@ -220,10 +221,11 @@
       html += '<td class="num">' + (o.quantity||1) + '</td>';
       html += '<td class="num hist-mono hist-price">' + (cs ? fmtEUR(cs.totalCost) : '—') + ' ' + finalTag + '</td>';
       html += '<td>' + stateBadgeHTML(o.orderState) + '</td>';
+      const page = (o.pieceType === 'tube') ? 'tubo.html' : 'index.html';
       html += '<td class="hist-actions">' +
-        '<button class="ghost-btn sm" data-load="'+o.id+'">Abrir</button>' +
+        '<button class="ghost-btn sm" data-load="'+o.id+'" data-page="'+page+'">Abrir</button>' +
         '<button class="ghost-btn sm" data-realtime="'+o.id+'" title="Registar tempo de corte real">Tempo</button>' +
-        '<button class="ghost-btn sm" data-dup="'+o.id+'" title="Criar encomenda nova a partir desta">Duplicar</button>' +
+        '<button class="ghost-btn sm" data-dup="'+o.id+'" data-page="'+page+'" title="Criar encomenda nova a partir desta">Duplicar</button>' +
         '<button class="rm-btn" data-del="'+o.id+'" title="Eliminar">✕</button>' +
       '</td>';
       html += '</tr>';
@@ -266,12 +268,12 @@
 
     ordersListEl.querySelectorAll('[data-load]').forEach(b=>{
       b.addEventListener('click', ()=>{
-        window.location.href = 'index.html?loadOrder=' + encodeURIComponent(b.getAttribute('data-load'));
+        window.location.href = (b.getAttribute('data-page')||'index.html') + '?loadOrder=' + encodeURIComponent(b.getAttribute('data-load'));
       });
     });
     ordersListEl.querySelectorAll('[data-dup]').forEach(b=>{
       b.addEventListener('click', ()=>{
-        window.location.href = 'index.html?duplicateOrder=' + encodeURIComponent(b.getAttribute('data-dup'));
+        window.location.href = (b.getAttribute('data-page')||'index.html') + '?duplicateOrder=' + encodeURIComponent(b.getAttribute('data-dup'));
       });
     });
     ordersListEl.querySelectorAll('[data-del]').forEach(b=>{
@@ -377,7 +379,7 @@
       '</tr></thead><tbody>';
     chosen.forEach(o=>{
       const cs = o.costSnapshot;
-      const mat = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' ' + o.materialSnapshot.thickness + 'mm') : '—';
+      const mat = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + (o.pieceType==='tube' ? '' : ' ' + o.materialSnapshot.thickness + 'mm')) : '—';
       const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
       const isFinal = !!(cs && cs.isFinal);
       html += '<tr>' +

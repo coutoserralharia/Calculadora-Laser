@@ -65,7 +65,8 @@
     <nav class="pagenav">
       <div class="nav-brand"><img src="logo-mark.svg" alt="" class="nav-logo"><span class="nav-name">JGPVC<em>LASER</em></span></div>
       <a href="dashboard.html" class="active">Dashboard</a>
-      <a href="index.html">Produção</a>
+      <a href="index.html">Produção Chapa</a>
+      <a href="tubo.html">Produção Tubo</a>
       <a href="encomendas.html">Histórico</a>
       <a href="definicoes.html">Definições</a>
     </nav>
@@ -93,7 +94,8 @@
     <div class="card">
       <h2 class="card-title"><span class="dot"></span>Ações rápidas</h2>
       <div class="quick-actions">
-        <a href="index.html" class="primary">＋ Nova ordem de produção<span class="qa-sub">Calcular, imprimir ficha, guardar</span></a>
+        <a href="index.html" class="primary">＋ Nova ordem — Chapa<span class="qa-sub">DXF ou dimensões manuais</span></a>
+        <a href="tubo.html" class="primary">＋ Nova ordem — Tubo<span class="qa-sub">Perfil, cortes e rotação</span></a>
         <a href="encomendas.html">Ver histórico<span class="qa-sub">Encomendas, tempos reais, relatórios</span></a>
       </div>
     </div>
@@ -204,7 +206,7 @@
         '<div class="order-row-name">' + (o.orderNumber ? '<span class="order-num">'+escapeHtml(o.orderNumber)+'</span> ' : '') + escapeHtml(o.orderName || 'Sem nome') + ' ' + stateBadgeHTML(o.orderState) + ' ' + badge + '</div>' +
         '<div class="order-row-meta">' + escapeHtml((o.client||'Sem cliente')) + ' · ' + dateStr + ' · ' + matStr + ' · ' + (o.quantity||1) + 'x · ' + costStr + '</div>' +
       '</div>' +
-      '<div class="order-row-actions"><a class="ghost-btn sm" style="text-decoration:none;" href="encomendas.html">Abrir</a></div>' +
+      '<div class="order-row-actions"><a class="ghost-btn sm" style="text-decoration:none;" href="' + (o.pieceType==='tube'?'tubo.html':'index.html') + '?loadOrder=' + encodeURIComponent(o.id) + '">Abrir</a></div>' +
     '</div>';
   }
 

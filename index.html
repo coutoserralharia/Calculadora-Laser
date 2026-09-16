@@ -24,7 +24,8 @@
     <nav class="pagenav">
       <div class="nav-brand"><img src="logo-mark.svg" alt="" class="nav-logo"><span class="nav-name">JGPVC<em>LASER</em></span></div>
       <a href="dashboard.html">Dashboard</a>
-      <a href="index.html" class="active">Produção</a>
+      <a href="index.html" class="active">Produção Chapa</a>
+      <a href="tubo.html">Produção Tubo</a>
       <a href="encomendas.html">Histórico</a>
       <a href="definicoes.html">Definições</a>
     </nav>
@@ -1465,6 +1466,7 @@
         orderNumber,
         createdAt,
         mode: state.mode,
+        pieceType: 'sheet',
         geometryScope: geometryScopeSelect.value,
         dxfFileName: state.mode==='dxf' ? state.dxfFileName : null,
         dxfText: state.mode==='dxf' ? state.dxfRawText : null,

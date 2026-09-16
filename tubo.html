@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Produção Tubo — Custo de Corte Laser</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111417">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Custo Laser">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+<div class="loading-veil" id="loadingVeil"><div class="lv-inner"><span class="lv-spin"></span>A carregar perfis e definições…</div></div>
+
+<div class="wrap">
+
+    <nav class="pagenav">
+      <div class="nav-brand"><img src="logo-mark.svg" alt="" class="nav-logo"><span class="nav-name">JGPVC<em>LASER</em></span></div>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="index.html">Produção Chapa</a>
+      <a href="tubo.html" class="active">Produção Tubo</a>
+      <a href="encomendas.html">Histórico</a>
+      <a href="definicoes.html">Definições</a>
+    </nav>
+
+  <header class="top">
+    <div class="top-row">
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+          <rect x="1" y="1" width="32" height="32" rx="8" stroke="#2b3138" stroke-width="1.2"/>
+          <line x1="6" y1="17" x2="22" y2="17" stroke="#ff5a2e" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="25" cy="17" r="3.4" fill="#3fe8d4"/>
+          <path d="M4 24L30 24" stroke="#3a4149" stroke-width="1" stroke-dasharray="1 3"/>
+        </svg>
+        <div class="brand-text">
+          <p class="eyebrow">Corte Laser // Produção Tubo</p>
+          <h1>Calculadora de Custo — Tubo</h1>
+        </div>
+      </div>
+      <p class="top-note">Escolha o perfil, indique os cortes e o tempo de rotação para obter o custo de fabrico.</p>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <!-- LEFT: CONTROLS -->
+    <section class="col">
+
+      <div class="card">
+        <h2 class="card-title with-action">
+          <span class="title-left"><span class="dot"></span>Dados da encomenda</span>
+          <button class="ghost-btn sm" id="newOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M13 8A5 5 0 113 8" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M13 3v3.5H9.5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Nova encomenda</button>
+        </h2>
+        <div class="field-row">
+          <div class="field"><label for="orderName">Nome da encomenda / peça</label><input type="text" id="orderName" placeholder="Ex: Estrutura de guarda-corpo"></div>
+          <div class="field">
+            <label for="clientName">Cliente</label>
+            <div class="autocomplete-wrap">
+              <input type="text" id="clientName" placeholder="Ex: Metalúrgica Silva, Lda." autocomplete="off">
+              <div class="autocomplete-list" id="clientSuggestions" hidden></div>
+            </div>
+          </div>
+        </div>
+        <div class="field-row" style="margin-bottom:0;">
+          <div class="field" style="margin-bottom:0;">
+            <label for="orderNumberPreview">Nº da encomenda (automático)</label>
+            <input type="text" id="orderNumberPreview" readonly>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="qtyInput">Quantidade de peças a produzir</label>
+            <input type="number" id="qtyInput" value="1" min="1" step="1">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Perfil de tubo</h2>
+        <div class="field" style="margin-bottom:14px;">
+          <label for="tubeProfileSelect">Perfil</label>
+          <select id="tubeProfileSelect"></select>
+          <p class="save-hint" style="margin-top:8px;">Perfis, velocidades e preços definem-se em <a href="definicoes.html" style="color:var(--readout);">Definições avançadas</a>.</p>
+        </div>
+        <div class="field-row" style="margin-bottom:0;">
+          <div class="field" style="margin-bottom:0;">
+            <label for="barLengthInput">Comprimento de barra usado</label>
+            <div class="unit-suffix"><input type="number" id="barLengthInput" min="0" step="10" value="1000"><span>mm</span></div>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="wasteModeSelect">Desperdício</label>
+            <select id="wasteModeSelect">
+              <option value="pct">% padrão do perfil</option>
+              <option value="manual">Já incluído no comprimento acima</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Cortes</h2>
+        <div class="field-row">
+          <div class="field">
+            <label for="straightCutsInput">Nº de cortes retos</label>
+            <input type="number" id="straightCutsInput" min="0" step="1" value="0">
+          </div>
+          <div class="field">
+            <label for="angleCutsInput">Nº de cortes em esquadria/ângulo</label>
+            <input type="number" id="angleCutsInput" min="0" step="1" value="0">
+          </div>
+        </div>
+        <div class="field-row" style="margin-bottom:0;">
+          <div class="field" style="margin-bottom:0;">
+            <label for="extraCutMmInput">Furos e bocas de ligação — comprimento total de corte</label>
+            <div class="unit-suffix"><input type="number" id="extraCutMmInput" min="0" step="10" value="0"><span>mm</span></div>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="rotationMinInput">Tempo de rotação</label>
+            <div class="unit-suffix"><input type="number" id="rotationMinInput" min="0" step="0.5" value="0"><span>min</span></div>
+          </div>
+        </div>
+      </div>
+
+      <details class="card" id="setupDetails" open>
+        <summary class="summary-row"><span>Preparação (setup) <span class="conn-badge conn-local" id="setupBadge"></span></span><span class="chev">▸</span></summary>
+        <div class="details-body">
+          <div class="field">
+            <label for="drawingType">Origem do desenho</label>
+            <select id="drawingType">
+              <option value="client_direct">Desenho do cliente, pronto a usar</option>
+              <option value="client_convert">Converter desenho do cliente</option>
+              <option value="from_scratch">Desenho de raiz</option>
+            </select>
+          </div>
+          <div class="field" id="designTimeField" hidden>
+            <label for="designTimeInput">Tempo de desenho</label>
+            <div class="unit-suffix"><input type="number" id="designTimeInput" min="0" step="1" value="0"><span>min</span></div>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="setupTimeInput">Tempo de setup</label>
+            <div class="unit-suffix"><input type="number" id="setupTimeInput" min="0" step="1" value="5"><span>min</span></div>
+          </div>
+        </div>
+      </details>
+
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Guardar encomenda <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
+        <p class="save-hint" id="editingNote" hidden style="color:var(--accent); margin-bottom:10px;"></p>
+        <div class="field">
+          <label for="orderComments">Comentários (internos — aparecem na ficha interna)</label>
+          <textarea id="orderComments" rows="3" placeholder="Notas para esta encomenda…" style="width:100%; resize:vertical; background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:9px 10px; border-radius:7px; font-family:'Inter',sans-serif; font-size:13.5px; outline:none;"></textarea>
+        </div>
+        <div class="mat-actions">
+          <button class="ghost-btn" id="saveOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M2 2h9l3 3v9H2V2z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M4 2v4h6V2M4 14v-4h8v4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg><span id="saveOrderBtnLabel">Guardar encomenda atual</span></button>
+          <a class="ghost-btn sm" href="encomendas.html" style="text-decoration:none;">Ver encomendas guardadas →</a>
+        </div>
+        <p class="save-hint" id="saveOrderHint"></p>
+        <div class="next-steps" id="nextSteps" hidden>
+          <div class="ns-head"><span id="nextStepsMsg"></span><button type="button" class="ns-close" id="nsClose" title="Fechar">✕</button></div>
+          <div class="ns-actions">
+            <button class="ghost-btn sm" id="nsPrintOperator" type="button">Ficha do operador</button>
+            <button class="ghost-btn sm" id="nsPrintQuote" type="button">Orçamento</button>
+            <button class="ghost-btn sm" id="nsNew" type="button">Nova encomenda</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT: RESULTS -->
+    <section class="col">
+
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Resumo do corte</h2>
+        <div class="preview-meta" id="previewMeta">
+          <div class="meta-item"><div class="k">Perfil</div><div class="v" id="metaProfile">—</div></div>
+          <div class="meta-item"><div class="k">Comprimento total de corte</div><div class="v" id="metaCutLength">—</div></div>
+          <div class="meta-item"><div class="k">Comprimento de barra</div><div class="v" id="metaBarLength">—</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Custo da encomenda <small id="costFinalBadge" style="margin-left:auto;"></small></h2>
+        <div class="field" style="margin-bottom:14px;">
+          <label for="realCuttingTimeInput">Tempo de corte real — total da encomenda, todas as peças (opcional)</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <div class="unit-suffix" style="flex:1;"><input type="number" id="realCuttingTimeInput" min="0" step="0.1" placeholder="deixe vazio para usar a estimativa"><span>min</span></div>
+            <button class="ghost-btn sm" id="clearRealTimeBtn" type="button">Repor estimativa</button>
+          </div>
+        </div>
+        <div class="breakdown-row"><span class="lbl">Peso unitário (1 peça)</span><span class="val" id="valWeightUnit">—</span></div>
+        <div class="breakdown-row"><span class="lbl">Peso total<small id="weightTotalSub">—</small></span><span class="val" id="valWeightTotal">—</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo total do material<small id="matInfoSub">—</small></span><span class="val" id="costMaterial">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo pré-corte<small id="preCorteSub">—</small></span><span class="val" id="costPreCorte">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo total do corte<small id="cutTimeSub">—</small></span><span class="val" id="costCorte">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Subtotal <small>(antes de ajuste)</small></span><span class="val" id="subtotalValue">€0,00</span></div>
+
+        <div class="field" style="margin:12px 0 4px;">
+          <label for="adjustmentValueInput">Ajuste comercial (opcional — use valor negativo para desconto)</label>
+          <div class="field-row" style="margin-bottom:0;">
+            <div class="field" style="margin-bottom:0;">
+              <div class="unit-suffix"><input type="number" id="adjustmentValueInput" step="0.5" placeholder="0,00"><span>€</span></div>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <select id="adjustmentReasonSelect">
+                <option value="">Motivo do ajuste…</option>
+                <option value="Pequena quantidade">Pequena quantidade</option>
+                <option value="Urgência">Urgência</option>
+                <option value="Cliente habitual">Cliente habitual</option>
+                <option value="Concorrência">Concorrência</option>
+                <option value="Complexidade">Complexidade</option>
+                <option value="Desperdício de barra">Desperdício de barra</option>
+                <option value="Outro">Outro</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="breakdown-row" id="adjustmentRow" hidden><span class="lbl">Ajuste comercial<small id="adjustmentSub">—</small></span><span class="val" id="adjustmentValueShown">€0,00</span></div>
+
+        <div class="breakdown-row" style="border-top:1.5px solid var(--border); margin-top:4px; padding-top:12px;"><span class="lbl" style="font-weight:600; color:var(--text);">Custo total da encomenda <small>(sem IVA)<span id="totalQtyTag"></span></small></span><span class="val" id="totalValue" style="font-size:16px; color:var(--readout);">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo total ÷ nº peças <small>(sem IVA)</small></span><span class="val" id="avgPerPieceValue">€0,00</span></div>
+        <div class="total-sub" id="totalTimeSub" hidden style="margin-top:10px; padding-top:10px;"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Imprimir</h2>
+        <div class="print-btns">
+          <button class="ghost-btn print-btn" id="printOperatorBtn" type="button">Ficha do operador</button>
+          <button class="ghost-btn print-btn" id="printInternalBtn" type="button">Ficha interna (com custos)</button>
+          <button class="ghost-btn print-btn" id="printQuoteBtn" type="button">Orçamento p/ cliente</button>
+        </div>
+        <p class="save-hint">A ficha do operador não mostra preços. A ficha interna inclui a decomposição de custos.</p>
+        <p class="save-hint" id="printHint"></p>
+      </div>
+
+    </section>
+  </main>
+
+  <footer class="disclaimer">
+    Ferramenta de cálculo interno. Perímetros de secção, velocidades e preços por perfil são valores de referência editáveis em <a href="definicoes.html" style="color:var(--text-dim);">Definições avançadas</a>. O tempo de corte em ângulo é estimado com um fator sobre o corte reto — ajuste-o em Definições consoante a realidade da máquina.
+  </footer>
+
+</div>
+
+<div class="action-bar" id="actionBar">
+  <div class="action-bar-inner">
+    <div class="ab-status">
+      <span class="dirty-dot" id="dirtyDot" hidden title="Tem alterações por gravar"></span>
+      <span id="abOrderNum">—</span>
+      <span class="ab-total" id="abTotal">€0,00</span>
+    </div>
+    <div class="state-picker ab-state" id="statePicker">
+      <button type="button" data-state="quote">Orçamentado</button>
+      <button type="button" data-state="production">Em produção</button>
+      <button type="button" data-state="done">Concluído</button>
+      <button type="button" data-state="cancelled">Cancelada</button>
+    </div>
+    <div class="ab-buttons">
+      <button class="ghost-btn sm" id="barNewBtn" type="button">Nova</button>
+      <button class="ghost-btn sm" id="barPrintOperatorBtn" type="button">Ficha operador</button>
+      <button class="ghost-btn sm accent" id="barSaveBtn" type="button"><span id="barSaveLabel">Guardar encomenda atual</span></button>
+    </div>
+  </div>
+</div>
+
+<div id="printSheet" class="print-sheet"></div>
+
+<script src="shared.js"></script>
+<script>
+(function(){
+  "use strict";
+  const { fmtEUR, fmtNum, escapeHtml, loadTubeProfiles, loadMachine, loadOrders, loadRemoteConfig,
+    remoteLoadOrders, remoteInsertOrder, remoteUpdateFullOrder, computeNextOrderNumber,
+    registerServiceWorker } = window.LC;
+
+  const $ = id => document.getElementById(id);
+
+  const state = {
+    profiles: [],
+    machine: Object.assign({}, window.LC.DEFAULT_MACHINE),
+    orders: [],
+    remote: { configured:false, url:'', key:'' },
+    loadedOrderId: null,
+    loadedOrderNumber: null,
+    loadedOrderCreatedAt: null,
+    loadedCostSnapshot: null,
+    orderState: 'production',
+    dirty: false,
+  };
+
+  const orderNameInp = $('orderName'), clientNameInp = $('clientName');
+  const orderCommentsInp = $('orderComments'), qtyInput = $('qtyInput');
+  const tubeProfileSelect = $('tubeProfileSelect'), barLengthInput = $('barLengthInput');
+  const wasteModeSelect = $('wasteModeSelect');
+  const straightCutsInput = $('straightCutsInput'), angleCutsInput = $('angleCutsInput');
+  const extraCutMmInput = $('extraCutMmInput'), rotationMinInput = $('rotationMinInput');
+  const drawingTypeSel = $('drawingType'), designTimeField = $('designTimeField');
+  const designTimeInput = $('designTimeInput'), setupTimeInput = $('setupTimeInput');
+  const realCuttingTimeInput = $('realCuttingTimeInput'), clearRealTimeBtn = $('clearRealTimeBtn');
+  const adjustmentValueInput = $('adjustmentValueInput'), adjustmentReasonSelect = $('adjustmentReasonSelect');
+  const saveOrderBtn = $('saveOrderBtn'), saveOrderHint = $('saveOrderHint');
+  const statePicker = $('statePicker'), clientSuggestionsEl = $('clientSuggestions');
+  const printHint = $('printHint'), printSheetEl = $('printSheet');
+
+  function getSelectedProfile(){
+    return state.profiles.find(p=>p.id===tubeProfileSelect.value) || state.profiles[0] || null;
+  }
+
+  function populateProfileSelect(){
+    tubeProfileSelect.innerHTML = '';
+    state.profiles.forEach(p=>{
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      tubeProfileSelect.appendChild(opt);
+    });
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* CÁLCULO                                                           */
+  /* ---------------------------------------------------------------- */
+  function computeCost(){
+    const profile = getSelectedProfile();
+    const qty = Math.max(1, parseInt(qtyInput.value,10)||1);
+    const barLenMm = parseFloat(barLengthInput.value)||0;
+    if(!profile || barLenMm <= 0){
+      return { valid:false, profile, qty };
+    }
+
+    const straightCuts = Math.max(0, parseInt(straightCutsInput.value,10)||0);
+    const angleCuts = Math.max(0, parseInt(angleCutsInput.value,10)||0);
+    const extraCutMm = Math.max(0, parseFloat(extraCutMmInput.value)||0);
+    const rotationMin = Math.max(0, parseFloat(rotationMinInput.value)||0);
+
+    // Comprimento de corte: cada corte (reto ou em ângulo) percorre o perímetro da secção.
+    // O corte em ângulo é mais lento, por isso conta com um fator sobre o tempo, não sobre o comprimento.
+    const perim = profile.perimeterMm || 0;
+    const angleFactor = state.machine.angleCutFactor ?? 1.4;
+    const cutLengthMm = (straightCuts + angleCuts) * perim + extraCutMm;
+    const effectiveCutMm = straightCuts*perim + angleCuts*perim*angleFactor + extraCutMm;
+
+    const speed = Math.max(profile.speed||1, 1);
+    const cutMinPerPiece = effectiveCutMm / speed + rotationMin;
+    const estimatedTotalTimeMin = cutMinPerPiece * qty;
+
+    const realTimeRaw = realCuttingTimeInput.value.trim();
+    const realTimeVal = parseFloat(realTimeRaw);
+    const isFinalTime = realTimeRaw !== '' && Number.isFinite(realTimeVal) && realTimeVal >= 0;
+    const cuttingTimeMin = isFinalTime ? realTimeVal : estimatedTotalTimeMin;
+    const corteCost = cuttingTimeMin * (state.machine.hourlyRate/60);
+
+    // Material: comprimento × kg/m × €/kg (com a % extra do perfil aplicada).
+    const wastePct = wasteModeSelect.value === 'pct' ? (profile.defaultWastePct||0) : 0;
+    const billedLenMm = barLenMm * (1 + wastePct/100);
+    const weightPerPiece = (billedLenMm/1000) * (profile.kgPerM||0);
+    const weightTotal = weightPerPiece * qty;
+    const effectivePricePerKg = (profile.pricePerKg||0) * (1 + (profile.markupPct||0)/100);
+    const materialCostPerPiece = weightPerPiece * effectivePricePerKg;
+    const materialCostTotal = materialCostPerPiece * qty;
+
+    const drawingType = drawingTypeSel.value;
+    const designTimeMin = drawingType==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
+    const setupTimeMin = parseFloat(setupTimeInput.value)||0;
+    const designCost = (designTimeMin/60) * (state.machine.designRate||0);
+    const setupCost = (setupTimeMin/60) * (state.machine.setupRate||0);
+    const preCorteCost = designCost + setupCost;
+
+    const subtotal = corteCost + materialCostTotal + preCorteCost;
+    const adjustmentValue = parseFloat(adjustmentValueInput.value) || 0;
+    const totalCost = subtotal + adjustmentValue;
+    const avgPerPiece = totalCost / qty;
+    const totalTimeMin = cuttingTimeMin + designTimeMin + setupTimeMin;
+
+    return {
+      valid:true, profile, qty,
+      straightCuts, angleCuts, extraCutMm, rotationMin,
+      cutLengthMm, billedLenMm, barLenMm, wastePct,
+      cuttingTimeMin, estimatedCuttingTimeMin: estimatedTotalTimeMin, corteCost,
+      materialCostTotal, materialCostPerPiece, weightPerPiece, weightTotal,
+      drawingType, designTimeMin, setupTimeMin, designCost, setupCost, preCorteCost,
+      subtotal, adjustmentValue, adjustmentReason: adjustmentReasonSelect.value,
+      totalCost, avgPerPiece, totalTimeMin,
+      isFinalDisplay: isFinalTime,
+    };
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* RENDER                                                            */
+  /* ---------------------------------------------------------------- */
+  function recalcAndRender(){
+    const r = computeCost();
+
+    if(!r.valid){
+      ['costMaterial','costPreCorte','costCorte','totalValue','avgPerPieceValue','subtotalValue'].forEach(id=>$(id).textContent = fmtEUR(0));
+      ['valWeightUnit','valWeightTotal'].forEach(id=>$(id).textContent = '—');
+      ['metaProfile','metaCutLength','metaBarLength'].forEach(id=>$(id).textContent = '—');
+      $('adjustmentRow').hidden = true;
+      $('matInfoSub').textContent = '—'; $('preCorteSub').textContent = '—';
+      $('cutTimeSub').textContent = '—'; $('weightTotalSub').textContent = '—';
+      $('totalQtyTag').textContent = '';
+      $('totalTimeSub').hidden = true;
+      $('costFinalBadge').textContent = '';
+      $('abTotal').textContent = fmtEUR(0);
+      return;
+    }
+
+    $('metaProfile').textContent = r.profile.name;
+    $('metaCutLength').textContent = fmtNum(r.cutLengthMm/10,1) + ' cm/peça';
+    $('metaBarLength').textContent = fmtNum(r.billedLenMm,0) + ' mm' + (r.wastePct ? ' (inclui ' + r.wastePct + '% desperdício)' : '');
+
+    $('valWeightUnit').textContent = fmtNum(r.weightPerPiece,2) + ' kg';
+    $('valWeightTotal').textContent = fmtNum(r.weightTotal,2) + ' kg';
+    $('weightTotalSub').textContent = r.qty>1 ? (r.qty + ' × ' + fmtNum(r.weightPerPiece,2) + ' kg') : 'igual ao unitário (1 peça)';
+
+    $('matInfoSub').textContent = fmtNum(r.profile.kgPerM,2) + ' kg/m · €/kg' + (r.qty>1 ? ' · ' + fmtEUR(r.materialCostPerPiece) + '/peça' : '');
+    $('costMaterial').textContent = fmtEUR(r.materialCostTotal);
+
+    $('preCorteSub').textContent = 'Desenho ' + fmtNum(r.designTimeMin,0) + 'min (' + fmtEUR(r.designCost) + ') + Setup ' + fmtNum(r.setupTimeMin,0) + 'min (' + fmtEUR(r.setupCost) + ')';
+    $('costPreCorte').textContent = fmtEUR(r.preCorteCost);
+
+    const cutsLabel = r.straightCuts + ' reto(s) + ' + r.angleCuts + ' em ângulo' + (r.extraCutMm ? ' + furos/bocas' : '') + (r.rotationMin ? ' · rotação ' + fmtNum(r.rotationMin,1) + 'min/peça' : '');
+    $('cutTimeSub').textContent = r.isFinalDisplay
+      ? (fmtNum(r.cuttingTimeMin,1) + ' min no total (tempo real) · ' + cutsLabel)
+      : (fmtNum(r.cuttingTimeMin,1) + ' min no total (estimado) · ' + cutsLabel);
+    $('costCorte').textContent = fmtEUR(r.corteCost);
+
+    $('subtotalValue').textContent = fmtEUR(r.subtotal);
+    if(r.adjustmentValue){
+      $('adjustmentRow').hidden = false;
+      $('adjustmentValueShown').textContent = (r.adjustmentValue>0?'+':'') + fmtEUR(r.adjustmentValue);
+      $('adjustmentValueShown').style.color = r.adjustmentValue<0 ? 'var(--danger)' : 'var(--readout)';
+      $('adjustmentSub').textContent = r.adjustmentReason || 'sem motivo indicado';
+    } else {
+      $('adjustmentRow').hidden = true;
+    }
+
+    $('totalValue').textContent = fmtEUR(r.totalCost);
+    $('abTotal').textContent = fmtEUR(r.totalCost);
+    $('abOrderNum').textContent = ($('orderNumberPreview').value || '—') + (orderNameInp.value.trim() ? ' · ' + orderNameInp.value.trim() : '');
+    $('totalQtyTag').textContent = ' — ' + r.qty + (r.qty===1 ? ' peça' : ' peças');
+    $('avgPerPieceValue').textContent = fmtEUR(r.avgPerPiece);
+
+    if(r.isFinalDisplay){
+      $('costFinalBadge').textContent = '(FINAL — tempo de corte real registado)';
+      $('costFinalBadge').style.color = 'var(--readout)';
+    } else {
+      $('costFinalBadge').textContent = '(estimado — velocidade da tabela)';
+      $('costFinalBadge').style.color = '';
+    }
+
+    $('totalTimeSub').hidden = false;
+    $('totalTimeSub').textContent = 'Tempo total estimado da encomenda: ' + fmtNum(r.totalTimeMin,1) + ' min (corte ' + fmtNum(r.cuttingTimeMin,1) + ' + preparação ' + fmtNum(r.designTimeMin+r.setupTimeMin,0) + ')';
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* ALTERAÇÕES POR GRAVAR                                             */
+  /* ---------------------------------------------------------------- */
+  function markDirty(){ if(!state.dirty){ state.dirty = true; updateEditingUI(); } }
+  function markClean(){ state.dirty = false; updateEditingUI(); }
+  document.addEventListener('input', e=>{ if(e.target.closest('.layout')) markDirty(); });
+  document.addEventListener('change', e=>{ if(e.target.closest('.layout')) markDirty(); });
+  window.addEventListener('beforeunload', e=>{
+    if(state.dirty && orderNameInp.value.trim()){ e.preventDefault(); e.returnValue = ''; }
+  });
+
+  function updateEditingUI(){
+    const note = $('editingNote'), label = $('saveOrderBtnLabel');
+    if(state.loadedOrderId){
+      note.hidden = false;
+      note.textContent = 'A editar a encomenda ' + (state.loadedOrderNumber||'') + ' — gravar vai atualizar esta mesma encomenda, não criar uma nova.';
+      label.textContent = 'Atualizar encomenda ' + (state.loadedOrderNumber||'');
+    } else {
+      note.hidden = true;
+      label.textContent = 'Guardar encomenda atual';
+    }
+    $('dirtyDot').hidden = !state.dirty;
+    $('barSaveLabel').textContent = label.textContent;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* SUGESTÕES DE CLIENTE                                              */
+  /* ---------------------------------------------------------------- */
+  let suggestIndex = -1;
+  function knownClients(){
+    const seen = new Map();
+    state.orders.forEach(o=>{
+      const n = (o.client||'').trim();
+      if(!n) return;
+      const k = n.toLowerCase();
+      if(!seen.has(k)) seen.set(k, n);
+    });
+    return Array.from(seen.values()).sort((a,b)=>a.localeCompare(b,'pt'));
+  }
+  function hideClientSuggestions(){ clientSuggestionsEl.hidden = true; clientSuggestionsEl.innerHTML = ''; suggestIndex = -1; }
+  function renderClientSuggestions(){
+    const q = clientNameInp.value.trim().toLowerCase();
+    if(!q){ hideClientSuggestions(); return; }
+    const matches = knownClients().filter(n=>{ const ln=n.toLowerCase(); return ln.includes(q) && ln!==q; }).slice(0,6);
+    if(!matches.length){ hideClientSuggestions(); return; }
+    clientSuggestionsEl.innerHTML = matches.map(n=>{
+      const idx = n.toLowerCase().indexOf(q);
+      const html = escapeHtml(n.slice(0,idx)) + '<mark>' + escapeHtml(n.slice(idx, idx+q.length)) + '</mark>' + escapeHtml(n.slice(idx+q.length));
+      return '<button type="button" class="autocomplete-item" data-name="'+escapeHtml(n)+'">'+html+'</button>';
+    }).join('');
+    clientSuggestionsEl.hidden = false;
+    suggestIndex = -1;
+    clientSuggestionsEl.querySelectorAll('.autocomplete-item').forEach(b=>{
+      b.addEventListener('mousedown', e=>{
+        e.preventDefault();
+        clientNameInp.value = b.getAttribute('data-name');
+        hideClientSuggestions();
+      });
+    });
+  }
+  function moveSuggestion(d){
+    const items = clientSuggestionsEl.querySelectorAll('.autocomplete-item');
+    if(!items.length) return;
+    suggestIndex = (suggestIndex + d + items.length) % items.length;
+    items.forEach((it,i)=> it.classList.toggle('active', i===suggestIndex));
+  }
+  clientNameInp.addEventListener('input', renderClientSuggestions);
+  clientNameInp.addEventListener('focus', renderClientSuggestions);
+  clientNameInp.addEventListener('blur', ()=> setTimeout(hideClientSuggestions, 120));
+  clientNameInp.addEventListener('keydown', e=>{
+    if(clientSuggestionsEl.hidden) return;
+    if(e.key==='ArrowDown'){ e.preventDefault(); moveSuggestion(1); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); moveSuggestion(-1); }
+    else if(e.key==='Enter' && suggestIndex>=0){
+      e.preventDefault();
+      const it = clientSuggestionsEl.querySelectorAll('.autocomplete-item')[suggestIndex];
+      if(it){ clientNameInp.value = it.getAttribute('data-name'); hideClientSuggestions(); }
+    } else if(e.key==='Escape'){ hideClientSuggestions(); }
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* ESTADO DA ORDEM                                                   */
+  /* ---------------------------------------------------------------- */
+  const STATE_CLASS = { quote:'sel-quote', production:'sel-production', done:'sel-done', cancelled:'sel-cancelled' };
+  function applyOrderStateUI(){
+    statePicker.querySelectorAll('button').forEach(b=>{
+      b.className = '';
+      if(b.getAttribute('data-state') === state.orderState) b.classList.add(STATE_CLASS[state.orderState]);
+    });
+  }
+  statePicker.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const next = b.getAttribute('data-state');
+      if(next === 'cancelled' && state.orderState !== 'cancelled'){
+        if(!confirm('Marcar esta encomenda como cancelada?\n\nFica registada no histórico com o mesmo número, mas deixa de contar em faturação, orçamentos pendentes e totais.')) return;
+      }
+      state.orderState = next;
+      applyOrderStateUI();
+      markDirty();
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* PREPARAÇÃO                                                        */
+  /* ---------------------------------------------------------------- */
+  const DRAWING_LABELS = { client_direct:'Cliente', client_convert:'Conversão', from_scratch:'De raiz' };
+  function updateSetupBadge(){
+    const designMin = drawingTypeSel.value==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
+    const totalMin = designMin + (parseFloat(setupTimeInput.value)||0);
+    $('setupBadge').textContent = '● ' + (DRAWING_LABELS[drawingTypeSel.value]||'') + ' · ' + fmtNum(totalMin,0) + ' min';
+  }
+  function applyDrawingTypeUI(){
+    designTimeField.hidden = drawingTypeSel.value==='client_direct';
+    if(drawingTypeSel.value==='client_direct') designTimeInput.value = 0;
+    updateSetupBadge();
+  }
+  drawingTypeSel.addEventListener('change', ()=>{
+    applyDrawingTypeUI();
+    if(!designTimeField.hidden) designTimeInput.focus();
+    recalcAndRender();
+  });
+  [designTimeInput, setupTimeInput].forEach(inp=>{
+    inp.addEventListener('input', ()=>{ updateSetupBadge(); recalcAndRender(); });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* LISTENERS DE RECÁLCULO                                            */
+  /* ---------------------------------------------------------------- */
+  [tubeProfileSelect, wasteModeSelect, adjustmentReasonSelect].forEach(el=> el.addEventListener('change', recalcAndRender));
+  [qtyInput, barLengthInput, straightCutsInput, angleCutsInput, extraCutMmInput,
+   rotationMinInput, realCuttingTimeInput, adjustmentValueInput, orderNameInp].forEach(el=> el.addEventListener('input', recalcAndRender));
+  clearRealTimeBtn.addEventListener('click', ()=>{ realCuttingTimeInput.value=''; recalcAndRender(); });
+
+  /* ---------------------------------------------------------------- */
+  /* IMPRESSÃO                                                         */
+  /* ---------------------------------------------------------------- */
+  const originalDocTitle = document.title;
+  function sanitizeFileNamePart(s){ return String(s||'').trim().replace(/[\\/:*?"<>|]+/g,'_'); }
+  function pRow(label, value){
+    return '<div class="p-row"><span class="p-label">'+label+'</span><span class="p-value">'+value+'</span></div>';
+  }
+
+  function printSheetHTML(mode){
+    const r = computeCost();
+    const orderName = orderNameInp.value.trim() || '—';
+    const client = clientNameInp.value.trim() || '—';
+    const qty = Math.max(1, parseInt(qtyInput.value,10)||1);
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});
+    const titles = { internal:'Ficha Interna — Custos de Fabrico (Tubo)', quote:'Orçamento', operator:'Ordem de Corte — Operador (Tubo)' };
+
+    let html = '<div class="p-logo"><img src="logo.svg" alt="Serralharia José Gabriel P. V. do Couto"></div>';
+    html += '<div class="p-title">' + (titles[mode]||titles.operator) + '</div>';
+    html += '<div class="p-meta">Gerado em ' + dateStr + '</div>';
+
+    if(mode==='quote'){
+      html += '<div class="p-section">';
+      html += pRow('Cliente', client);
+      html += pRow('Nº da encomenda', $('orderNumberPreview').value || '—');
+      html += pRow('Data', now.toLocaleDateString('pt-PT'));
+      html += pRow('Peça', orderName);
+      html += pRow('Perfil', r.valid ? r.profile.name : '—');
+      html += pRow('Quantidade', qty);
+      html += '</div>';
+      html += '<div class="p-totals">';
+      html += '<div class="p-total-item p-total-main"><span>Total (' + qty + (qty===1?' peça':' peças') + ') — sem IVA</span><strong>' + (r.valid?fmtEUR(r.totalCost):'—') + '</strong></div>';
+      html += '<div class="p-total-item"><span>Preço por peça — sem IVA</span><strong>' + (r.valid?fmtEUR(r.avgPerPiece):'—') + '</strong></div>';
+      html += '</div>';
+      html += '<div class="p-quote-note">Orçamento válido durante os próximos 7 dias.</div>';
+      return html;
+    }
+
+    html += '<div class="p-section">';
+    html += pRow('Nº da encomenda', $('orderNumberPreview').value || '—');
+    html += pRow('Encomenda / peça', orderName);
+    html += pRow('Cliente', client);
+    html += pRow('Perfil de tubo', r.valid ? r.profile.name : '—');
+    html += pRow('Quantidade a produzir', qty);
+    html += '</div>';
+
+    html += '<div class="p-section">';
+    html += pRow('Comprimento de barra por peça', r.valid ? (fmtNum(r.barLenMm,0) + ' mm') : '—');
+    html += pRow('Cortes retos', r.valid ? r.straightCuts : '—');
+    html += pRow('Cortes em esquadria/ângulo', r.valid ? r.angleCuts : '—');
+    if(r.valid && r.extraCutMm) html += pRow('Furos e bocas de ligação', fmtNum(r.extraCutMm,0) + ' mm de corte');
+    if(r.valid && r.rotationMin) html += pRow('Tempo de rotação', fmtNum(r.rotationMin,1) + ' min/peça');
+    if(r.valid && r.weightPerPiece>0) html += pRow('Peso de 1 peça', fmtNum(r.weightPerPiece,2) + ' kg');
+    html += '</div>';
+
+    html += '<div class="p-realtime-box">Tempo de corte real (TOTAL da encomenda, todas as peças): __________________ min</div>';
+
+    if(mode==='internal'){
+      html += '<div class="p-section">';
+      html += '<div class="p-costs-title">Custo da encomenda</div>';
+      html += pRow('Peso unitário (1 peça)', r.valid ? (fmtNum(r.weightPerPiece,2)+' kg') : '—');
+      html += pRow('Peso total', r.valid ? (fmtNum(r.weightTotal,2)+' kg') : '—');
+      html += pRow('Comprimento faturado por peça', r.valid ? (fmtNum(r.billedLenMm,0)+' mm' + (r.wastePct ? ' (inclui '+r.wastePct+'% desperdício)' : '')) : '—');
+      html += pRow('Custo total do material', r.valid ? fmtEUR(r.materialCostTotal) : '—');
+      html += pRow('Custo pré-corte', r.valid ? fmtEUR(r.preCorteCost) : '—');
+      if(r.valid){
+        const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[r.drawingType] || r.drawingType;
+        html += pRow('　· Desenho', drawLabel + (r.designTimeMin ? ' — '+r.designTimeMin+' min ('+fmtEUR(r.designCost)+')' : ' — sem custo'));
+        html += pRow('　· Setup', r.setupTimeMin+' min ('+fmtEUR(r.setupCost)+')');
+      }
+      html += pRow('Custo total do corte', r.valid ? (fmtEUR(r.corteCost)+' ('+fmtNum(r.cuttingTimeMin,1)+' min no total'+(r.isFinalDisplay?', real':', estimado')+')') : '—');
+      if(r.valid && r.adjustmentValue){
+        html += pRow('Subtotal', fmtEUR(r.subtotal));
+        html += pRow('Ajuste comercial' + (r.adjustmentReason ? ' ('+escapeHtml(r.adjustmentReason)+')' : ''), (r.adjustmentValue>0?'+':'') + fmtEUR(r.adjustmentValue));
+      }
+      html += '</div>';
+      html += '<div class="p-totals">';
+      html += '<div class="p-total-item p-total-main"><span>Total da encomenda (' + qty + (qty===1?' peça':' peças') + ') — sem IVA</span><strong>' + (r.valid?fmtEUR(r.totalCost):'—') + '</strong></div>';
+      html += '<div class="p-total-item"><span>Total ÷ nº peças — sem IVA</span><strong>' + (r.valid?fmtEUR(r.avgPerPiece):'—') + '</strong></div>';
+      html += '</div>';
+      const commentsText = orderCommentsInp.value.trim();
+      html += '<div class="p-notes-box"><div class="p-notes-title">Comentários</div>' +
+        (commentsText ? '<div class="p-notes-text">' + escapeHtml(commentsText).replace(/\n/g,'<br>') + '</div>'
+                      : '<div class="p-notes-lines"><span></span><span></span><span></span></div>') + '</div>';
+    }
+
+    html += '<div class="p-sign"><div>Operador: ______________________</div><div>Data: ______________</div></div>';
+    return html;
+  }
+
+  function doPrint(mode){
+    const r = computeCost();
+    if(!r.valid){
+      printHint.textContent = 'Escolha o perfil e indique o comprimento de barra antes de imprimir.';
+      printHint.style.color = 'var(--danger)';
+      return;
+    }
+    printHint.style.color = ''; printHint.textContent = '';
+    printSheetEl.innerHTML = printSheetHTML(mode);
+    const orderNumber = $('orderNumberPreview').value.trim();
+    const orderName = orderNameInp.value.trim();
+    const modeTag = mode==='internal' ? ' (custos)' : (mode==='quote' ? ' (orcamento)' : '');
+    document.title = sanitizeFileNamePart((orderNumber ? orderNumber + modeTag + ' - ' : '') + (orderName || 'encomenda')) || originalDocTitle;
+    window.print();
+  }
+  window.addEventListener('afterprint', ()=>{ document.title = originalDocTitle; });
+  $('printOperatorBtn').addEventListener('click', ()=>doPrint('operator'));
+  $('printInternalBtn').addEventListener('click', ()=>doPrint('internal'));
+  $('printQuoteBtn').addEventListener('click', ()=>doPrint('quote'));
+
+  /* ---------------------------------------------------------------- */
+  /* NOVA / CARREGAR / DUPLICAR                                        */
+  /* ---------------------------------------------------------------- */
+  async function refreshOrderNumberPreview(){
+    try{ $('orderNumberPreview').value = await computeNextOrderNumber(state.remote, state.orders); }
+    catch(e){ $('orderNumberPreview').value = ''; }
+  }
+
+  function resetOrderForm(){
+    state.loadedOrderId = null; state.loadedOrderNumber = null;
+    state.loadedOrderCreatedAt = null; state.loadedCostSnapshot = null;
+    state.orderState = 'production';
+    orderNameInp.value = ''; clientNameInp.value = ''; orderCommentsInp.value = '';
+    qtyInput.value = 1;
+    barLengthInput.value = 1000;
+    wasteModeSelect.value = 'pct';
+    straightCutsInput.value = 0; angleCutsInput.value = 0;
+    extraCutMmInput.value = 0; rotationMinInput.value = 0;
+    realCuttingTimeInput.value = '';
+    adjustmentValueInput.value = ''; adjustmentReasonSelect.value = '';
+    drawingTypeSel.value = 'client_direct';
+    setupTimeInput.value = state.machine.defaultSetupMin ?? 5;
+    applyDrawingTypeUI();
+    applyOrderStateUI();
+    refreshOrderNumberPreview();
+    recalcAndRender();
+    markClean();
+  }
+  $('newOrderBtn').addEventListener('click', ()=>{
+    if((orderNameInp.value.trim() || clientNameInp.value.trim()) &&
+       !confirm('Isto limpa o formulário atual. Continuar?')) return;
+    resetOrderForm();
+  });
+
+  async function populateFromOrder(o){
+    orderNameInp.value = o.orderName || '';
+    clientNameInp.value = o.client || '';
+    orderCommentsInp.value = o.comments || '';
+    qtyInput.value = o.quantity || 1;
+    state.orderState = o.orderState || 'production';
+
+    const t = o.tubeInputs || {};
+    if(t.profileId && state.profiles.some(p=>p.id===t.profileId)) tubeProfileSelect.value = t.profileId;
+    barLengthInput.value = t.barLengthMm ?? 1000;
+    wasteModeSelect.value = t.wasteMode || 'pct';
+    straightCutsInput.value = t.straightCuts ?? 0;
+    angleCutsInput.value = t.angleCuts ?? 0;
+    extraCutMmInput.value = t.extraCutMm ?? 0;
+    rotationMinInput.value = t.rotationMin ?? 0;
+
+    const cs = o.costSnapshot;
+    realCuttingTimeInput.value = (cs && cs.isFinal && isFinite(cs.cuttingTimeMin)) ? cs.cuttingTimeMin : '';
+    adjustmentValueInput.value = (cs && cs.adjustmentValue) ? cs.adjustmentValue : '';
+    adjustmentReasonSelect.value = (cs && cs.adjustmentReason) || '';
+
+    const si = cs && cs.setupInputs;
+    if(si){
+      drawingTypeSel.value = si.drawingType || 'client_direct';
+      designTimeInput.value = si.designTimeMin || 0;
+      setupTimeInput.value = si.setupTimeMin ?? 5;
+    }
+    applyDrawingTypeUI();
+    applyOrderStateUI();
+    recalcAndRender();
+  }
+
+  async function loadOrderIntoForm(o){
+    state.loadedOrderId = o.id;
+    state.loadedOrderNumber = o.orderNumber;
+    state.loadedOrderCreatedAt = o.createdAt;
+    state.loadedCostSnapshot = o.costSnapshot || null;
+    await populateFromOrder(o);
+    $('orderNumberPreview').value = o.orderNumber || '';
+    markClean();
+    saveOrderHint.style.color = 'var(--readout)';
+    saveOrderHint.textContent = 'Encomenda ' + (o.orderNumber||'') + ' reposta — gravar atualiza esta mesma encomenda.';
+    setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
+  }
+
+  async function loadOrderAsDuplicate(o){
+    state.loadedOrderId = null; state.loadedOrderNumber = null;
+    state.loadedOrderCreatedAt = null; state.loadedCostSnapshot = null;
+    await populateFromOrder(o);
+    realCuttingTimeInput.value = '';
+    await refreshOrderNumberPreview();
+    recalcAndRender();
+    markClean();
+    saveOrderHint.style.color = 'var(--readout)';
+    saveOrderHint.textContent = 'Dados copiados de "' + (o.orderName||'sem nome') + '" — grava como encomenda nova (nº ' + $('orderNumberPreview').value + ').';
+    setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* PASSO SEGUINTE                                                    */
+  /* ---------------------------------------------------------------- */
+  function showNextSteps(orderNumber){
+    const box = $('nextSteps');
+    $('nextStepsMsg').innerHTML = 'Encomenda <strong>' + escapeHtml(orderNumber) + '</strong> guardada.';
+    box.hidden = false;
+    box.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+  $('nsPrintOperator').addEventListener('click', ()=>doPrint('operator'));
+  $('nsPrintQuote').addEventListener('click', ()=>doPrint('quote'));
+  $('nsNew').addEventListener('click', ()=>{ $('nextSteps').hidden = true; $('newOrderBtn').click(); });
+  $('nsClose').addEventListener('click', ()=>{ $('nextSteps').hidden = true; });
+
+  /* ---------------------------------------------------------------- */
+  /* GUARDAR                                                           */
+  /* ---------------------------------------------------------------- */
+  saveOrderBtn.addEventListener('click', async ()=>{
+    const orderName = orderNameInp.value.trim();
+    if(!orderName){
+      saveOrderHint.style.color = 'var(--danger)';
+      saveOrderHint.textContent = 'Introduza um nome para a encomenda antes de guardar.';
+      orderNameInp.focus();
+      return;
+    }
+    const r = computeCost();
+    if(!r.valid){
+      saveOrderHint.style.color = 'var(--danger)';
+      saveOrderHint.textContent = 'Escolha o perfil e indique o comprimento de barra antes de guardar.';
+      return;
+    }
+    if(state.loadedOrderId && state.loadedCostSnapshot && state.loadedCostSnapshot.isFinal){
+      if(!confirm('Esta encomenda (' + (state.loadedOrderNumber||'') + ') já está marcada como Final, com preço fechado. Tens a certeza que queres substituir os dados gravados?')) return;
+    }
+
+    const saveLabelEl = $('saveOrderBtnLabel');
+    const originalLabelText = saveLabelEl.textContent;
+    saveOrderBtn.disabled = true;
+    saveLabelEl.textContent = 'A guardar…';
+    try{
+      const isUpdate = !!state.loadedOrderId;
+      const id = isUpdate ? state.loadedOrderId : ('o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8));
+      const orderNumber = isUpdate ? state.loadedOrderNumber : await computeNextOrderNumber(state.remote, state.orders);
+      const createdAt = isUpdate ? state.loadedOrderCreatedAt : new Date().toISOString();
+
+      const rec = {
+        id, client: clientNameInp.value.trim(), orderName, orderNumber, createdAt,
+        comments: orderCommentsInp.value.trim(),
+        orderState: state.orderState,
+        pieceType: 'tube',
+        mode: 'tube',
+        quantity: r.qty,
+        materialId: r.profile.id,
+        materialSnapshot: { name: r.profile.name, thickness: 0, speed: r.profile.speed,
+          kgPerM: r.profile.kgPerM, pricePerKg: r.profile.pricePerKg, markupPct: r.profile.markupPct,
+          perimeterMm: r.profile.perimeterMm },
+        machineSnapshot: Object.assign({}, state.machine),
+        tubeInputs: {
+          profileId: r.profile.id, barLengthMm: r.barLenMm, wasteMode: wasteModeSelect.value,
+          straightCuts: r.straightCuts, angleCuts: r.angleCuts,
+          extraCutMm: r.extraCutMm, rotationMin: r.rotationMin,
+        },
+        costSnapshot: {
+          totalCost: r.totalCost, avgPerPiece: r.avgPerPiece,
+          cuttingTimeMin: r.cuttingTimeMin, corteCost: r.corteCost,
+          materialCost: r.materialCostPerPiece, weightPerPiece: r.weightPerPiece, weightTotal: r.weightTotal,
+          designCost: r.designCost, setupCost: r.setupCost, preCorteCost: r.preCorteCost,
+          subtotal: r.subtotal, adjustmentValue: r.adjustmentValue, adjustmentReason: r.adjustmentReason,
+          isFinal: r.isFinalDisplay,
+          estimadoCuttingTimeMin: (state.loadedCostSnapshot && state.loadedCostSnapshot.estimadoCuttingTimeMin != null)
+            ? state.loadedCostSnapshot.estimadoCuttingTimeMin : r.estimatedCuttingTimeMin,
+          setupInputs: {
+            drawingType: drawingTypeSel.value,
+            designTimeMin: parseFloat(designTimeInput.value)||0,
+            setupTimeMin: parseFloat(setupTimeInput.value)||0,
+          },
+        },
+      };
+
+      const verb = isUpdate ? 'atualizada' : 'guardada';
+      if(state.remote.configured){
+        saveOrderHint.style.color = '';
+        saveOrderHint.textContent = 'A guardar no servidor…';
+        try{
+          if(isUpdate) await remoteUpdateFullOrder(state.remote, id, rec);
+          else await remoteInsertOrder(state.remote, rec);
+        }catch(err){
+          saveOrderHint.style.color = 'var(--danger)';
+          saveOrderHint.textContent = 'Não foi possível guardar no servidor: ' + err.message;
+          return;
+        }
+        const idx = state.orders.findIndex(o=>o.id===id);
+        if(idx>=0) state.orders[idx] = rec; else state.orders.unshift(rec);
+        saveOrderHint.style.color = 'var(--readout)';
+        saveOrderHint.textContent = 'Encomenda ' + orderNumber + ' ' + verb + ' no servidor central.';
+      } else {
+        const idx = state.orders.findIndex(o=>o.id===id);
+        if(idx>=0) state.orders[idx] = rec; else state.orders.unshift(rec);
+        await window.LC.saveOrders(state.orders);
+        const verify = await window.LC.loadOrders();
+        if(!verify.some(o=>o.id===rec.id)){
+          saveOrderHint.style.color = 'var(--danger)';
+          saveOrderHint.textContent = 'Aviso: a encomenda não ficou guardada neste navegador.';
+          return;
+        }
+        saveOrderHint.style.color = 'var(--readout)';
+        saveOrderHint.textContent = 'Encomenda ' + orderNumber + ' ' + verb + '.';
+      }
+
+      state.loadedOrderId = id;
+      state.loadedOrderNumber = orderNumber;
+      state.loadedOrderCreatedAt = createdAt;
+      state.loadedCostSnapshot = rec.costSnapshot;
+      $('orderNumberPreview').value = orderNumber;
+      markClean();
+      showNextSteps(orderNumber);
+    }catch(err){
+      saveOrderHint.style.color = 'var(--danger)';
+      saveOrderHint.textContent = 'Ocorreu um erro inesperado ao guardar: ' + err.message;
+    } finally {
+      saveOrderBtn.disabled = false;
+      if(saveLabelEl.textContent === 'A guardar…') saveLabelEl.textContent = originalLabelText;
+    }
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* BARRA DE AÇÕES + ATALHOS                                          */
+  /* ---------------------------------------------------------------- */
+  $('barSaveBtn').addEventListener('click', ()=> saveOrderBtn.click());
+  $('barNewBtn').addEventListener('click', ()=> $('newOrderBtn').click());
+  $('barPrintOperatorBtn').addEventListener('click', ()=> doPrint('operator'));
+  document.addEventListener('keydown', e=>{
+    const mod = e.ctrlKey || e.metaKey;
+    if(!mod) return;
+    if(e.key === 's'){ e.preventDefault(); saveOrderBtn.click(); }
+    else if(e.key === 'p'){ e.preventDefault(); doPrint('operator'); }
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* INIT                                                              */
+  /* ---------------------------------------------------------------- */
+  async function init(){
+    state.profiles = await loadTubeProfiles();
+    state.machine = await loadMachine();
+    state.remote = await loadRemoteConfig();
+
+    const badge = $('connBadge');
+    if(state.remote.configured){ badge.textContent = '● servidor central'; badge.className = 'conn-badge conn-online'; }
+    else { badge.textContent = '● só este aparelho'; badge.className = 'conn-badge conn-local'; }
+
+    populateProfileSelect();
+    setupTimeInput.value = state.machine.defaultSetupMin ?? 5;
+    applyDrawingTypeUI();
+    applyOrderStateUI();
+
+    try{
+      state.orders = state.remote.configured ? await remoteLoadOrders(state.remote) : await loadOrders();
+    }catch(e){ state.orders = []; }
+
+    await refreshOrderNumberPreview();
+
+    const params = new URLSearchParams(location.search);
+    const loadId = params.get('loadOrder'), dupId = params.get('duplicateOrder');
+    if(loadId){
+      const o = state.orders.find(x=>x.id===loadId);
+      if(o) await loadOrderIntoForm(o);
+      history.replaceState(null, '', 'tubo.html');
+    } else if(dupId){
+      const o = state.orders.find(x=>x.id===dupId);
+      if(o) await loadOrderAsDuplicate(o);
+      history.replaceState(null, '', 'tubo.html');
+    }
+
+    recalcAndRender();
+    markClean();
+    $('loadingVeil').classList.add('done');
+  }
+  init();
+
+  registerServiceWorker();
+})();
+</script>
+</body>
+</html>
