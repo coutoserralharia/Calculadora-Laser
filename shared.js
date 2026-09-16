@@ -310,6 +310,7 @@
       client_ref: o.clientRef || null,
       order_state: o.orderState || null,
       piece_type: o.pieceType || 'sheet',
+      was_quoted: o.wasQuoted || false,
       tube_inputs: o.tubeInputs || null,
     };
   }
@@ -322,6 +323,7 @@
       clientRef: r.client_ref,
       orderState: r.order_state,
       pieceType: r.piece_type || 'sheet',
+      wasQuoted: r.was_quoted || false,
       tubeInputs: r.tube_inputs,
     };
   }
@@ -761,6 +763,9 @@
     const since = sinceDate ? new Date(sinceDate).getTime() : 0;
     let won = 0, lost = 0, open = 0;
     (orders||[]).forEach(o=>{
+      // Só entram encomendas que estiveram mesmo em orçamento nalgum momento — trabalho que
+      // foi direto para produção nunca foi "convertido", não pertence a esta conta.
+      if(!o.wasQuoted && o.orderState !== 'quote') return;
       if(!o.createdAt || new Date(o.createdAt).getTime() < since) return;
       const st = o.orderState || 'production';
       if(st === 'production' || st === 'done') won++;

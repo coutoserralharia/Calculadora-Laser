@@ -352,6 +352,7 @@
     loadedOrderCreatedAt: null,
     loadedCostSnapshot: null,
     orderState: 'production',
+    wasQuoted: false,
     dirty: false,
   };
 
@@ -1164,6 +1165,7 @@
         if(!confirm('Marcar esta encomenda como cancelada?\n\nFica registada no histórico com o mesmo número, mas deixa de contar em faturação, orçamentos pendentes e totais.')) return;
       }
       state.orderState = next;
+      if(next === 'quote') state.wasQuoted = true;  // marca permanente, para a taxa de conversão
       applyOrderStateUI();
       markDirty();
     });
@@ -1282,6 +1284,7 @@
     realCuttingTimeInput.value = '';
     geometryScopeSelect.value = 'unit';
     state.orderState = 'production';
+    state.wasQuoted = false;
     applyOrderStateUI();
     adjustmentValueInput.value = '';
     adjustmentReasonSelect.value = '';
@@ -1337,6 +1340,7 @@
     qtyInput.value = o.quantity || 1;
     geometryScopeSelect.value = o.geometryScope || 'unit';
     state.orderState = o.orderState || 'production';
+    state.wasQuoted = !!o.wasQuoted || state.orderState === 'quote';
     applyOrderStateUI();
     adjustmentValueInput.value = (o.costSnapshot && o.costSnapshot.adjustmentValue) ? o.costSnapshot.adjustmentValue : '';
     adjustmentReasonSelect.value = (o.costSnapshot && o.costSnapshot.adjustmentReason) || '';
@@ -1462,6 +1466,7 @@
         client: clientNameInp.value.trim(),
         comments: orderCommentsInp.value.trim(),
         orderState: state.orderState,
+        wasQuoted: state.wasQuoted || state.orderState === 'quote',
         orderName,
         orderNumber,
         createdAt,

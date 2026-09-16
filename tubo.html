@@ -290,6 +290,7 @@
     loadedOrderCreatedAt: null,
     loadedCostSnapshot: null,
     orderState: 'production',
+    wasQuoted: false,
     dirty: false,
   };
 
@@ -554,6 +555,7 @@
         if(!confirm('Marcar esta encomenda como cancelada?\n\nFica registada no histórico com o mesmo número, mas deixa de contar em faturação, orçamentos pendentes e totais.')) return;
       }
       state.orderState = next;
+      if(next === 'quote') state.wasQuoted = true;  // marca permanente, para a taxa de conversão
       applyOrderStateUI();
       markDirty();
     });
@@ -713,6 +715,7 @@
     state.loadedOrderId = null; state.loadedOrderNumber = null;
     state.loadedOrderCreatedAt = null; state.loadedCostSnapshot = null;
     state.orderState = 'production';
+    state.wasQuoted = false;
     orderNameInp.value = ''; clientNameInp.value = ''; orderCommentsInp.value = '';
     qtyInput.value = 1;
     barLengthInput.value = 1000;
@@ -741,6 +744,7 @@
     orderCommentsInp.value = o.comments || '';
     qtyInput.value = o.quantity || 1;
     state.orderState = o.orderState || 'production';
+    state.wasQuoted = !!o.wasQuoted || state.orderState === 'quote';
 
     const t = o.tubeInputs || {};
     if(t.profileId && state.profiles.some(p=>p.id===t.profileId)) tubeProfileSelect.value = t.profileId;
@@ -842,6 +846,7 @@
         id, client: clientNameInp.value.trim(), orderName, orderNumber, createdAt,
         comments: orderCommentsInp.value.trim(),
         orderState: state.orderState,
+        wasQuoted: state.wasQuoted || state.orderState === 'quote',
         pieceType: 'tube',
         mode: 'tube',
         quantity: r.qty,

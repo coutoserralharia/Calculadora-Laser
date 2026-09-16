@@ -268,15 +268,18 @@
     const monthStart = startOfMonth();
     const c = summarizeConversion(state.orders, monthStart);
     if(!c.decided){
-      $('conversionBox').innerHTML = '<p class="orders-empty">Ainda sem orçamentos decididos este mês.</p>';
+      const msg = c.open
+        ? c.open + ' orçamento(s) ainda por decidir este mês.'
+        : 'Ainda sem orçamentos decididos este mês.';
+      $('conversionBox').innerHTML = '<p class="orders-empty">' + msg + '</p>';
       return;
     }
     const cls = c.pct >= 70 ? 'readout' : (c.pct >= 40 ? 'warn' : 'danger');
     $('conversionBox').innerHTML =
       '<div class="stat-line"><span class="stat-big ' + cls + '">' + fmtNum(c.pct,0) + '%</span>' +
-      '<span class="stat-label">' + c.won + ' de ' + c.decided + ' · este mês</span></div>' +
+      '<span class="stat-label">' + c.won + ' de ' + c.decided + ' orçamentos · este mês</span></div>' +
       '<div class="stat-bar"><div class="stat-bar-fill ' + cls + '" style="width:' + c.pct.toFixed(0) + '%"></div></div>' +
-      '<p class="stat-sub">' + c.lost + ' cancelado(s)' + (c.open ? ' · ' + c.open + ' ainda por decidir' : '') + '</p>';
+      '<p class="stat-sub">' + c.lost + ' cancelado(s)' + (c.open ? ' · ' + c.open + ' por decidir' : '') + ' · conta só ordens que passaram por orçamento</p>';
   }
 
   function renderAlerts(){
