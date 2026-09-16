@@ -35,8 +35,23 @@
   .wk-k{margin:0 0 4px; font-size:11.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.04em;}
   .wk-v{margin:0; font-size:19px; font-weight:600; color:var(--text); line-height:1.25;}
   .wk-s{margin:3px 0 0; font-size:11.5px; color:var(--text-muted);}
-  #pendingList .order-num, #recentList .order-num{color:var(--text);}
-  .kpi-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px;}
+  .kpi-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(165px, 1fr)); gap:12px; margin-bottom:16px;}
+  .kpi .v.warn{color:#f0b429;}
+  .kpi .v.prod{color:#ff8c3a;}
+  .kpi .v.danger{color:#e24b4a;}
+  .dash-stack{display:flex; flex-direction:column; gap:16px;}
+  .stat-line{display:flex; align-items:baseline; gap:9px; margin-bottom:9px; flex-wrap:wrap;}
+  .stat-big{font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; line-height:1;}
+  .stat-big.readout{color:var(--readout);}
+  .stat-big.warn{color:#f0b429;}
+  .stat-big.danger{color:#e24b4a;}
+  .stat-label{font-size:12px; color:var(--text-muted);}
+  .stat-bar{height:6px; background:var(--panel-2); border-radius:99px; overflow:hidden;}
+  .stat-bar-fill{height:100%; border-radius:99px; transition:width .3s ease;}
+  .stat-bar-fill.readout{background:var(--readout);}
+  .stat-bar-fill.warn{background:#f0b429;}
+  .stat-bar-fill.danger{background:#e24b4a;}
+  .stat-sub{margin:8px 0 0; font-size:11.5px; color:var(--text-muted);}
   .kpi{
     background:var(--panel-2); border:1px solid var(--border-soft); border-radius:9px;
     padding:14px 16px;
@@ -100,29 +115,37 @@
       </div>
     </div>
 
-    <div class="dash-grid">
-      <div class="card" style="margin-bottom:0;">
-        <h2 class="card-title"><span class="dot"></span>Estado atual <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
-        <div class="kpi-grid" id="kpiGrid">
-          <p class="orders-empty" style="grid-column:1/-1;">A carregar…</p>
-        </div>
-      </div>
+    <div class="kpi-grid" id="kpiGrid">
+      <p class="orders-empty" style="grid-column:1/-1;">A carregar…</p>
+    </div>
 
+    <div class="card">
+      <h2 class="card-title with-action">
+        <span class="title-left"><span class="dot"></span>Produção atual <span class="conn-badge" id="connBadge" style="margin-left:8px;"></span></span>
+        <a href="encomendas.html" class="ghost-btn sm" style="text-decoration:none;">Ver histórico →</a>
+      </h2>
+      <div id="productionTable"></div>
+    </div>
+
+    <div class="dash-grid">
       <div class="card" style="margin-bottom:0;">
         <h2 class="card-title"><span class="dot"></span>Alertas <span class="alert-count" id="alertCount" hidden></span></h2>
         <div id="alertsList"><p class="orders-empty">A carregar…</p></div>
       </div>
-    </div>
 
-    <div class="card">
-      <h2 class="card-title"><span class="dot"></span>Em produção</h2>
-      <p class="save-hint" style="margin-bottom:12px;">Encomendas ainda com custo estimado — falta registar o tempo real de corte.</p>
-      <div id="pendingList"></div>
-    </div>
-
-    <div class="card">
-      <h2 class="card-title"><span class="dot"></span>Últimas encomendas</h2>
-      <div id="recentList"></div>
+      <div class="dash-stack">
+        <div class="card" style="margin-bottom:0;">
+          <h2 class="card-title with-action">
+            <span class="title-left"><span class="dot"></span>Precisão dos tempos</span>
+            <a href="definicoes.html" class="ghost-btn sm" style="text-decoration:none;">Detalhes →</a>
+          </h2>
+          <div id="accuracyBox"></div>
+        </div>
+        <div class="card" style="margin-bottom:0;">
+          <h2 class="card-title"><span class="dot"></span>Conversão de orçamentos</h2>
+          <div id="conversionBox"></div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -143,7 +166,7 @@
 (function(){
   "use strict";
   const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, loadMachine, loadMaterials, loadRemoteConfig,
-    remoteLoadOrders, summarizeAccuracy, summarizeWeek, buildAlerts, registerServiceWorker } = window.LC;
+    remoteLoadOrders, summarizeAccuracy, summarizeWeek, buildAlerts, summarizeConversion, overallAccuracy, registerServiceWorker } = window.LC;
 
   const $ = id => document.getElementById(id);
   const state = { orders: [], machine: {}, materials: [], remote: { configured:false, url:'', key:'' } };
@@ -185,29 +208,88 @@
     const monthLabel = new Date().toLocaleDateString('pt-PT', { month:'long' });
 
     $('kpiGrid').innerHTML =
-      '<div class="kpi"><div class="k">Encomendas em ' + escapeHtml(monthLabel) + '</div><div class="v">' + thisMonth.length + '</div><div class="sub">' + orders.length + ' no total</div></div>' +
-      '<div class="kpi"><div class="k">Faturado em ' + escapeHtml(monthLabel) + '</div><div class="v readout">' + fmtEUR(monthRevenue) + '</div><div class="sub">sem IVA · exclui orçamentos</div></div>' +
-      '<div class="kpi"><div class="k">Em orçamento</div><div class="v" style="color:#f0b429;">' + fmtEUR(quotedValue) + '</div><div class="sub">' + quoted + ' por confirmar</div></div>' +
-      '<div class="kpi"><div class="k">Em produção</div><div class="v" style="color:#ff8c3a;">' + inProduction + '</div><div class="sub">' + quoted + ' orçamentado(s)</div></div>' +
-      '<div class="kpi"><div class="k">Falta tempo real</div><div class="v ' + (pending.length ? 'accent' : '') + '">' + pending.length + '</div><div class="sub">ainda em estimativa</div></div>';
+      kpiHTML('Encomendas · ' + monthLabel, thisMonth.length, live.length + ' no total', '') +
+      kpiHTML('Faturado · ' + monthLabel, fmtEUR(monthRevenue), 'sem IVA · exclui orçamentos', 'readout') +
+      kpiHTML('Em orçamento', fmtEUR(quotedValue), quoted + ' por confirmar', 'warn') +
+      kpiHTML('Em produção', inProduction, quoted + ' orçamentado(s)', 'prod') +
+      kpiHTML('Falta tempo real', pending.length, 'ainda em estimativa', pending.length ? 'danger' : '');
   }
 
-  function orderRowHTML(o, showPendingTag){
-    const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
-    const matStr = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' ' + o.materialSnapshot.thickness + 'mm') : '—';
-    const cs = o.costSnapshot;
-    const costStr = cs ? fmtEUR(cs.totalCost) : '—';
-    const isFinal = !!(cs && cs.isFinal);
-    const badge = showPendingTag
-      ? '<span class="status-badge status-est">Estimado</span>'
-      : ('<span class="status-badge ' + (isFinal?'status-final':'status-est') + '">' + (isFinal?'Final':'Estimado') + '</span>');
-    return '<div class="order-row">' +
-      '<div class="order-row-main">' +
-        '<div class="order-row-name">' + (o.orderNumber ? '<span class="order-num">'+escapeHtml(o.orderNumber)+'</span> ' : '') + escapeHtml(o.orderName || 'Sem nome') + ' ' + stateBadgeHTML(o.orderState) + ' ' + badge + '</div>' +
-        '<div class="order-row-meta">' + escapeHtml((o.client||'Sem cliente')) + ' · ' + dateStr + ' · ' + matStr + ' · ' + (o.quantity||1) + 'x · ' + costStr + '</div>' +
-      '</div>' +
-      '<div class="order-row-actions"><a class="ghost-btn sm" style="text-decoration:none;" href="' + (o.pieceType==='tube'?'tubo.html':'index.html') + '?loadOrder=' + encodeURIComponent(o.id) + '">Abrir</a></div>' +
-    '</div>';
+  function kpiHTML(k, v, sub, cls){
+    return '<div class="kpi"><div class="k">' + escapeHtml(k) + '</div>' +
+      '<div class="v ' + (cls||'') + '">' + v + '</div>' +
+      '<div class="sub">' + escapeHtml(sub) + '</div></div>';
+  }
+
+  function renderProductionTable(){
+    const rank = { production:0, quote:1 };
+    const rows = state.orders
+      .filter(o => ['production','quote'].includes(o.orderState||'production'))
+      .sort((a,b)=>{
+        const ra = rank[a.orderState||'production'], rb = rank[b.orderState||'production'];
+        if(ra !== rb) return ra - rb;
+        return (b.createdAt||'').localeCompare(a.createdAt||'');
+      })
+      .slice(0, 5);
+
+    if(!rows.length){
+      $('productionTable').innerHTML = '<p class="orders-empty">Nada em produção nem por orçamentar.</p>';
+      return;
+    }
+    let html = '<div class="hist-wrap"><table class="hist-table"><thead><tr>' +
+      '<th>Nº</th><th>Cliente</th><th>Peça</th><th>Material</th>' +
+      '<th class="num">Qt.</th><th class="num">Total</th><th>Estado</th><th></th>' +
+      '</tr></thead><tbody>';
+    rows.forEach(o=>{
+      const cs = o.costSnapshot, ms = o.materialSnapshot;
+      const mat = ms ? (escapeHtml(ms.name) + (o.pieceType==='tube' ? '' : ' ' + ms.thickness + 'mm')) : '—';
+      const page = (o.pieceType === 'tube') ? 'tubo.html' : 'index.html';
+      html += '<tr>' +
+        '<td class="hist-num">' + escapeHtml(o.orderNumber||'—') + '</td>' +
+        '<td>' + escapeHtml(o.client||'—') + '</td>' +
+        '<td>' + escapeHtml(o.orderName||'—') + '</td>' +
+        '<td class="hist-dim">' + mat + '</td>' +
+        '<td class="num">' + (o.quantity||1) + '</td>' +
+        '<td class="num hist-mono hist-price">' + (cs ? fmtEUR(cs.totalCost) : '—') + '</td>' +
+        '<td>' + stateBadgeHTML(o.orderState) + '</td>' +
+        '<td class="hist-actions"><a class="ghost-btn sm" style="text-decoration:none;" href="' + page + '?loadOrder=' + encodeURIComponent(o.id) + '">Abrir</a></td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+    $('productionTable').innerHTML = html;
+  }
+
+  function renderAccuracyBox(){
+    const rows = summarizeAccuracy(state.orders, state.materials);
+    const acc = overallAccuracy(rows);
+    if(!acc){
+      $('accuracyBox').innerHTML = '<p class="orders-empty">Ainda sem encomendas com tempo real registado.</p>';
+      return;
+    }
+    const dev = acc.avgDeviationPct;
+    const abs = Math.abs(dev);
+    const cls = abs>15 ? 'danger' : (abs>5 ? 'warn' : 'readout');
+    const pctBar = Math.min(abs, 50) / 50 * 100;   // 50% de desvio enche a barra
+    $('accuracyBox').innerHTML =
+      '<div class="stat-line"><span class="stat-big ' + cls + '">' + (dev>=0?'+':'') + fmtNum(dev,0) + '%</span>' +
+      '<span class="stat-label">real vs. estimado</span></div>' +
+      '<div class="stat-bar"><div class="stat-bar-fill ' + cls + '" style="width:' + pctBar.toFixed(0) + '%"></div></div>' +
+      '<p class="stat-sub">média de ' + acc.count + ' encomenda(s) com tempo real</p>';
+  }
+
+  function renderConversionBox(){
+    const monthStart = startOfMonth();
+    const c = summarizeConversion(state.orders, monthStart);
+    if(!c.decided){
+      $('conversionBox').innerHTML = '<p class="orders-empty">Ainda sem orçamentos decididos este mês.</p>';
+      return;
+    }
+    const cls = c.pct >= 70 ? 'readout' : (c.pct >= 40 ? 'warn' : 'danger');
+    $('conversionBox').innerHTML =
+      '<div class="stat-line"><span class="stat-big ' + cls + '">' + fmtNum(c.pct,0) + '%</span>' +
+      '<span class="stat-label">' + c.won + ' de ' + c.decided + ' · este mês</span></div>' +
+      '<div class="stat-bar"><div class="stat-bar-fill ' + cls + '" style="width:' + c.pct.toFixed(0) + '%"></div></div>' +
+      '<p class="stat-sub">' + c.lost + ' cancelado(s)' + (c.open ? ' · ' + c.open + ' ainda por decidir' : '') + '</p>';
   }
 
   function renderAlerts(){
@@ -249,23 +331,6 @@
       '<div class="wk"><p class="wk-k">Tempo de máquina</p><p class="wk-v">' + (hours ? hours + ' h ' + String(mins).padStart(2,'0') : Math.round(w.cuttingMin) + ' min') + '</p><p class="wk-s">só corte, sem setup</p></div>';
   }
 
-  function renderLists(){
-    const pending = state.orders
-      .filter(o => o.orderState !== 'cancelled' && o.costSnapshot && !o.costSnapshot.isFinal)
-      .sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))
-      .slice(0, 8);
-    $('pendingList').innerHTML = pending.length
-      ? pending.map(o=>orderRowHTML(o, true)).join('')
-      : '<p class="orders-empty">Nada pendente — todas as encomendas guardadas já têm tempo real registado.</p>';
-
-    const recent = state.orders.slice()
-      .sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))
-      .slice(0, 8);
-    $('recentList').innerHTML = recent.length
-      ? recent.map(o=>orderRowHTML(o, false)).join('')
-      : '<p class="orders-empty">Ainda não há encomendas guardadas.</p>';
-  }
-
   async function init(){
     state.remote = await loadRemoteConfig();
     state.machine = await loadMachine();
@@ -276,14 +341,14 @@
     }catch(err){
       state.orders = [];
       $('kpiGrid').innerHTML = '<p class="orders-empty" style="grid-column:1/-1;">Não foi possível carregar as encomendas: ' + escapeHtml(err.message) + '</p>';
-      $('pendingList').innerHTML = '';
-      $('recentList').innerHTML = '';
       return;
     }
     renderKPIs();
+    renderProductionTable();
     renderAlerts();
+    renderAccuracyBox();
+    renderConversionBox();
     renderWeek();
-    renderLists();
   }
   init();
 

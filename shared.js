@@ -752,5 +752,31 @@
     return alerts;
   };
 
+  /* ---------------------------------------------------------------- */
+  /* CONVERSÃO DE ORÇAMENTOS                                            */
+  /* Quantos orçamentos do período acabaram em produção/concluídos,      */
+  /* contra os que ficaram parados ou foram cancelados.                 */
+  /* ---------------------------------------------------------------- */
+  LC.summarizeConversion = function(orders, sinceDate){
+    const since = sinceDate ? new Date(sinceDate).getTime() : 0;
+    let won = 0, lost = 0, open = 0;
+    (orders||[]).forEach(o=>{
+      if(!o.createdAt || new Date(o.createdAt).getTime() < since) return;
+      const st = o.orderState || 'production';
+      if(st === 'production' || st === 'done') won++;
+      else if(st === 'cancelled') lost++;
+      else if(st === 'quote') open++;
+    });
+    const decided = won + lost;
+    return { won, lost, open, decided, pct: decided ? (won/decided)*100 : null };
+  };
+
+  /* Precisão global dos tempos: desvio médio entre real e estimado.     */
+  LC.overallAccuracy = function(accuracyRows){
+    let n = 0, sum = 0;
+    (accuracyRows||[]).forEach(r=>{ n += r.count; sum += r.avgDeviationPct * r.count; });
+    return n ? { count:n, avgDeviationPct: sum/n } : null;
+  };
+
   window.LC = LC;
 })();
