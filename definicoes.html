@@ -104,7 +104,7 @@
       <h2 class="card-title"><span class="dot"></span>Gerir perfis de tubo</h2>
       <div class="mat-table-wrap">
         <table class="mat-table">
-          <thead><tr><th>Perfil</th><th>Perím. secção (mm)</th><th>Veloc. (mm/min)</th><th>kg/m</th><th>€/kg base</th><th>% extra</th><th>€/kg final</th><th>% desperdício</th><th>Barra (mm)</th><th></th></tr></thead>
+          <thead><tr><th>Perfil</th><th>Perím. secção (mm)</th><th>Veloc. (mm/min)</th><th>€/m base</th><th>% extra</th><th>€/m final</th><th>% desperdício</th><th>Barra (mm)</th><th></th></tr></thead>
           <tbody id="tubeProfilesTbody"></tbody>
         </table>
       </div>
@@ -112,7 +112,7 @@
         <button class="ghost-btn" id="addTubeProfileBtn" type="button">+ Adicionar linha</button>
         <button class="ghost-btn" id="resetTubeProfilesBtn" type="button">Repor valores por defeito</button>
       </div>
-      <p class="save-hint" style="margin-top:8px;">O perímetro da secção é a soma dos lados (tubo quadrado/retangular) ou π×diâmetro (tubo redondo) — mede-se uma vez por perfil. A "% desperdício" aplica-se automaticamente quando escolheres esse modo na Orçamentação; "Barra (mm)" é só informativo, para referência do comprimento normal de compra.</p>
+      <p class="save-hint" style="margin-top:8px;">O tubo é orçamentado ao metro: indique o preço por metro do seu fornecedor e a % extra a aplicar. O perímetro da secção é a soma dos lados (tubo quadrado/retangular) ou π×diâmetro (tubo redondo) — mede-se uma vez por perfil. A "% desperdício" aplica-se automaticamente quando escolheres esse modo na Orçamentação; "Barra (mm)" é só informativo, para referência do comprimento normal de compra.</p>
     </div>
 
     <div class="card">
@@ -354,13 +354,12 @@ create policy "public access"
     tubeProfilesTbody.innerHTML = '';
     state.tubeProfiles.forEach((p,i)=>{
       const tr = document.createElement('tr');
-      const finalPrice = (p.pricePerKg||0) * (1 + (p.markupPct||0)/100);
+      const finalPrice = (p.pricePerM||0) * (1 + (p.markupPct||0)/100);
       tr.innerHTML =
         '<td><input type="text" data-i="'+i+'" data-f="name" value="'+p.name.replace(/"/g,'&quot;')+'"></td>' +
         '<td><input type="number" step="1" min="0" data-i="'+i+'" data-f="perimeterMm" value="'+(p.perimeterMm||0)+'"></td>' +
         '<td><input type="number" step="10" min="1" data-i="'+i+'" data-f="speed" value="'+(p.speed||0)+'"></td>' +
-        '<td><input type="number" step="0.01" min="0" data-i="'+i+'" data-f="kgPerM" value="'+(p.kgPerM||0)+'"></td>' +
-        '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="pricePerKg" value="'+(p.pricePerKg||0)+'"></td>' +
+        '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="pricePerM" value="'+(p.pricePerM||0)+'"></td>' +
         '<td><input type="number" step="1" min="0" data-i="'+i+'" data-f="markupPct" value="'+(p.markupPct||0)+'"></td>' +
         '<td class="mat-final-price">'+finalPrice.toFixed(2).replace('.',',')+' €</td>' +
         '<td><input type="number" step="1" min="0" data-i="'+i+'" data-f="defaultWastePct" value="'+(p.defaultWastePct??10)+'"></td>' +
@@ -383,9 +382,9 @@ create policy "public access"
   }
   function onTubeProfileFieldLivePreview(e){
     const f = e.target.getAttribute('data-f');
-    if(f!=='pricePerKg' && f!=='markupPct') return;
+    if(f!=='pricePerM' && f!=='markupPct') return;
     const row = e.target.closest('tr');
-    const price = parseFloat(row.querySelector('[data-f="pricePerKg"]').value)||0;
+    const price = parseFloat(row.querySelector('[data-f="pricePerM"]').value)||0;
     const markup = parseFloat(row.querySelector('[data-f="markupPct"]').value)||0;
     row.querySelector('.mat-final-price').textContent = (price*(1+markup/100)).toFixed(2).replace('.',',') + ' €';
   }
@@ -398,7 +397,7 @@ create policy "public access"
     saveTubeProfiles(state.tubeProfiles);
   }
   $('addTubeProfileBtn').addEventListener('click', ()=>{
-    state.tubeProfiles.push({id:'t'+Date.now(), name:'Novo perfil', perimeterMm:100, speed:3000, kgPerM:1, pricePerKg:1.4, markupPct:0, defaultWastePct:10, barLengthMm:6000});
+    state.tubeProfiles.push({id:'t'+Date.now(), name:'Novo perfil', perimeterMm:100, speed:3000, pricePerM:3, markupPct:0, defaultWastePct:10, barLengthMm:6000});
     renderTubeProfilesTable();
     saveTubeProfiles(state.tubeProfiles);
   });

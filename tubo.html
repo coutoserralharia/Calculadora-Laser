@@ -193,8 +193,8 @@
             <button class="ghost-btn sm" id="clearRealTimeBtn" type="button">Repor estimativa</button>
           </div>
         </div>
-        <div class="breakdown-row"><span class="lbl">Peso unitário (1 peça)</span><span class="val" id="valWeightUnit">—</span></div>
-        <div class="breakdown-row"><span class="lbl">Peso total<small id="weightTotalSub">—</small></span><span class="val" id="valWeightTotal">—</span></div>
+        <div class="breakdown-row"><span class="lbl">Comprimento por peça</span><span class="val" id="valLenUnit">—</span></div>
+        <div class="breakdown-row"><span class="lbl">Comprimento total<small id="lenTotalSub">—</small></span><span class="val" id="valLenTotal">—</span></div>
         <div class="breakdown-row"><span class="lbl">Custo total do material<small id="matInfoSub">—</small></span><span class="val" id="costMaterial">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo pré-corte<small id="preCorteSub">—</small></span><span class="val" id="costPreCorte">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo total do corte<small id="cutTimeSub">—</small></span><span class="val" id="costCorte">€0,00</span></div>
@@ -255,10 +255,10 @@
       <span class="ab-total" id="abTotal">€0,00</span>
     </div>
     <div class="state-picker ab-state" id="statePicker">
+      <button type="button" data-state="cancelled">Cancelada</button>
       <button type="button" data-state="quote">Orçamentado</button>
       <button type="button" data-state="production">Em produção</button>
       <button type="button" data-state="done">Concluído</button>
-      <button type="button" data-state="cancelled">Cancelada</button>
     </div>
     <div class="ab-buttons">
       <button class="ghost-btn sm" id="barNewBtn" type="button">Nova</button>
@@ -354,13 +354,13 @@
     const cuttingTimeMin = isFinalTime ? realTimeVal : estimatedTotalTimeMin;
     const corteCost = cuttingTimeMin * (state.machine.hourlyRate/60);
 
-    // Material: comprimento × kg/m × €/kg (com a % extra do perfil aplicada).
+    // Material: o tubo é orçamentado ao metro — comprimento × €/m (com a % extra do perfil).
     const wastePct = wasteModeSelect.value === 'pct' ? (profile.defaultWastePct||0) : 0;
     const billedLenMm = barLenMm * (1 + wastePct/100);
-    const weightPerPiece = (billedLenMm/1000) * (profile.kgPerM||0);
-    const weightTotal = weightPerPiece * qty;
-    const effectivePricePerKg = (profile.pricePerKg||0) * (1 + (profile.markupPct||0)/100);
-    const materialCostPerPiece = weightPerPiece * effectivePricePerKg;
+    const billedLenM = billedLenMm / 1000;
+    const totalLenM = billedLenM * qty;
+    const effectivePricePerM = (profile.pricePerM||0) * (1 + (profile.markupPct||0)/100);
+    const materialCostPerPiece = billedLenM * effectivePricePerM;
     const materialCostTotal = materialCostPerPiece * qty;
 
     const drawingType = drawingTypeSel.value;
@@ -379,9 +379,9 @@
     return {
       valid:true, profile, qty,
       straightCuts, angleCuts, extraCutMm, rotationMin,
-      cutLengthMm, billedLenMm, barLenMm, wastePct,
+      cutLengthMm, billedLenMm, billedLenM, totalLenM, barLenMm, wastePct, effectivePricePerM,
       cuttingTimeMin, estimatedCuttingTimeMin: estimatedTotalTimeMin, corteCost,
-      materialCostTotal, materialCostPerPiece, weightPerPiece, weightTotal,
+      materialCostTotal, materialCostPerPiece,
       drawingType, designTimeMin, setupTimeMin, designCost, setupCost, preCorteCost,
       subtotal, adjustmentValue, adjustmentReason: adjustmentReasonSelect.value,
       totalCost, avgPerPiece, totalTimeMin,
@@ -397,11 +397,11 @@
 
     if(!r.valid){
       ['costMaterial','costPreCorte','costCorte','totalValue','avgPerPieceValue','subtotalValue'].forEach(id=>$(id).textContent = fmtEUR(0));
-      ['valWeightUnit','valWeightTotal'].forEach(id=>$(id).textContent = '—');
+      ['valLenUnit','valLenTotal'].forEach(id=>$(id).textContent = '—');
       ['metaProfile','metaCutLength','metaBarLength'].forEach(id=>$(id).textContent = '—');
       $('adjustmentRow').hidden = true;
       $('matInfoSub').textContent = '—'; $('preCorteSub').textContent = '—';
-      $('cutTimeSub').textContent = '—'; $('weightTotalSub').textContent = '—';
+      $('cutTimeSub').textContent = '—'; $('lenTotalSub').textContent = '—';
       $('totalQtyTag').textContent = '';
       $('totalTimeSub').hidden = true;
       $('costFinalBadge').textContent = '';
@@ -413,11 +413,11 @@
     $('metaCutLength').textContent = fmtNum(r.cutLengthMm/10,1) + ' cm/peça';
     $('metaBarLength').textContent = fmtNum(r.billedLenMm,0) + ' mm' + (r.wastePct ? ' (inclui ' + r.wastePct + '% desperdício)' : '');
 
-    $('valWeightUnit').textContent = fmtNum(r.weightPerPiece,2) + ' kg';
-    $('valWeightTotal').textContent = fmtNum(r.weightTotal,2) + ' kg';
-    $('weightTotalSub').textContent = r.qty>1 ? (r.qty + ' × ' + fmtNum(r.weightPerPiece,2) + ' kg') : 'igual ao unitário (1 peça)';
+    $('valLenUnit').textContent = fmtNum(r.billedLenM,3) + ' m';
+    $('valLenTotal').textContent = fmtNum(r.totalLenM,3) + ' m';
+    $('lenTotalSub').textContent = r.qty>1 ? (r.qty + ' × ' + fmtNum(r.billedLenM,3) + ' m') : 'igual ao unitário (1 peça)';
 
-    $('matInfoSub').textContent = fmtNum(r.profile.kgPerM,2) + ' kg/m · €/kg' + (r.qty>1 ? ' · ' + fmtEUR(r.materialCostPerPiece) + '/peça' : '');
+    $('matInfoSub').textContent = fmtEUR(r.effectivePricePerM) + '/m' + (r.qty>1 ? ' · ' + fmtEUR(r.materialCostPerPiece) + '/peça' : '');
     $('costMaterial').textContent = fmtEUR(r.materialCostTotal);
 
     $('preCorteSub').textContent = 'Desenho ' + fmtNum(r.designTimeMin,0) + 'min (' + fmtEUR(r.designCost) + ') + Setup ' + fmtNum(r.setupTimeMin,0) + 'min (' + fmtEUR(r.setupCost) + ')';
@@ -643,7 +643,7 @@
     html += pRow('Cortes em esquadria/ângulo', r.valid ? r.angleCuts : '—');
     if(r.valid && r.extraCutMm) html += pRow('Furos e bocas de ligação', fmtNum(r.extraCutMm,0) + ' mm de corte');
     if(r.valid && r.rotationMin) html += pRow('Tempo de rotação', fmtNum(r.rotationMin,1) + ' min/peça');
-    if(r.valid && r.weightPerPiece>0) html += pRow('Peso de 1 peça', fmtNum(r.weightPerPiece,2) + ' kg');
+    if(r.valid) html += pRow('Comprimento faturado por peça', fmtNum(r.billedLenM,3) + ' m' + (r.wastePct ? ' (inclui '+r.wastePct+'% desperdício)' : ''));
     html += '</div>';
 
     html += '<div class="p-realtime-box">Tempo de corte real (TOTAL da encomenda, todas as peças): __________________ min</div>';
@@ -651,9 +651,9 @@
     if(mode==='internal'){
       html += '<div class="p-section">';
       html += '<div class="p-costs-title">Custo da encomenda</div>';
-      html += pRow('Peso unitário (1 peça)', r.valid ? (fmtNum(r.weightPerPiece,2)+' kg') : '—');
-      html += pRow('Peso total', r.valid ? (fmtNum(r.weightTotal,2)+' kg') : '—');
-      html += pRow('Comprimento faturado por peça', r.valid ? (fmtNum(r.billedLenMm,0)+' mm' + (r.wastePct ? ' (inclui '+r.wastePct+'% desperdício)' : '')) : '—');
+      html += pRow('Comprimento por peça', r.valid ? (fmtNum(r.billedLenM,3)+' m' + (r.wastePct ? ' (inclui '+r.wastePct+'% desperdício)' : '')) : '—');
+      html += pRow('Comprimento total', r.valid ? (fmtNum(r.totalLenM,3)+' m') : '—');
+      html += pRow('Preço do tubo', r.valid ? (fmtEUR(r.effectivePricePerM)+'/m') : '—');
       html += pRow('Custo total do material', r.valid ? fmtEUR(r.materialCostTotal) : '—');
       html += pRow('Custo pré-corte', r.valid ? fmtEUR(r.preCorteCost) : '—');
       if(r.valid){
@@ -847,7 +847,7 @@
         quantity: r.qty,
         materialId: r.profile.id,
         materialSnapshot: { name: r.profile.name, thickness: 0, speed: r.profile.speed,
-          kgPerM: r.profile.kgPerM, pricePerKg: r.profile.pricePerKg, markupPct: r.profile.markupPct,
+          pricePerM: r.profile.pricePerM, markupPct: r.profile.markupPct,
           perimeterMm: r.profile.perimeterMm },
         machineSnapshot: Object.assign({}, state.machine),
         tubeInputs: {
@@ -858,7 +858,7 @@
         costSnapshot: {
           totalCost: r.totalCost, avgPerPiece: r.avgPerPiece,
           cuttingTimeMin: r.cuttingTimeMin, corteCost: r.corteCost,
-          materialCost: r.materialCostPerPiece, weightPerPiece: r.weightPerPiece, weightTotal: r.weightTotal,
+          materialCost: r.materialCostPerPiece, lengthPerPieceM: r.billedLenM, lengthTotalM: r.totalLenM,
           designCost: r.designCost, setupCost: r.setupCost, preCorteCost: r.preCorteCost,
           subtotal: r.subtotal, adjustmentValue: r.adjustmentValue, adjustmentReason: r.adjustmentReason,
           isFinal: r.isFinalDisplay,

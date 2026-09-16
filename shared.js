@@ -211,9 +211,9 @@
   LC.DEFAULT_MACHINE = { hourlyRate:45, designRate:30, setupRate:30, pierceTime:0.8, areaBasis:'bbox', defaultSetupMin:5, wasteMarginMm:5, alertQuoteDays:7, alertRealTimeDays:2, angleCutFactor:1.4 };
 
   LC.DEFAULT_TUBE_PROFILES = [
-    {id:'t1', name:'Quadrado 40x40x2mm', perimeterMm:160, speed:4000, kgPerM:2.31, pricePerKg:1.4, markupPct:0, defaultWastePct:10, barLengthMm:6000},
-    {id:'t2', name:'Retangular 60x40x2mm', perimeterMm:200, speed:3500, kgPerM:2.90, pricePerKg:1.4, markupPct:0, defaultWastePct:10, barLengthMm:6000},
-    {id:'t3', name:'Redondo Ø33.7x2mm', perimeterMm:106, speed:4200, kgPerM:1.56, pricePerKg:1.4, markupPct:0, defaultWastePct:10, barLengthMm:6000},
+    {id:'t1', name:'Quadrado 40x40x2mm', perimeterMm:160, speed:4000, pricePerM:3.20, markupPct:0, defaultWastePct:10, barLengthMm:6000},
+    {id:'t2', name:'Retangular 60x40x2mm', perimeterMm:200, speed:3500, pricePerM:4.10, markupPct:0, defaultWastePct:10, barLengthMm:6000},
+    {id:'t3', name:'Redondo Ø33.7x2mm', perimeterMm:106, speed:4200, pricePerM:2.20, markupPct:0, defaultWastePct:10, barLengthMm:6000},
   ];
 
   /* ---------------------------------------------------------------- */
