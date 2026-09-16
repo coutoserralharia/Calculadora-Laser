@@ -507,6 +507,9 @@
     const quotes = live.filter(isQuote);
     const totalRevenue = invoiced.reduce((s,o)=> s + val(o), 0);
     const totalQuoted = quotes.reduce((s,o)=> s + val(o), 0);
+    const realCostSum = invoiced.reduce((s,o)=> s + (o.costSnapshot && isFinite(o.costSnapshot.realCost) ? o.costSnapshot.realCost : 0), 0);
+    const marginSum = totalRevenue - realCostSum;
+    const marginPctTotal = realCostSum > 0 ? (marginSum/realCostSum)*100 : null;
     const finalCount = live.filter(o=>o.costSnapshot && o.costSnapshot.isFinal).length;
 
     const byClient = {};
@@ -522,6 +525,10 @@
     html += '<div class="meta-item"><div class="k">Faturado (sem IVA)</div><div class="v">'+fmtEUR(totalRevenue)+'</div></div>';
     html += '<div class="meta-item"><div class="k">Em orçamento</div><div class="v">'+fmtEUR(totalQuoted)+'</div></div>';
     html += '</div>';
+    if(realCostSum > 0){
+      html += '<div class="meta-item"><div class="k">Custo real</div><div class="v">'+fmtEUR(realCostSum)+'</div></div>';
+      html += '<div class="meta-item"><div class="k">Margem</div><div class="v">'+fmtEUR(marginSum)+(marginPctTotal!=null ? ' · '+fmtNum(marginPctTotal,1)+'%' : '')+'</div></div>';
+    }
     if(cancelled.length) html += '<div class="meta-item"><div class="k">Canceladas</div><div class="v">'+cancelled.length+'</div></div>';
     html += '<p class="save-hint" style="margin-top:10px;">Faturado conta apenas ordens em produção ou concluídas. Canceladas não entram em nenhum total. Os '+quotes.length+' orçamento(s) por confirmar aparecem à parte e não entram no total.</p>';
     html += '<div class="mat-table-wrap" style="margin-top:14px;"><table class="mat-table"><thead><tr><th>Cliente</th><th>Faturado (sem IVA)</th></tr></thead><tbody>';
@@ -549,7 +556,7 @@
 
   $('exportReportBtn').addEventListener('click', ()=>{
     const STATE_LABEL = { quote:'Orçamentado', production:'Em produção', done:'Concluído', cancelled:'Cancelada' };
-    const rows = [['Nº Encomenda','Data','Cliente','Peça','Material','Espessura (mm)','Quantidade','Estado','Custo fechado','Subtotal (€)','Ajuste (€)','Motivo do ajuste','Total sem IVA (€)']];
+    const rows = [['Nº Encomenda','Data','Cliente','Peça','Material','Espessura (mm)','Quantidade','Estado','Custo fechado','Subtotal (€)','Ajuste (€)','Motivo do ajuste','Total sem IVA (€)','Custo real (€)','Margem (€)','Margem (%)']];
     reportOrders.slice().sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||'')).forEach(o=>{
       const cs = o.costSnapshot;
       rows.push([
@@ -566,6 +573,9 @@
         cs && cs.adjustmentValue ? cs.adjustmentValue.toFixed(2).replace('.',',') : '',
         (cs && cs.adjustmentReason) || '',
         cs && isFinite(cs.totalCost) ? cs.totalCost.toFixed(2).replace('.',',') : '',
+        cs && isFinite(cs.realCost) ? cs.realCost.toFixed(2).replace('.',',') : '',
+        cs && isFinite(cs.marginValue) ? cs.marginValue.toFixed(2).replace('.',',') : '',
+        cs && isFinite(cs.marginPct) ? cs.marginPct.toFixed(1).replace('.',',') : '',
       ]);
     });
     const csv = rows.map(r => r.map(cell=>{

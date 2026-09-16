@@ -360,9 +360,11 @@
     const billedLenMm = barLenMm * (1 + wastePct/100);
     const billedLenM = billedLenMm / 1000;
     const totalLenM = billedLenM * qty;
-    const effectivePricePerM = (profile.pricePerM||0) * (1 + (profile.markupPct||0)/100);
+    const basePricePerM = profile.pricePerM||0;
+    const effectivePricePerM = basePricePerM * (1 + (profile.markupPct||0)/100);
     const materialCostPerPiece = billedLenM * effectivePricePerM;
     const materialCostTotal = materialCostPerPiece * qty;
+    const materialCostBaseTotal = billedLenM * basePricePerM * qty;   // sem margem
 
     const drawingType = drawingTypeSel.value;
     const designTimeMin = drawingType==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
@@ -374,6 +376,10 @@
     const subtotal = corteCost + materialCostTotal + preCorteCost;
     const adjustmentValue = parseFloat(adjustmentValueInput.value) || 0;
     const totalCost = subtotal + adjustmentValue;
+    // Custo real para a empresa: material ao preço de compra, sem a margem do perfil.
+    const realCost = corteCost + materialCostBaseTotal + preCorteCost;
+    const marginValue = totalCost - realCost;
+    const marginPct = realCost > 0 ? (marginValue/realCost)*100 : null;
     const avgPerPiece = totalCost / qty;
     const totalTimeMin = cuttingTimeMin + designTimeMin + setupTimeMin;
 
@@ -382,7 +388,8 @@
       straightCuts, angleCuts, extraCutMm, rotationMin,
       cutLengthMm, billedLenMm, billedLenM, totalLenM, barLenMm, wastePct, effectivePricePerM,
       cuttingTimeMin, estimatedCuttingTimeMin: estimatedTotalTimeMin, corteCost,
-      materialCostTotal, materialCostPerPiece,
+      materialCostTotal, materialCostPerPiece, materialCostBaseTotal,
+      realCost, marginValue, marginPct,
       drawingType, designTimeMin, setupTimeMin, designCost, setupCost, preCorteCost,
       subtotal, adjustmentValue, adjustmentReason: adjustmentReasonSelect.value,
       totalCost, avgPerPiece, totalTimeMin,
@@ -673,6 +680,13 @@
       html += '<div class="p-total-item p-total-main"><span>Total da encomenda (' + qty + (qty===1?' peça':' peças') + ') — sem IVA</span><strong>' + (r.valid?fmtEUR(r.totalCost):'—') + '</strong></div>';
       html += '<div class="p-total-item"><span>Total ÷ nº peças — sem IVA</span><strong>' + (r.valid?fmtEUR(r.avgPerPiece):'—') + '</strong></div>';
       html += '</div>';
+      if(r.valid){
+        html += '<div class="p-section p-margin-box">';
+        html += '<div class="p-costs-title">Margem (uso interno)</div>';
+        html += pRow('Custo real para a empresa', fmtEUR(r.realCost));
+        html += pRow('Margem', fmtEUR(r.marginValue) + (r.marginPct!=null ? ' · ' + fmtNum(r.marginPct,1) + '%' : ''));
+        html += '</div>';
+      }
       const commentsText = orderCommentsInp.value.trim();
       html += '<div class="p-notes-box"><div class="p-notes-title">Comentários</div>' +
         (commentsText ? '<div class="p-notes-text">' + escapeHtml(commentsText).replace(/\n/g,'<br>') + '</div>'
@@ -866,6 +880,7 @@
           materialCost: r.materialCostPerPiece, lengthPerPieceM: r.billedLenM, lengthTotalM: r.totalLenM,
           designCost: r.designCost, setupCost: r.setupCost, preCorteCost: r.preCorteCost,
           subtotal: r.subtotal, adjustmentValue: r.adjustmentValue, adjustmentReason: r.adjustmentReason,
+          realCost: r.realCost, marginValue: r.marginValue, marginPct: r.marginPct,
           isFinal: r.isFinalDisplay,
           estimadoCuttingTimeMin: (state.loadedCostSnapshot && state.loadedCostSnapshot.estimadoCuttingTimeMin != null)
             ? state.loadedCostSnapshot.estimadoCuttingTimeMin : r.estimatedCuttingTimeMin,

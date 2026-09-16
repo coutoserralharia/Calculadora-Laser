@@ -683,14 +683,17 @@
     }
     const areaM2 = areaMm2/1e6;
     const weightFromGeometry = areaM2 * (material.thickness||0) * (material.density||0);
-    const effectivePricePerKg = (material.pricePerKg||0) * (1 + (material.markupPct||0)/100);
+    const basePricePerKg = material.pricePerKg||0;
+    const effectivePricePerKg = basePricePerKg * (1 + (material.markupPct||0)/100);
     const materialCostFromGeometry = weightFromGeometry * effectivePricePerKg;
+    const materialCostBaseFromGeometry = weightFromGeometry * basePricePerKg;   // sem margem
     // Em modo "batch" a área/peso calculados já são o total da encomenda; em modo "unit" são de
     // 1 peça e multiplicam-se pela quantidade. O valor "por peça" fica sempre como referência.
     const weightTotal = isBatchGeometry ? weightFromGeometry : weightFromGeometry * qty;
     const weightPerPiece = weightTotal / qty;
     const materialCostTotal = isBatchGeometry ? materialCostFromGeometry : materialCostFromGeometry * qty;
     const materialCostPerPiece = materialCostTotal / qty;
+    const materialCostBaseTotal = isBatchGeometry ? materialCostBaseFromGeometry : materialCostBaseFromGeometry * qty;
 
     const drawingType = drawingTypeSel.value;
     const designTimeMin = drawingType==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
@@ -702,13 +705,19 @@
     const subtotal = corteCost + materialCostTotal + preCorteCostRaw;
     const adjustmentValue = parseFloat(adjustmentValueInput.value) || 0;
     const totalCost = subtotal + adjustmentValue;
+    // Custo real para a empresa: tudo igual, mas com o material ao preço de compra (sem margem).
+    // O corte e a preparação já são cobrados ao custo/hora interno, por isso não mudam.
+    const realCost = corteCost + materialCostBaseTotal + preCorteCostRaw;
+    const marginValue = totalCost - realCost;
+    const marginPct = realCost > 0 ? (marginValue/realCost)*100 : null;
     const avgPerPiece = totalCost / qty;
     const totalTimeMin = cuttingTimeMin + designTimeMin + setupTimeMin; // cuttingTimeMin já é total e já inclui perfurações
 
     return {
       valid:true, geo, material, qty,
       cuttingTimeMin, estimatedCuttingTimeMin: estimatedTotalTimeMin, corteCost,
-      materialCostTotal, materialCostPerPiece, weightPerPiece, weightTotal, isBatchGeometry,
+      materialCostTotal, materialCostPerPiece, materialCostBaseTotal, weightPerPiece, weightTotal, isBatchGeometry,
+      realCost, marginValue, marginPct,
       drawingType, designTimeMin, setupTimeMin, designCost,
       totalTimeMin,
       preCorteCost: preCorteCostRaw, subtotal, adjustmentValue,
@@ -1010,6 +1019,13 @@
       html += '<div class="p-total-item p-total-main"><span>Total da encomenda (' + qty + (qty===1?' peça':' peças') + ') — sem IVA</span><strong>' + (result.valid?fmtEUR(result.totalCost):'—') + '</strong></div>';
       html += '<div class="p-total-item"><span>Total ÷ nº peças — sem IVA</span><strong>' + (result.valid?fmtEUR(result.avgPerPiece):'—') + '</strong></div>';
       html += '</div>';
+      if(result.valid){
+        html += '<div class="p-section p-margin-box">';
+        html += '<div class="p-costs-title">Margem (uso interno)</div>';
+        html += pRow('Custo real para a empresa', fmtEUR(result.realCost));
+        html += pRow('Margem', fmtEUR(result.marginValue) + (result.marginPct!=null ? ' · ' + fmtNum(result.marginPct,1) + '%' : ''));
+        html += '</div>';
+      }
       const commentsText = orderCommentsInp.value.trim();
       html += '<div class="p-notes-box"><div class="p-notes-title">Comentários</div>' +
         (commentsText
@@ -1487,6 +1503,7 @@
           materialCost: result.materialCostPerPiece, weightPerPiece: result.weightPerPiece, weightTotal: result.weightTotal,
           designCost: result.designCost, setupCost: result.setupCost, preCorteCost: result.preCorteCost,
           subtotal: result.subtotal, adjustmentValue: result.adjustmentValue, adjustmentReason: result.adjustmentReason,
+          realCost: result.realCost, marginValue: result.marginValue, marginPct: result.marginPct,
           isFinal: result.isFinalDisplay,
           // Estimativa original de tempo de corte — fica fixa desde a 1ª gravação, mesmo que
           // depois se corrija com o tempo real, para se poder comparar estimado vs real mais tarde.

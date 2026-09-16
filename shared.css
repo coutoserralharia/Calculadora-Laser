@@ -277,6 +277,7 @@
     margin-top:20px; padding:12px 14px; border:1.5px dashed #111; border-radius:4px;
     font-size:13px; font-weight:600; color:#111;
   }
+  .print-sheet .p-margin-box{margin-top:16px; padding:12px 14px; border:1px dashed #999; border-radius:4px; background:#fafafa;}
   .print-sheet .p-notes-box{margin-top:18px; padding:12px 14px; border:1px solid #ccc; border-radius:4px;}
   .print-sheet .p-notes-title{font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:#666; font-weight:600; margin-bottom:10px;}
   .print-sheet .p-notes-lines span{display:block; border-bottom:1px solid #ccc; height:22px;}
