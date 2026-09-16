@@ -72,9 +72,34 @@
             <option value="cancelled">Cancelada</option>
           </select>
         </div>
+        <div class="field" style="margin:0; flex:1; min-width:140px;">
+          <label for="filterType">Tipo</label>
+          <select id="filterType">
+            <option value="">Todos</option>
+            <option value="sheet">Chapa</option>
+            <option value="tube">Tubo</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0; flex:1; min-width:160px;">
+          <label for="filterMaterial">Chapa</label>
+          <select id="filterMaterial"><option value="">Todas</option></select>
+        </div>
+        <div class="field" style="margin:0; flex:1; min-width:160px;">
+          <label for="filterTube">Tubo</label>
+          <select id="filterTube"><option value="">Todos</option></select>
+        </div>
+      </div>
+      <div class="hist-filters" style="margin-top:12px;">
         <div class="field" style="margin:0; flex:1; min-width:150px;">
-          <label for="filterMaterial">Material</label>
-          <select id="filterMaterial"><option value="">Todos</option></select>
+          <label for="filterFrom">De</label>
+          <input type="date" id="filterFrom">
+        </div>
+        <div class="field" style="margin:0; flex:1; min-width:150px;">
+          <label for="filterTo">Até</label>
+          <input type="date" id="filterTo">
+        </div>
+        <div class="field" style="margin:0; flex:1; min-width:150px; display:flex; align-items:flex-end;">
+          <button class="ghost-btn sm" id="clearFiltersBtn" type="button" style="width:100%;">Limpar filtros</button>
         </div>
       </div>
     </div>
@@ -114,6 +139,7 @@
       </div>
       <div class="mat-actions">
         <button class="ghost-btn" id="generateReportBtn" type="button">Gerar relatório</button>
+        <button class="ghost-btn" id="printReportBtn" type="button" hidden><svg class="btn-icon" viewBox="0 0 16 16"><path d="M4 6V2h8v4M4 12H2V7h12v5h-2M4 10h8v4H4z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>Imprimir / PDF</button>
         <button class="ghost-btn" id="exportReportBtn" type="button" hidden><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Exportar CSV</button>
       </div>
       <div id="reportResults"></div>
@@ -142,6 +168,10 @@
 
   const orderSearchInp = $('orderSearch'), ordersListEl = $('ordersList'), saveOrderHint = $('saveOrderHint');
   const filterStateSel = $('filterState'), filterMaterialSel = $('filterMaterial');
+  const filterTypeSel = $('filterType'), filterTubeSel = $('filterTube');
+  const filterFromInp = $('filterFrom'), filterToInp = $('filterTo');
+  const PAGE_SIZE = 50;
+  let currentPage = 1;
   const localStorageNoteEl = $('localStorageNote');
 
   function updateConnBadge(){
@@ -162,29 +192,49 @@
   }
 
   function populateFilterOptions(){
-    const mats = [];
+    const sheets = [], tubes = [];
     state.orders.forEach(o=>{
       const n = o.materialSnapshot ? o.materialSnapshot.name : null;
-      if(n && !mats.includes(n)) mats.push(n);
+      if(!n) return;
+      const list = (o.pieceType === 'tube') ? tubes : sheets;
+      if(!list.includes(n)) list.push(n);
     });
-    mats.sort((a,b)=>a.localeCompare(b,'pt'));
-    const cur = filterMaterialSel.value;
-    filterMaterialSel.innerHTML = '<option value="">Todos</option>' +
-      mats.map(n=>'<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>').join('');
-    if(cur && mats.includes(cur)) filterMaterialSel.value = cur;
+    sheets.sort((a,b)=>a.localeCompare(b,'pt'));
+    tubes.sort((a,b)=>a.localeCompare(b,'pt'));
+
+    const curM = filterMaterialSel.value, curT = filterTubeSel.value;
+    filterMaterialSel.innerHTML = '<option value="">Todas</option>' +
+      sheets.map(n=>'<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>').join('');
+    filterTubeSel.innerHTML = '<option value="">Todos</option>' +
+      tubes.map(n=>'<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>').join('');
+    if(curM && sheets.includes(curM)) filterMaterialSel.value = curM;
+    if(curT && tubes.includes(curT)) filterTubeSel.value = curT;
   }
 
   function getFilteredOrders(){
     const q = (orderSearchInp.value||'').toLowerCase().trim();
     const fState = filterStateSel.value;
+    const fType = filterTypeSel.value;
     const fMat = filterMaterialSel.value;
+    const fTube = filterTubeSel.value;
+    const from = filterFromInp.value ? new Date(filterFromInp.value+'T00:00:00').getTime() : null;
+    const to = filterToInp.value ? new Date(filterToInp.value+'T23:59:59').getTime() : null;
+
     return state.orders.filter(o=>{
       if(q){
         const hay = (o.client||'') + ' ' + (o.orderName||'') + ' ' + (o.orderNumber||'') + ' ' + (o.clientRef||'') + ' ' + (o.dxfFileName||'');
         if(!hay.toLowerCase().includes(q)) return false;
       }
       if(fState && (o.orderState||'production') !== fState) return false;
-      if(fMat && (!o.materialSnapshot || o.materialSnapshot.name !== fMat)) return false;
+      if(fType && (o.pieceType||'sheet') !== fType) return false;
+      if(fMat && (o.pieceType==='tube' || !o.materialSnapshot || o.materialSnapshot.name !== fMat)) return false;
+      if(fTube && (o.pieceType!=='tube' || !o.materialSnapshot || o.materialSnapshot.name !== fTube)) return false;
+      if(from || to){
+        if(!o.createdAt) return false;
+        const t = new Date(o.createdAt).getTime();
+        if(from && t < from) return false;
+        if(to && t > to) return false;
+      }
       return true;
     }).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   }
@@ -195,6 +245,10 @@
       ordersListEl.innerHTML = '<p class="orders-empty">' + (state.orders.length ? 'Nenhuma encomenda corresponde aos filtros.' : 'Ainda não guardou nenhuma encomenda.') + '</p>';
       return;
     }
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    if(currentPage > totalPages) currentPage = totalPages;
+    const pageStart = (currentPage-1) * PAGE_SIZE;
+    const pageRows = filtered.slice(pageStart, pageStart + PAGE_SIZE);
     let html = '<div class="hist-wrap"><table class="hist-table">';
     html += '<thead><tr>' +
       '<th class="sel-col"><input type="checkbox" id="selAll" title="Selecionar todas as visíveis"></th>' +
@@ -202,7 +256,7 @@
       '<th class="num">Qt.</th><th class="num">Preço total</th>' +
       '<th>Estado</th><th></th></tr></thead><tbody>';
 
-    filtered.forEach(o=>{
+    pageRows.forEach(o=>{
       const cs = o.costSnapshot;
       const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
       const matStr = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' ' + o.materialSnapshot.thickness + 'mm') : '—';
@@ -245,7 +299,26 @@
       html += '</div></td></tr>';
     });
     html += '</tbody></table></div>';
+
+    if(filtered.length > PAGE_SIZE){
+      const from = pageStart + 1, to = Math.min(pageStart + PAGE_SIZE, filtered.length);
+      html += '<div class="pager">' +
+        '<span class="pager-info">' + from + '–' + to + ' de ' + filtered.length + '</span>' +
+        '<div class="pager-btns">' +
+          '<button class="ghost-btn sm" data-page="prev"' + (currentPage===1?' disabled':'') + '>← Anterior</button>' +
+          '<span class="pager-num">' + currentPage + ' / ' + totalPages + '</span>' +
+          '<button class="ghost-btn sm" data-page="next"' + (currentPage===totalPages?' disabled':'') + '>Seguinte →</button>' +
+        '</div></div>';
+    }
     ordersListEl.innerHTML = html;
+
+    ordersListEl.querySelectorAll('[data-page]').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        currentPage += (b.getAttribute('data-page')==='next' ? 1 : -1);
+        renderOrdersList();
+        ordersListEl.scrollIntoView({behavior:'smooth', block:'start'});
+      });
+    });
 
     ordersListEl.querySelectorAll('.row-sel').forEach(cb=>{
       cb.addEventListener('change', ()=>{
@@ -256,7 +329,7 @@
     });
     const selAll = $('selAll');
     if(selAll){
-      const visible = getFilteredOrders().map(o=>o.id);
+      const visible = pageRows.map(o=>o.id);
       selAll.checked = visible.length>0 && visible.every(id=>selectedIds.has(id));
       selAll.addEventListener('change', ()=>{
         visible.forEach(id=>{ if(selAll.checked) selectedIds.add(id); else selectedIds.delete(id); });
@@ -414,9 +487,16 @@
     setTimeout(()=>{ document.title = originalTitle; }, 500);
   });
 
-  orderSearchInp.addEventListener('input', renderOrdersList);
-  filterStateSel.addEventListener('change', renderOrdersList);
-  filterMaterialSel.addEventListener('change', renderOrdersList);
+  function onFilterChange(){ currentPage = 1; renderOrdersList(); }
+  orderSearchInp.addEventListener('input', onFilterChange);
+  [filterStateSel, filterMaterialSel, filterTypeSel, filterTubeSel, filterFromInp, filterToInp]
+    .forEach(el=> el.addEventListener('change', onFilterChange));
+  $('clearFiltersBtn').addEventListener('click', ()=>{
+    orderSearchInp.value = '';
+    [filterStateSel, filterMaterialSel, filterTypeSel, filterTubeSel, filterFromInp, filterToInp]
+      .forEach(el=> el.value = '');
+    onFilterChange();
+  });
 
   $('exportOrdersBtn').addEventListener('click', ()=>{
     const blob = new Blob([JSON.stringify(state.orders, null, 2)], {type:'application/json'});
@@ -495,6 +575,7 @@
     if(!orders.length){
       resultsEl.innerHTML = '<p class="orders-empty">Nenhuma encomenda neste período.</p>';
       $('exportReportBtn').hidden = true;
+      $('printReportBtn').hidden = true;
       return;
     }
     // Faturado real exclui orçamentos ainda por confirmar — esses contam à parte.
@@ -538,6 +619,7 @@
     html += '</tbody></table></div>';
     resultsEl.innerHTML = html;
     $('exportReportBtn').hidden = false;
+    $('printReportBtn').hidden = false;
   }
 
   $('generateReportBtn').addEventListener('click', ()=>{
@@ -552,6 +634,67 @@
       return true;
     });
     renderReport(reportOrders);
+  });
+
+  $('printReportBtn').addEventListener('click', ()=>{
+    if(!reportOrders.length) return;
+    const val = o => (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0);
+    const isQuote = o => o.orderState === 'quote';
+    const isCancelled = o => o.orderState === 'cancelled';
+    const live = reportOrders.filter(o=>!isCancelled(o));
+    const invoiced = live.filter(o=>!isQuote(o));
+    const quotes = live.filter(isQuote);
+    const totalRevenue = invoiced.reduce((s,o)=> s + val(o), 0);
+    const totalQuoted = quotes.reduce((s,o)=> s + val(o), 0);
+    const realCostSum = invoiced.reduce((s,o)=> s + (o.costSnapshot && isFinite(o.costSnapshot.realCost) ? o.costSnapshot.realCost : 0), 0);
+    const marginSum = totalRevenue - realCostSum;
+    const marginPctTotal = realCostSum > 0 ? (marginSum/realCostSum)*100 : null;
+
+    const STATE_LABEL = { quote:'Orçamentado', production:'Em produção', done:'Concluído', cancelled:'Cancelada' };
+    const fromStr = $('reportFrom').value, toStr = $('reportTo').value;
+    const fmtD = v => v ? new Date(v+'T00:00:00').toLocaleDateString('pt-PT') : '—';
+    const now = new Date();
+
+    let html = '<div class="p-logo"><img src="logo.svg" alt="Serralharia José Gabriel P. V. do Couto"></div>';
+    html += '<div class="p-title">Relatório de Encomendas</div>';
+    html += '<div class="p-meta">Período: ' + fmtD(fromStr) + ' a ' + fmtD(toStr) + ' · gerado em ' + now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) + '</div>';
+
+    html += '<div class="p-section">';
+    html += '<div class="p-row"><span class="p-label">Encomendas faturadas</span><span class="p-value">' + invoiced.length + '</span></div>';
+    html += '<div class="p-row"><span class="p-label">Faturado (sem IVA)</span><span class="p-value">' + fmtEUR(totalRevenue) + '</span></div>';
+    if(realCostSum > 0){
+      html += '<div class="p-row"><span class="p-label">Custo real</span><span class="p-value">' + fmtEUR(realCostSum) + '</span></div>';
+      html += '<div class="p-row"><span class="p-label">Margem</span><span class="p-value">' + fmtEUR(marginSum) + (marginPctTotal!=null ? ' · ' + fmtNum(marginPctTotal,1) + '%' : '') + '</span></div>';
+    }
+    if(quotes.length) html += '<div class="p-row"><span class="p-label">Em orçamento (' + quotes.length + ')</span><span class="p-value">' + fmtEUR(totalQuoted) + '</span></div>';
+    html += '</div>';
+
+    html += '<table class="p-group-table"><thead><tr>' +
+      '<th>Nº</th><th>Data</th><th>Cliente</th><th>Peça</th><th>Material</th>' +
+      '<th class="num">Qt.</th><th>Estado</th><th class="num">Total s/ IVA</th>' +
+      '</tr></thead><tbody>';
+    reportOrders.slice().sort((a,b)=>(a.orderNumber||'').localeCompare(b.orderNumber||'')).forEach(o=>{
+      const cs = o.costSnapshot, ms = o.materialSnapshot;
+      const mat = ms ? (escapeHtml(ms.name) + (o.pieceType==='tube' ? '' : ' ' + ms.thickness + 'mm')) : '—';
+      html += '<tr>' +
+        '<td>' + escapeHtml(o.orderNumber||'—') + '</td>' +
+        '<td>' + (o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—') + '</td>' +
+        '<td>' + escapeHtml(o.client||'—') + '</td>' +
+        '<td>' + escapeHtml(o.orderName||'—') + '</td>' +
+        '<td>' + mat + '</td>' +
+        '<td class="num">' + (o.quantity||1) + '</td>' +
+        '<td>' + (STATE_LABEL[o.orderState||'production']||'') + '</td>' +
+        '<td class="num">' + (cs ? fmtEUR(cs.totalCost) : '—') + '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div class="p-group-note">Faturado conta apenas ordens em produção ou concluídas. Canceladas aparecem na lista mas não entram nos totais.</div>';
+
+    $('printSheet').innerHTML = html;
+    const originalTitle = document.title;
+    document.title = 'Relatorio ' + (fromStr||'inicio') + ' a ' + (toStr||'fim');
+    window.print();
+    setTimeout(()=>{ document.title = originalTitle; }, 500);
   });
 
   $('exportReportBtn').addEventListener('click', ()=>{
