@@ -797,5 +797,27 @@
     return n ? { count:n, avgDeviationPct: sum/n } : null;
   };
 
+  /* ---------------------------------------------------------------- */
+  /* MODO CLARO / ESCURO                                               */
+  /* Aplicado já no <head> de cada página (evita o "flash" errado);    */
+  /* isto só liga o botão do menu e mantém a etiqueta em sincronia.    */
+  /* ---------------------------------------------------------------- */
+  (function initThemeToggle(){
+    const btn = document.getElementById('themeToggleBtn');
+    if(!btn) return;
+    const label = document.getElementById('themeToggleLabel');
+    function sync(){
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      if(label) label.textContent = isLight ? 'Modo escuro' : 'Modo claro';
+    }
+    sync();
+    btn.addEventListener('click', ()=>{
+      const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      try{ localStorage.setItem('laser_theme', next); }catch(e){}
+      sync();
+    });
+  })();
+
   window.LC = LC;
 })();

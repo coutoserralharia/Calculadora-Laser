@@ -15,6 +15,37 @@
     --radius:10px;
     font-size:16px;
   }
+  /* Modo diurno — mesma paleta de acento, fundo e texto invertidos para leitura confortável
+     à luz do dia. Ativado com [data-theme="light"] na tag <html>, gravado em localStorage. */
+  :root[data-theme="light"]{
+    --bg:#f4f5f6;
+    --panel:#ffffff;
+    --panel-2:#f0f1f3;
+    --border:#dde1e6;
+    --border-soft:#e8eaed;
+    --text:#20242a;
+    --text-muted:#5c636b;
+    --text-dim:#8b939c;
+    --accent:#e6501f;
+    --accent-dim:#c9481f;
+    --readout:#0d8f80;
+    --readout-dim:#0a6f66;
+    --danger:#d33;
+  }
+  /* Cores de estado mais saturadas em fundo claro, para manter contraste de leitura. */
+  :root[data-theme="light"] .state-quote,
+  :root[data-theme="light"] .state-picker button.sel-quote{color:#a15c00;}
+  :root[data-theme="light"] .state-production,
+  :root[data-theme="light"] .state-picker button.sel-production{color:#b8460c;}
+  :root[data-theme="light"] .state-done,
+  :root[data-theme="light"] .state-picker button.sel-done{color:#15803d;}
+  :root[data-theme="light"] .state-cancelled,
+  :root[data-theme="light"] .state-picker button.sel-cancelled{color:#6b7280;}
+  :root[data-theme="light"] .state-picker button.sel-quote{border-color:#a15c00;}
+  :root[data-theme="light"] .state-picker button.sel-production{border-color:#b8460c;}
+  :root[data-theme="light"] .state-picker button.sel-done{border-color:#15803d;}
+  :root[data-theme="light"] .state-picker button.sel-cancelled{border-color:#6b7280;}
+  :root[data-theme="light"] .sql-block{color:#0d8f80;}
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
@@ -337,6 +368,17 @@
   }
   @media (max-width:640px){ nav.pagenav a{font-size:12px; padding:8px 6px;} }
 
+  .nav-theme-toggle{
+    margin-top:auto; display:flex; align-items:center; gap:8px; cursor:pointer;
+    padding:9px 12px; border-radius:7px; border:1px solid var(--border-soft);
+    background:none; color:var(--text-muted); font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600;
+  }
+  .nav-theme-toggle:hover{color:var(--text); border-color:var(--text-dim);}
+  .nav-theme-toggle svg{flex:0 0 auto;}
+  :root[data-theme="light"] .nav-theme-toggle .icon-moon,
+  :root:not([data-theme="light"]) .nav-theme-toggle .icon-sun{display:none;}
+  @media (max-width:900px){ .nav-theme-toggle{margin-top:0;} }
+
 
 
   /* Sugestões de cliente */
@@ -496,6 +538,8 @@
   .acc-dim{color:var(--text-dim); font-size:11.5px;}
   .acc-ok{color:var(--readout); font-size:11.5px; font-weight:600;}
   .acc-new{font-family:'JetBrains Mono',monospace; color:var(--accent); font-weight:700; white-space:nowrap;}
+  .acc-tube-tag{font-size:9.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--text-dim);
+    background:rgba(255,255,255,0.06); padding:1px 6px; border-radius:20px; margin-left:4px;}
 
   /* Paginação do histórico */
   .pager{display:flex; align-items:center; justify-content:space-between; gap:12px;

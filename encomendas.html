@@ -15,13 +15,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared.css">
+<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('laser_theme')||'dark');</script>
 <style>
   .layout-single{max-width:1400px; margin:0 auto;}
-  .realtime-form{
-    background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px;
-    padding:12px; margin:2px 0 8px;
-  }
-  .realtime-form label{display:block; font-size:11.5px; color:var(--text-muted); margin-bottom:8px;}
 </style>
 </head>
 <body>
@@ -34,6 +30,11 @@
       <a href="tubo.html">Produção Tubo</a>
       <a href="encomendas.html" class="active">Histórico</a>
       <a href="definicoes.html">Definições</a>
+      <button class="nav-theme-toggle" id="themeToggleBtn" type="button" title="Alternar modo claro/escuro">
+        <svg class="icon-moon" width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M13.5 9.5A6 6 0 016.5 2.5a6 6 0 106.999 7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <svg class="icon-sun" width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M8 1v1.6M8 13.4V15M15 8h-1.6M2.6 8H1M12.7 3.3l-1.1 1.1M4.4 11.6l-1.1 1.1M12.7 12.7l-1.1-1.1M4.4 4.4L3.3 3.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span id="themeToggleLabel">Modo claro</span>
+      </button>
     </nav>
 
   <header class="top">
@@ -160,7 +161,7 @@
 (function(){
   "use strict";
   const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, saveOrders, loadRemoteConfig,
-    remoteLoadOrders, remoteInsertOrder, remoteUpdateOrder, remoteDeleteOrder, recomputeFinalCost, registerServiceWorker } = window.LC;
+    remoteLoadOrders, remoteInsertOrder, remoteDeleteOrder, registerServiceWorker } = window.LC;
 
   const $ = id => document.getElementById(id);
   const state = { orders: [], remote: { configured:false, url:'', key:'' } };
@@ -278,25 +279,10 @@
       const page = (o.pieceType === 'tube') ? 'tubo.html' : 'index.html';
       html += '<td class="hist-actions">' +
         '<button class="ghost-btn sm" data-load="'+o.id+'" data-page="'+page+'">Abrir</button>' +
-        '<button class="ghost-btn sm" data-realtime="'+o.id+'" title="Registar tempo de corte real">Tempo</button>' +
         '<button class="ghost-btn sm" data-dup="'+o.id+'" data-page="'+page+'" title="Criar encomenda nova a partir desta">Duplicar</button>' +
         '<button class="rm-btn" data-del="'+o.id+'" title="Eliminar">✕</button>' +
       '</td>';
       html += '</tr>';
-
-      html += '<tr class="rt-row" id="rtform-'+o.id+'" hidden><td colspan="10">';
-      html += '<div class="realtime-form" style="margin:0;">';
-      html += '<label for="rtinput-'+o.id+'">Tempo de corte real — total da encomenda, todas as peças</label>';
-      html += '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">';
-      html += '<div class="unit-suffix" style="flex:1; min-width:140px;"><input type="number" min="0" step="0.1" id="rtinput-'+o.id+'" value="' + (cs && isFinite(cs.cuttingTimeMin) ? cs.cuttingTimeMin.toFixed(1) : '') + '"><span>min</span></div>';
-      html += '<button class="ghost-btn sm" data-rt-save="'+o.id+'">Guardar e recalcular</button>';
-      html += '<button class="ghost-btn sm" data-rt-cancel="'+o.id+'">Cancelar</button>';
-      html += '</div>';
-      if(isFinal && cs.estimadoCuttingTimeMin != null && isFinite(cs.cuttingTimeMin)){
-        html += '<p class="save-hint" style="margin-top:6px;">Estimado na altura: ' + fmtNum(cs.estimadoCuttingTimeMin,1) + ' min → real registado: ' + fmtNum(cs.cuttingTimeMin,1) + ' min</p>';
-      }
-      html += '<p class="save-hint" id="rthint-'+o.id+'" style="margin-top:6px;"></p>';
-      html += '</div></td></tr>';
     });
     html += '</tbody></table></div>';
 
@@ -362,50 +348,6 @@
         state.orders = state.orders.filter(o=>o.id!==id);
         if(!state.remote.configured) saveOrders(state.orders);
         renderOrdersList();
-      });
-    });
-    ordersListEl.querySelectorAll('[data-realtime]').forEach(b=>{
-      b.addEventListener('click', ()=>{
-        const id = b.getAttribute('data-realtime');
-        const form = $('rtform-' + id);
-        form.hidden = !form.hidden;
-        if(!form.hidden) $('rtinput-' + id).focus();
-      });
-    });
-    ordersListEl.querySelectorAll('[data-rt-cancel]').forEach(b=>{
-      b.addEventListener('click', ()=>{
-        $('rtform-' + b.getAttribute('data-rt-cancel')).hidden = true;
-      });
-    });
-    ordersListEl.querySelectorAll('[data-rt-save]').forEach(b=>{
-      b.addEventListener('click', async ()=>{
-        const id = b.getAttribute('data-rt-save');
-        const rec = state.orders.find(o=>o.id===id);
-        const input = $('rtinput-' + id);
-        const hint = $('rthint-' + id);
-        const val = parseFloat(input.value);
-        if(!rec || !rec.costSnapshot){
-          hint.style.color = 'var(--danger)'; hint.textContent = 'Esta encomenda não tem dados de custo guardados.'; return;
-        }
-        if(!Number.isFinite(val) || val < 0){
-          hint.style.color = 'var(--danger)'; hint.textContent = 'Introduza um tempo válido, em minutos.'; return;
-        }
-        const originalLabel = b.textContent;
-        b.disabled = true; b.textContent = 'A guardar…';
-        hint.style.color = ''; hint.textContent = '';
-        try{
-          const newCostSnapshot = await recomputeFinalCost(rec, val);
-          if(state.remote.configured){
-            await remoteUpdateOrder(state.remote, id, newCostSnapshot);
-          }
-          rec.costSnapshot = newCostSnapshot;
-          if(!state.remote.configured) await saveOrders(state.orders);
-          renderOrdersList();
-        }catch(err){
-          hint.style.color = 'var(--danger)';
-          hint.textContent = 'Não foi possível guardar: ' + err.message;
-          b.disabled = false; b.textContent = originalLabel;
-        }
       });
     });
   }
