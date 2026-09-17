@@ -598,7 +598,8 @@ create policy "public access"
       btn.addEventListener('click', ()=>{
         const row = lastSummary[parseInt(btn.getAttribute('data-apply'),10)];
         const newSpeed = parseInt(btn.getAttribute('data-speed'),10);
-        const mat = state.materials.find(m=>m.id===row.materialId);
+        const list = row.pieceType==='tube' ? state.tubeProfiles : state.materials;
+        const mat = list.find(m=>m.id===row.materialId);
         if(!mat || !isFinite(newSpeed) || newSpeed<=0) return;
         const msg = 'Ajustar a velocidade de "'+row.key+'"?\n\n' +
           'Atual: '+mat.speed+' mm/min\n' +
@@ -608,8 +609,8 @@ create policy "public access"
         if(!confirm(msg)) return;
         mat.speed = newSpeed;
         mat.speedCalibratedAt = new Date().toISOString();
-        saveMaterials(state.materials);
-        renderMaterialsTable();
+        if(row.pieceType==='tube'){ saveTubeProfiles(state.tubeProfiles); renderTubeProfilesTable(); }
+        else { saveMaterials(state.materials); renderMaterialsTable(); }
         btn.outerHTML = '<span class="acc-ok">aplicado ✓</span>';
       });
     });
@@ -629,7 +630,7 @@ create policy "public access"
       } else {
         orders = await loadOrders();
       }
-      const summary = summarizeAccuracy(orders, state.materials);
+      const summary = summarizeAccuracy(orders, state.materials, state.tubeProfiles);
       if(!summary.length){
         resultsEl.innerHTML = '<p class="orders-empty">Ainda não há dados para analisar — são precisas encomendas com tempo de corte real registado. Materiais afinados recentemente só voltam a aparecer depois de novas encomendas cortadas à velocidade nova.</p>';
       } else {
@@ -639,11 +640,13 @@ create policy "public access"
         summary.forEach((row,i)=>{
           const absDev = Math.abs(row.avgDeviationPct);
           const devColor = absDev>15 ? 'var(--danger)' : (absDev>5 ? '#f0b429' : 'var(--readout)');
-          const mat = row.materialId ? state.materials.find(m=>m.id===row.materialId) : null;
+          const list = row.pieceType==='tube' ? state.tubeProfiles : state.materials;
+          const mat = row.materialId ? list.find(m=>m.id===row.materialId) : null;
+          const rowLabel = escapeHtml(row.key) + (row.pieceType==='tube' ? ' <span class="acc-tube-tag">tubo</span>' : '');
 
           let suggestion = '<span class="acc-dim">—</span>';
           if(!mat){
-            suggestion = '<span class="acc-dim">material removido</span>';
+            suggestion = '<span class="acc-dim">' + (row.pieceType==='tube' ? 'perfil removido' : 'material removido') + '</span>';
           } else if(row.count < MIN_SAMPLES){
             const falta = MIN_SAMPLES - row.count;
             suggestion = '<span class="acc-dim">faltam ' + falta + ' registo(s)' +
@@ -658,7 +661,7 @@ create policy "public access"
           }
 
           html += '<tr>' +
-            '<td>'+escapeHtml(row.key)+'</td>' +
+            '<td>'+rowLabel+'</td>' +
             '<td>'+row.count+'</td>' +
             '<td>'+fmtNum(row.avgEstimado,1)+' min</td>' +
             '<td>'+fmtNum(row.avgReal,1)+' min</td>' +

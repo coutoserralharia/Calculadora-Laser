@@ -146,11 +146,11 @@
 <script>
 (function(){
   "use strict";
-  const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, loadMachine, loadMaterials, loadRemoteConfig,
+  const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, loadMachine, loadMaterials, loadTubeProfiles, loadRemoteConfig,
     remoteLoadOrders, summarizeAccuracy, summarizeWeek, buildAlerts, summarizeConversion, overallAccuracy, registerServiceWorker } = window.LC;
 
   const $ = id => document.getElementById(id);
-  const state = { orders: [], machine: {}, materials: [], remote: { configured:false, url:'', key:'' } };
+  const state = { orders: [], machine: {}, materials: [], tubeProfiles: [], remote: { configured:false, url:'', key:'' } };
 
   function updateConnBadge(){
     const badge = $('connBadge');
@@ -247,7 +247,7 @@
   }
 
   function renderAccuracyBox(){
-    const rows = summarizeAccuracy(state.orders, state.materials);
+    const rows = summarizeAccuracy(state.orders, state.materials, state.tubeProfiles);
     const acc = overallAccuracy(rows);
     if(!acc){
       $('accuracyBox').innerHTML = '<p class="orders-empty">Ainda sem encomendas com tempo real registado.</p>';
@@ -283,7 +283,7 @@
   }
 
   function renderAlerts(){
-    const accuracy = summarizeAccuracy(state.orders, state.materials);
+    const accuracy = summarizeAccuracy(state.orders, state.materials, state.tubeProfiles);
     const alerts = buildAlerts(state.orders, state.machine, accuracy);
     const listEl = $('alertsList'), countEl = $('alertCount');
 
@@ -325,6 +325,7 @@
     state.remote = await loadRemoteConfig();
     state.machine = await loadMachine();
     state.materials = await loadMaterials();
+    state.tubeProfiles = await loadTubeProfiles();
     updateConnBadge();
     try{
       state.orders = state.remote.configured ? await remoteLoadOrders(state.remote) : await loadOrders();

@@ -404,13 +404,12 @@
   /* PRECISÃO DAS ESTIMATIVAS — compara tempo estimado vs tempo real,   */
   /* agrupado por material/espessura, para ajudar a calibrar a tabela.  */
   /* ---------------------------------------------------------------- */
-  LC.summarizeAccuracy = function(orders, materials){
-    // Depois de se afinar a velocidade de um material, as encomendas anteriores deixam de contar:
-    // foram estimadas com a velocidade antiga e voltariam a sugerir a mesma correção.
+  LC.summarizeAccuracy = function(orders, materials, tubeProfiles){
+    // Depois de se afinar a velocidade de um material/perfil, as encomendas anteriores deixam de
+    // contar: foram estimadas com a velocidade antiga e voltariam a sugerir a mesma correção.
     const calibratedAt = {};
-    (materials||[]).forEach(m=>{
-      if(m.speedCalibratedAt) calibratedAt[m.id] = new Date(m.speedCalibratedAt).getTime();
-    });
+    (materials||[]).forEach(m=>{ if(m.speedCalibratedAt) calibratedAt[m.id] = new Date(m.speedCalibratedAt).getTime(); });
+    (tubeProfiles||[]).forEach(p=>{ if(p.speedCalibratedAt) calibratedAt[p.id] = new Date(p.speedCalibratedAt).getTime(); });
     const groups = {};
     (orders||[]).forEach(o=>{
       const cs = o.costSnapshot;
@@ -420,9 +419,10 @@
       if(cs.estimadoCuttingTimeMin <= 0) return; // avoid divide-by-zero on the deviation %
       const cal = o.materialId ? calibratedAt[o.materialId] : null;
       if(cal && o.createdAt && new Date(o.createdAt).getTime() <= cal) return;
+      const isTube = o.pieceType === 'tube';
       const ms = o.materialSnapshot;
-      const key = ms ? (ms.name + ' — ' + ms.thickness + 'mm') : 'Material desconhecido';
-      if(!groups[key]) groups[key] = { key, materialId:o.materialId||null, calibratedAt: (o.materialId ? calibratedAt[o.materialId] : null) || null, count:0, sumEstimado:0, sumReal:0, sumDeviationPct:0 };
+      const key = ms ? (isTube ? ms.name : (ms.name + ' — ' + ms.thickness + 'mm')) : 'Material desconhecido';
+      if(!groups[key]) groups[key] = { key, pieceType: isTube?'tube':'sheet', materialId:o.materialId||null, calibratedAt: (o.materialId ? calibratedAt[o.materialId] : null) || null, count:0, sumEstimado:0, sumReal:0, sumDeviationPct:0 };
       const g = groups[key];
       g.count++;
       g.sumEstimado += cs.estimadoCuttingTimeMin;
@@ -431,6 +431,7 @@
     });
     return Object.values(groups).map(g => ({
       key: g.key,
+      pieceType: g.pieceType,
       materialId: g.materialId,
       calibratedAt: g.calibratedAt,
       count: g.count,
@@ -451,6 +452,19 @@
     const cs = rec.costSnapshot || {};
     const geoSnap = cs.geoSnapshot;
     const qty = rec.quantity || 1;
+
+    // O material não muda ao registar o tempo real — só o custo de corte muda. Por isso o custo
+    // real e a margem só precisam de um ajuste (delta), não de um recálculo do zero: evita ficarem
+    // presos no valor de quando a encomenda ainda era estimativa.
+    function withMarginFields(base, corteCost, totalCost){
+      if(cs.realCost != null && isFinite(cs.corteCost)){
+        const realCost = cs.realCost - cs.corteCost + corteCost;
+        const marginValue = totalCost - realCost;
+        const marginPct = realCost > 0 ? (marginValue/realCost)*100 : null;
+        return Object.assign(base, { realCost, marginValue, marginPct });
+      }
+      return base;
+    }
 
     if(geoSnap && geoSnap.perimeterMm){
       try{
@@ -490,20 +504,20 @@
           const totalCost = corteCost + materialCost*qty + preCorteCost + adj;
           const avgPerPiece = totalCost / qty;
 
-          return Object.assign({}, cs, {
+          return Object.assign({}, cs, withMarginFields({
             cuttingTimeMin: realCuttingTimeMin,
             corteCost, materialCost, weightPerPiece, weightTotal,
             designCost, setupCost, preCorteCost,
             totalCost, avgPerPiece,
             isFinal: true,
-          });
+          }, corteCost, totalCost));
         }
         // material desta encomenda já não existe na tabela — cai para o método antigo abaixo
       }catch(e){ /* falha a ir buscar materiais/máquina atuais — cai para o método antigo abaixo */ }
     }
 
-    // Método antigo (encomendas sem geometria gravada, ou material entretanto removido):
-    // reaproveita os valores tal como estavam na cotação original.
+    // Método antigo (encomendas sem geometria gravada — incluindo TODAS as de tubo, ou material
+    // entretanto removido): reaproveita os valores tal como estavam na cotação original.
     const ms = rec.machineSnapshot || {};
     const hourlyRate = ms.hourlyRate || 0;
     const materialCost = cs.materialCost || 0; // por peça
@@ -511,11 +525,11 @@
     const corteCost = (realCuttingTimeMin/60) * hourlyRate;
     const totalCost = corteCost + materialCost*qty + preCorteCost + (cs.adjustmentValue||0);
     const avgPerPiece = totalCost / qty;
-    return Object.assign({}, cs, {
+    return Object.assign({}, cs, withMarginFields({
       cuttingTimeMin: realCuttingTimeMin,
       corteCost, totalCost, avgPerPiece,
       isFinal: true,
-    });
+    }, corteCost, totalCost));
   };
 
   /* ---------------------------------------------------------------- */
