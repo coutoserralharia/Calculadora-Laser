@@ -159,43 +159,42 @@
         </div>
       </div>
 
-      <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Material</h2>
-        <div class="field-row" style="margin-bottom:0;">
-          <div class="field" style="margin-bottom:0;">
-            <label for="materialTypeSelect">Tipo de material</label>
+      <div class="card-row">
+        <div class="card" style="margin-bottom:0;">
+          <h2 class="card-title"><span class="dot"></span>Material</h2>
+          <div class="field">
+            <label for="materialTypeSelect">Tipo</label>
             <select id="materialTypeSelect"></select>
           </div>
           <div class="field" style="margin-bottom:0;">
             <label for="materialThicknessSelect">Espessura</label>
             <select id="materialThicknessSelect"></select>
           </div>
+          <select id="materialSelect" style="display:none;" aria-hidden="true" tabindex="-1"></select>
         </div>
-        <select id="materialSelect" style="display:none;" aria-hidden="true" tabindex="-1"></select>
-        <p class="save-hint" style="margin-top:10px;">Preços e velocidades definem-se em <a href="definicoes.html" style="color:var(--readout);">Definições avançadas</a>.</p>
-      </div>
 
-      <details class="card" id="setupDetails" open>
-        <summary class="summary-row"><span>Preparação (setup) <span class="conn-badge conn-local" id="setupBadge"></span></span><span class="chev">▸</span></summary>
-        <div class="details-body">
-          <div class="field">
-            <label for="drawingType">Origem do desenho</label>
-            <select id="drawingType">
-              <option value="client_direct">Desenho do cliente, pronto a usar</option>
-              <option value="client_convert">Converter desenho do cliente</option>
-              <option value="from_scratch">Desenho de raiz</option>
-            </select>
+        <details class="card" id="setupDetails" open style="margin-bottom:0;">
+          <summary class="summary-row"><span>Preparação (setup) <span class="conn-badge conn-local" id="setupBadge"></span></span><span class="chev">▸</span></summary>
+          <div class="details-body">
+            <div class="field">
+              <label for="drawingType">Origem do desenho</label>
+              <select id="drawingType">
+                <option value="client_direct">Desenho do cliente, pronto a usar</option>
+                <option value="client_convert">Converter desenho do cliente</option>
+                <option value="from_scratch">Desenho de raiz</option>
+              </select>
+            </div>
+            <div class="field" id="designTimeField" hidden>
+              <label for="designTimeInput">Tempo de desenho</label>
+              <div class="unit-suffix"><input type="number" id="designTimeInput" min="0" step="1" value="0"><span>min</span></div>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <label for="setupTimeInput">Tempo de setup</label>
+              <div class="unit-suffix"><input type="number" id="setupTimeInput" min="0" step="1" value="5"><span>min</span></div>
+            </div>
           </div>
-          <div class="field" id="designTimeField" hidden>
-            <label for="designTimeInput">Tempo de desenho</label>
-            <div class="unit-suffix"><input type="number" id="designTimeInput" min="0" step="1" value="0"><span>min</span></div>
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label for="setupTimeInput">Tempo de setup</label>
-            <div class="unit-suffix"><input type="number" id="setupTimeInput" min="0" step="1" value="5"><span>min</span></div>
-          </div>
-        </div>
-      </details>
+        </details>
+      </div>
 
       <div class="card">
         <h2 class="card-title"><span class="dot"></span>Guardar encomenda <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
@@ -226,23 +225,19 @@
 
       <div class="card preview-card">
         <div class="preview-head">
-          <h2 class="card-title" style="margin-bottom:8px;"><span class="dot"></span>Pré-visualização do corte</h2>
+          <h2 class="card-title" style="margin-bottom:8px;"><span class="dot"></span>Pré-visualização e dimensões</h2>
         </div>
         <canvas id="preview" width="600" height="260"></canvas>
         <div id="previewEmpty" class="preview-empty">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 3"/></svg>
           <span>Carregue um ficheiro DXF para ver o percurso de corte, ou use o modo manual</span>
         </div>
-      </div>
-
-      <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Dimensões</h2>
         <div class="preview-meta" id="previewMeta" hidden>
           <div class="meta-item"><div class="k">Dimensões (L × A)</div><div class="v" id="metaDim">—</div></div>
           <div class="meta-item"><div class="k">Perímetro</div><div class="v" id="metaPerim">—</div></div>
           <div class="meta-item"><div class="k">Perfurações</div><div class="v" id="metaPierces">—</div></div>
         </div>
-        <p class="orders-empty" id="dimEmpty" style="padding:14px 0 4px;">Carregue um ficheiro ou preencha as dimensões para confirmar aqui.</p>
+        <p class="orders-empty" id="dimEmpty" style="padding:14px 16px 16px;">Carregue um ficheiro ou preencha as dimensões para confirmar aqui.</p>
       </div>
 
       <div class="card">
@@ -287,16 +282,12 @@
         <div class="breakdown-row" style="border-top:1.5px solid var(--border); margin-top:4px; padding-top:12px;"><span class="lbl" style="font-weight:600; color:var(--text);">Custo total da encomenda <small>(sem IVA)<span id="totalQtyTag"></span></small></span><span class="val" id="totalValue" style="font-size:16px; color:var(--readout);">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo total ÷ nº peças <small>(sem IVA)</small></span><span class="val" id="avgPerPieceValue">€0,00</span></div>
         <div class="total-sub" id="totalTimeSub" hidden style="margin-top:10px; padding-top:10px;"></div>
-      </div>
 
-      <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Imprimir</h2>
-        <div class="print-btns">
+        <div class="print-btns" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border-soft);">
           <button class="ghost-btn print-btn" id="printOperatorBtn" type="button">Ficha do operador</button>
           <button class="ghost-btn print-btn" id="printInternalBtn" type="button">Ficha interna (com custos)</button>
           <button class="ghost-btn print-btn" id="printQuoteBtn" type="button">Orçamento p/ cliente</button>
         </div>
-        <p class="save-hint">A ficha do operador não mostra preços. A ficha interna inclui a decomposição de custos.</p>
         <p class="save-hint" id="printHint"></p>
       </div>
 
