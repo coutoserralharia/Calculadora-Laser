@@ -85,7 +85,8 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card-row">
+        <div class="card" style="margin-bottom:0;">
         <div class="tabs">
           <button class="tab-btn active" id="tabDxfBtn" type="button">Ficheiro DXF</button>
           <button class="tab-btn" id="tabManualBtn" type="button">Dimensões manuais</button>
@@ -155,6 +156,17 @@
             <input type="number" id="manualHoles" value="0" min="0" step="1">
           </div>
         </div>
+        </div>
+
+        <div class="card" style="margin-bottom:0;">
+          <h2 class="card-title"><span class="dot"></span>Dimensões</h2>
+          <div class="preview-meta" id="previewMeta" hidden style="flex-direction:column; gap:10px;">
+            <div class="meta-item"><div class="k">Dimensões (L × A)</div><div class="v" id="metaDim">—</div></div>
+            <div class="meta-item"><div class="k">Perímetro</div><div class="v" id="metaPerim">—</div></div>
+            <div class="meta-item"><div class="k">Perfurações</div><div class="v" id="metaPierces">—</div></div>
+          </div>
+          <p class="orders-empty" id="dimEmpty" style="padding:14px 0 4px;">Carregue um ficheiro ou preencha as dimensões para confirmar aqui.</p>
+        </div>
       </div>
 
       <div class="card-row">
@@ -169,6 +181,8 @@
             <select id="materialThicknessSelect"></select>
           </div>
           <select id="materialSelect" style="display:none;" aria-hidden="true" tabindex="-1"></select>
+          <div class="breakdown-row" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-soft);"><span class="lbl">Peso unitário (1 peça)</span><span class="val" id="valWeightUnit">—</span></div>
+          <div class="breakdown-row" style="border-bottom:none; padding-bottom:0;"><span class="lbl">Peso total<small id="weightTotalSub">—</small></span><span class="val" id="valWeightTotal">—</span></div>
         </div>
 
         <details class="card" id="setupDetails" open style="margin-bottom:0;">
@@ -192,6 +206,39 @@
             </div>
           </div>
         </details>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Ajustes</h2>
+        <div class="field" style="margin-bottom:0;">
+          <label for="realCuttingTimeInput">Tempo de corte real — total da encomenda, todas as peças (opcional)</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <div class="unit-suffix" style="flex:1;"><input type="number" id="realCuttingTimeInput" min="0" step="0.1" placeholder="deixe vazio para usar a estimativa"><span>min</span></div>
+            <button class="ghost-btn sm" id="clearRealTimeBtn" type="button">Repor estimativa</button>
+          </div>
+        </div>
+
+        <button class="ghost-btn sm" id="showAdjustmentBtn" type="button" style="margin:12px 0 4px;">+ Ajuste comercial</button>
+        <div class="field" id="adjustmentFields" hidden style="margin:12px 0 0;">
+          <label for="adjustmentValueInput">Ajuste comercial (opcional — use valor negativo para desconto)</label>
+          <div class="field-row" style="margin-bottom:0;">
+            <div class="field" style="margin-bottom:0;">
+              <div class="unit-suffix"><input type="number" id="adjustmentValueInput" step="0.5" placeholder="0,00"><span>€</span></div>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <select id="adjustmentReasonSelect">
+                <option value="">Motivo do ajuste…</option>
+                <option value="Pequena quantidade">Pequena quantidade</option>
+                <option value="Urgência">Urgência</option>
+                <option value="Cliente habitual">Cliente habitual</option>
+                <option value="Concorrência">Concorrência</option>
+                <option value="Complexidade">Complexidade</option>
+                <option value="Desperdício de chapa">Desperdício de chapa</option>
+                <option value="Outro">Outro</option>
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="card">
@@ -223,58 +270,21 @@
 
       <div class="card preview-card">
         <div class="preview-head">
-          <h2 class="card-title" style="margin-bottom:8px;"><span class="dot"></span>Pré-visualização e dimensões</h2>
+          <h2 class="card-title" style="margin-bottom:8px;"><span class="dot"></span>Pré-visualização do corte</h2>
         </div>
         <canvas id="preview" width="600" height="260"></canvas>
         <div id="previewEmpty" class="preview-empty">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 3"/></svg>
           <span>Carregue um ficheiro DXF para ver o percurso de corte, ou use o modo manual</span>
         </div>
-        <div class="preview-meta" id="previewMeta" hidden>
-          <div class="meta-item"><div class="k">Dimensões (L × A)</div><div class="v" id="metaDim">—</div></div>
-          <div class="meta-item"><div class="k">Perímetro</div><div class="v" id="metaPerim">—</div></div>
-          <div class="meta-item"><div class="k">Perfurações</div><div class="v" id="metaPierces">—</div></div>
-        </div>
-        <p class="orders-empty" id="dimEmpty" style="padding:14px 16px 16px;">Carregue um ficheiro ou preencha as dimensões para confirmar aqui.</p>
       </div>
 
       <div class="card">
         <h2 class="card-title"><span class="dot"></span>Custo da encomenda <small id="costFinalBadge" style="margin-left:auto;"></small></h2>
-        <div class="field" style="margin-bottom:14px;">
-          <label for="realCuttingTimeInput">Tempo de corte real — total da encomenda, todas as peças (opcional)</label>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <div class="unit-suffix" style="flex:1;"><input type="number" id="realCuttingTimeInput" min="0" step="0.1" placeholder="deixe vazio para usar a estimativa"><span>min</span></div>
-            <button class="ghost-btn sm" id="clearRealTimeBtn" type="button">Repor estimativa</button>
-          </div>
-        </div>
-        <div class="breakdown-row"><span class="lbl">Peso unitário (1 peça)</span><span class="val" id="valWeightUnit">—</span></div>
-        <div class="breakdown-row"><span class="lbl">Peso total<small id="weightTotalSub">—</small></span><span class="val" id="valWeightTotal">—</span></div>
         <div class="breakdown-row"><span class="lbl">Custo total do material<small id="matInfoSub">—</small></span><span class="val" id="costMaterial">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo pré-corte<small id="preCorteSub">—</small></span><span class="val" id="costPreCorte">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo total do corte<small id="cutTimeSub">—</small></span><span class="val" id="costCorte">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Subtotal <small>(antes de ajuste)</small></span><span class="val" id="subtotalValue">€0,00</span></div>
-
-        <button class="ghost-btn sm" id="showAdjustmentBtn" type="button" style="margin:10px 0 4px;">+ Ajuste comercial</button>
-        <div class="field" id="adjustmentFields" hidden style="margin:12px 0 4px;">
-          <label for="adjustmentValueInput">Ajuste comercial (opcional — use valor negativo para desconto)</label>
-          <div class="field-row" style="margin-bottom:0;">
-            <div class="field" style="margin-bottom:0;">
-              <div class="unit-suffix"><input type="number" id="adjustmentValueInput" step="0.5" placeholder="0,00"><span>€</span></div>
-            </div>
-            <div class="field" style="margin-bottom:0;">
-              <select id="adjustmentReasonSelect">
-                <option value="">Motivo do ajuste…</option>
-                <option value="Pequena quantidade">Pequena quantidade</option>
-                <option value="Urgência">Urgência</option>
-                <option value="Cliente habitual">Cliente habitual</option>
-                <option value="Concorrência">Concorrência</option>
-                <option value="Complexidade">Complexidade</option>
-                <option value="Desperdício de chapa">Desperdício de chapa</option>
-                <option value="Outro">Outro</option>
-              </select>
-            </div>
-          </div>
-        </div>
         <div class="breakdown-row" id="adjustmentRow" hidden><span class="lbl">Ajuste comercial<small id="adjustmentSub">—</small></span><span class="val" id="adjustmentValueShown">€0,00</span></div>
 
         <div class="breakdown-row" style="border-top:1.5px solid var(--border); margin-top:4px; padding-top:12px;"><span class="lbl" style="font-weight:600; color:var(--text);">Custo total da encomenda <small>(sem IVA)<span id="totalQtyTag"></span></small></span><span class="val" id="totalValue" style="font-size:16px; color:var(--readout);">€0,00</span></div>
