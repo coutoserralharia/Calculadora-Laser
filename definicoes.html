@@ -89,6 +89,10 @@
           <label>Alertar tempo real em falta após</label>
           <div class="unit-suffix"><input type="number" id="alertRealTimeDays" step="1" min="1"><span>dias</span></div>
         </div>
+        <div class="field">
+          <label>Alertar cópia de segurança em falta após</label>
+          <div class="unit-suffix"><input type="number" id="alertBackupDays" step="1" min="1"><span>dias</span></div>
+        </div>
       </div>
       <p class="save-hint" style="margin:-6px 0 12px;">Controlam os avisos que aparecem no Dashboard.</p>
       <div class="field-row">
@@ -255,7 +259,7 @@ create policy "public access"
   const hourlyRateInp = $('hourlyRate'), designRateInp = $('designRate'), pierceTimeInp = $('pierceTime');
   const setupRateInp = $('setupRate'), defaultSetupMinInp = $('defaultSetupMin'), wasteMarginMmInp = $('wasteMarginMm');
   const areaBasisSel = $('areaBasis');
-  const alertQuoteDaysInp = $('alertQuoteDays'), alertRealTimeDaysInp = $('alertRealTimeDays');
+  const alertQuoteDaysInp = $('alertQuoteDays'), alertRealTimeDaysInp = $('alertRealTimeDays'), alertBackupDaysInp = $('alertBackupDays');
   const angleCutFactorInp = $('angleCutFactor');
 
   function applyMachineToInputs(){
@@ -268,9 +272,10 @@ create policy "public access"
     wasteMarginMmInp.value = state.machine.wasteMarginMm ?? 5;
     alertQuoteDaysInp.value = state.machine.alertQuoteDays ?? 7;
     alertRealTimeDaysInp.value = state.machine.alertRealTimeDays ?? 2;
+    alertBackupDaysInp.value = state.machine.alertBackupDays ?? 14;
     angleCutFactorInp.value = state.machine.angleCutFactor ?? 1.4;
   }
-  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, setupRateInp, defaultSetupMinInp, wasteMarginMmInp, alertQuoteDaysInp, alertRealTimeDaysInp, angleCutFactorInp].forEach(inp=>{
+  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, setupRateInp, defaultSetupMinInp, wasteMarginMmInp, alertQuoteDaysInp, alertRealTimeDaysInp, alertBackupDaysInp, angleCutFactorInp].forEach(inp=>{
     inp.addEventListener('input', ()=>{
       state.machine.hourlyRate = parseFloat(hourlyRateInp.value)||0;
       state.machine.designRate = parseFloat(designRateInp.value)||0;
@@ -281,6 +286,7 @@ create policy "public access"
       state.machine.wasteMarginMm = parseFloat(wasteMarginMmInp.value)||0;
       state.machine.alertQuoteDays = parseInt(alertQuoteDaysInp.value,10)||7;
       state.machine.alertRealTimeDays = parseInt(alertRealTimeDaysInp.value,10)||2;
+      state.machine.alertBackupDays = parseInt(alertBackupDaysInp.value,10)||14;
       state.machine.angleCutFactor = parseFloat(angleCutFactorInp.value)||1.4;
       saveMachine(state.machine);
     });

@@ -442,6 +442,7 @@
   });
 
   $('exportOrdersBtn').addEventListener('click', ()=>{
+    try{ localStorage.setItem('laser_last_backup', new Date().toISOString()); }catch(e){}
     const blob = new Blob([JSON.stringify(state.orders, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

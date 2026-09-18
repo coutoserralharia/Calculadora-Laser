@@ -790,6 +790,23 @@
       });
     }
 
+    // Lembrete de cópia de segurança — só faz sentido depois de haver dados que valha a pena
+    // guardar, e não incomoda logo no início (instalação nova, poucas encomendas).
+    const backupDays = machine.alertBackupDays ?? 14;
+    const liveOrders = (orders||[]).filter(o=>o.orderState!=='cancelled');
+    if(liveOrders.length >= 5){
+      let lastBackup = null;
+      try{ lastBackup = localStorage.getItem('laser_last_backup'); }catch(e){}
+      const daysSince = lastBackup ? Math.floor((now - new Date(lastBackup).getTime())/dayMs) : null;
+      if(daysSince === null || daysSince > backupDays){
+        alerts.push({
+          kind:'warning', title:'Cópia de segurança',
+          detail: daysSince===null ? 'Nunca exportou as encomendas' : ('Última cópia há ' + daysSince + ' dias'),
+          action:'Exportar', href:'encomendas.html',
+        });
+      }
+    }
+
     (accuracy||[]).forEach(row=>{
       if(row.count >= 5 && Math.abs(row.avgDeviationPct) >= 3 && row.materialId){
         alerts.push({

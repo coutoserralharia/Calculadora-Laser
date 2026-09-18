@@ -130,7 +130,15 @@
   const params = new URLSearchParams(location.search);
   const orderId = params.get('id');
 
-  const state = { rec: null, orders: [], remote: { configured:false, url:'', key:'' } };
+  const state = { rec: null, orders: [], remote: { configured:false, url:'', key:'' }, dirty: false, closed: false };
+
+  $('realTimeInput').addEventListener('input', ()=>{ state.dirty = true; });
+  window.addEventListener('beforeunload', e=>{
+    if(state.dirty && !state.closed){
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
 
   function drawDXF(dxfText){
     const box = $('drawingBox');
@@ -296,8 +304,8 @@
           '<button class="ghost-btn" id="mLater" type="button" style="flex:1;">Agora não</button>' +
         '</div>' +
       '</div></div>';
-    $('mPrintNow').addEventListener('click', ()=>{ host.innerHTML=''; doPrintInternal(); setTimeout(()=>{ location.href='producao.html'; }, 300); });
-    $('mLater').addEventListener('click', ()=>{ host.innerHTML=''; location.href='producao.html'; });
+    $('mPrintNow').addEventListener('click', ()=>{ host.innerHTML=''; state.closed = true; doPrintInternal(); setTimeout(()=>{ location.href='producao.html'; }, 300); });
+    $('mLater').addEventListener('click', ()=>{ host.innerHTML=''; state.closed = true; location.href='producao.html'; });
   }
 
   $('btnDone').addEventListener('click', async ()=>{
@@ -332,6 +340,7 @@
     hint.style.color = ''; hint.textContent = 'A gravar…';
     try{
       await persist(null, 'cancelled');
+      state.closed = true;
       location.href = 'producao.html';
     }catch(err){
       hint.style.color = 'var(--danger)';
