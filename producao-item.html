@@ -301,6 +301,10 @@
   }
 
   $('btnDone').addEventListener('click', async ()=>{
+    const raw0 = $('realTimeInput').value.trim();
+    if(raw0 === ''){
+      if(!confirm('Ainda não registaste o tempo de corte real.\n\nSe concluíres assim, o preço fica com o valor estimado e este indicador nunca mais desaparece do Dashboard. Continuar mesmo sem tempo real?')) return;
+    }
     const btn = $('btnDone'), hint = $('closeHint');
     const raw = $('realTimeInput').value.trim();
     const val = parseFloat(raw);

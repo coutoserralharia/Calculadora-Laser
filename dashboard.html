@@ -182,7 +182,7 @@
     const isCancelled = o => o.orderState === 'cancelled';
     const live = orders.filter(o => !isCancelled(o));
     const thisMonth = live.filter(o => o.createdAt && new Date(o.createdAt) >= monthStart);
-    const pending = live.filter(o => o.costSnapshot && !o.costSnapshot.isFinal);
+    const pending = live.filter(o => (o.orderState||'production') === 'production' && o.costSnapshot && !o.costSnapshot.isFinal);
     // Faturado real = só o que foi mesmo produzido (Em produção + Concluído).
     // Orçamentos ainda por confirmar contam à parte, para não inflacionar o valor do mês.
     const isQuote = o => o.orderState === 'quote';
