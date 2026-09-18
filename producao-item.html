@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Fechar Encomenda — Custo de Corte Laser</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111417">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Custo Laser">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('laser_theme')||'dark');</script>
+<style>
+  .layout-single{max-width:640px; margin:0 auto;}
+  .pi-id-card{margin-bottom:16px;}
+  .pi-id-num{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin:0 0 4px;}
+  .pi-id-name{font-size:19px; font-weight:600; margin:0 0 4px; color:var(--text);}
+  .pi-id-client{font-size:13.5px; color:var(--text-muted); margin:0;}
+  .pi-drawing{
+    height:220px; background:var(--panel-2); border-radius:var(--radius); margin-bottom:14px;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+  .pi-drawing canvas{max-width:100%; max-height:100%;}
+  .pi-drawing .pi-noprev{font-size:12.5px; color:var(--text-dim);}
+  .pi-specs{display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13.5px;}
+  .pi-specs .k{color:var(--text-dim); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin:0 0 3px;}
+  .pi-specs .v{color:var(--text); margin:0;}
+  .pi-price-row{display:flex; justify-content:space-between; align-items:center; font-size:13.5px; padding:7px 0;}
+  .pi-price-row .lbl{color:var(--text-muted);}
+  .pi-price-row .val{font-family:'JetBrains Mono',monospace;}
+  .pi-price-final{border-top:1.5px solid var(--border); margin-top:8px; padding-top:12px; font-size:15px; font-weight:600;}
+  .pi-price-final .val{color:var(--readout); font-size:18px;}
+  .pi-real-input{margin:14px 0 4px; padding-top:12px; border-top:1px solid var(--border-soft);}
+  .pi-real-input label{display:block; font-size:12px; color:var(--text-muted); margin-bottom:7px;}
+  .pi-close-btns{display:flex; gap:10px; margin-top:16px;}
+  .pi-btn{
+    flex:1; border:none; padding:13px; font-size:13.5px; font-weight:600; border-radius:var(--radius);
+    cursor:pointer; font-family:'Inter',sans-serif; display:flex; align-items:center; justify-content:center; gap:7px;
+  }
+  .pi-btn-done{background:#1ea672; color:#062e1f;}
+  .pi-btn-done:hover{filter:brightness(1.08);}
+  .pi-btn-cancel{background:var(--danger); color:#3a0a0a;}
+  .pi-btn-cancel:hover{filter:brightness(1.08);}
+  .pi-btn:disabled{opacity:.5; cursor:default;}
+  .pi-modal-veil{
+    position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.55);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .pi-modal{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:22px; max-width:360px; width:100%;}
+  .pi-modal-title{display:flex; align-items:center; gap:9px; margin:0 0 10px; font-size:15px; font-weight:600; color:var(--readout);}
+  .pi-modal-text{font-size:13px; color:var(--text-muted); margin:0 0 18px; line-height:1.5;}
+  .pi-modal-btns{display:flex; gap:10px;}
+  .pi-back-link{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text-muted); text-decoration:none; margin-bottom:14px;}
+  .pi-back-link:hover{color:var(--text);}
+</style>
+</head>
+<body>
+<div class="loading-veil" id="loadingVeil"><div class="lv-inner"><span class="lv-spin"></span>A carregar…</div></div>
+
+<div class="wrap">
+
+    <nav class="pagenav">
+      <div class="nav-brand"><img src="logo-mark.svg" alt="" class="nav-logo"><span class="nav-name">JGPVC<em>LASER</em></span></div>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="index.html">Encomenda Chapa</a>
+      <a href="tubo.html">Encomenda Tubo</a>
+      <a href="producao.html" class="active">Produção</a>
+      <a href="encomendas.html">Histórico</a>
+      <a href="definicoes.html">Definições</a>
+      <button class="nav-theme-toggle" id="themeToggleBtn" type="button" title="Alternar modo claro/escuro">
+        <svg class="icon-moon" width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M13.5 9.5A6 6 0 016.5 2.5a6 6 0 106.999 7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <svg class="icon-sun" width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M8 1v1.6M8 13.4V15M15 8h-1.6M2.6 8H1M12.7 3.3l-1.1 1.1M4.4 11.6l-1.1 1.1M12.7 12.7l-1.1-1.1M4.4 4.4L3.3 3.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span id="themeToggleLabel">Modo claro</span>
+      </button>
+    </nav>
+
+  <main class="layout-single">
+    <a class="pi-back-link" href="producao.html">← Voltar à Produção</a>
+
+    <div class="card pi-id-card" id="idCard">
+      <p class="pi-id-num">—</p>
+      <p class="pi-id-name">A carregar…</p>
+      <p class="pi-id-client">—</p>
+    </div>
+
+    <div class="card">
+      <div class="pi-drawing" id="drawingBox"><span class="pi-noprev">—</span></div>
+      <div class="pi-specs" id="specsGrid"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title"><span class="dot"></span>Resumo do preço</h2>
+      <div class="pi-price-row"><span class="lbl">Custo total estimado</span><span class="val" id="estTotal">—</span></div>
+      <div class="pi-price-row"><span class="lbl">Preço por peça estimado</span><span class="val" id="estPerPiece">—</span></div>
+
+      <div class="pi-real-input">
+        <label for="realTimeInput">Tempo de corte real — total, todas as peças (min)</label>
+        <div class="unit-suffix"><input type="number" id="realTimeInput" min="0" step="0.1" placeholder="deixe vazio para manter a estimativa"><span>min</span></div>
+      </div>
+
+      <div class="pi-price-row pi-price-final"><span class="lbl">Preço final corrigido</span><span class="val" id="finalTotal">—</span></div>
+    </div>
+
+    <div class="pi-close-btns">
+      <button class="pi-btn pi-btn-done" id="btnDone" type="button">✓ Concluída</button>
+      <button class="pi-btn pi-btn-cancel" id="btnCancel" type="button">✕ Cancelada</button>
+    </div>
+    <p class="save-hint" id="closeHint" style="margin-top:10px;"></p>
+  </main>
+
+</div>
+
+<div id="printModalHost"></div>
+<div id="printSheet" class="print-sheet"></div>
+
+<script src="shared.js"></script>
+<script>
+(function(){
+  "use strict";
+  const { fmtEUR, fmtNum, escapeHtml, parseDXF, loadOrders, loadRemoteConfig,
+    remoteLoadOrders, remoteUpdateFullOrder, saveOrders, recomputeFinalCost, registerServiceWorker } = window.LC;
+
+  const $ = id => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const orderId = params.get('id');
+
+  const state = { rec: null, orders: [], remote: { configured:false, url:'', key:'' } };
+
+  function drawDXF(dxfText){
+    const box = $('drawingBox');
+    if(!dxfText){ box.innerHTML = '<span class="pi-noprev">Sem ficheiro DXF — encomenda por dimensões manuais</span>'; return; }
+    let result;
+    try{ result = parseDXF(dxfText); }
+    catch(e){ box.innerHTML = '<span class="pi-noprev">Não foi possível reconstruir o desenho</span>'; return; }
+    const canvas = document.createElement('canvas');
+    const dpr = window.devicePixelRatio || 1;
+    const w = box.clientWidth || 500, h = 220;
+    canvas.width = w*dpr; canvas.height = h*dpr;
+    canvas.style.width = w+'px'; canvas.style.height = h+'px';
+    box.innerHTML = ''; box.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    const bbox = result.bbox;
+    if(!bbox || !isFinite(bbox.maxX-bbox.minX) || (bbox.maxX-bbox.minX)<=0){
+      box.innerHTML = '<span class="pi-noprev">Desenho vazio</span>'; return;
+    }
+    const pad = 20;
+    const sx = (w-2*pad)/(bbox.maxX-bbox.minX), sy = (h-2*pad)/(bbox.maxY-bbox.minY);
+    const scale = Math.min(sx, sy);
+    const ox = pad + ((w-2*pad) - (bbox.maxX-bbox.minX)*scale)/2 - bbox.minX*scale;
+    const oy = pad + ((h-2*pad) - (bbox.maxY-bbox.minY)*scale)/2 - bbox.minY*scale;
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    ctx.strokeStyle = isLight ? '#20242a' : '#e9e6df';
+    ctx.lineWidth = 1.3;
+    (result.contours||[]).forEach(c=>{
+      if(!c.points || !c.points.length) return;
+      ctx.beginPath();
+      c.points.forEach((p,i)=>{
+        const x = ox + p.x*scale, y = h - (oy + p.y*scale);
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      });
+      if(c.closed) ctx.closePath();
+      ctx.stroke();
+    });
+  }
+
+  function renderOrder(){
+    const rec = state.rec;
+    const cs = rec.costSnapshot || {};
+    const isTube = rec.pieceType === 'tube';
+    const ms = rec.materialSnapshot;
+
+    $('idCard').innerHTML =
+      '<p class="pi-id-num">' + escapeHtml(rec.orderNumber||'—') + '</p>' +
+      '<p class="pi-id-name">' + escapeHtml(rec.orderName||'Sem nome') + '</p>' +
+      '<p class="pi-id-client">' + escapeHtml(rec.client||'Sem cliente') + '</p>';
+
+    if(isTube){
+      const t = rec.tubeInputs || {};
+      $('drawingBox').innerHTML = '<span class="pi-noprev">Peça em tubo — ' + escapeHtml((ms&&ms.name)||'') + '</span>';
+      $('specsGrid').innerHTML =
+        '<div><p class="k">Perfil</p><p class="v">' + escapeHtml((ms&&ms.name)||'—') + '</p></div>' +
+        '<div><p class="k">Quantidade</p><p class="v">' + (rec.quantity||1) + ' peças</p></div>' +
+        '<div><p class="k">Comprimento de barra</p><p class="v">' + (t.barLengthMm!=null ? fmtNum(t.barLengthMm,0)+' mm' : '—') + '</p></div>' +
+        '<div><p class="k">Cortes</p><p class="v">' + (t.straightCuts||0) + ' reto(s) + ' + (t.angleCuts||0) + ' ângulo</p></div>';
+    } else {
+      drawDXF(rec.dxfText);
+      $('specsGrid').innerHTML =
+        '<div><p class="k">Material</p><p class="v">' + escapeHtml((ms&&ms.name)||'—') + '</p></div>' +
+        '<div><p class="k">Espessura</p><p class="v">' + (ms ? ms.thickness+' mm' : '—') + '</p></div>' +
+        '<div><p class="k">Medidas</p><p class="v">' + (cs.geoSnapshot && cs.geoSnapshot.widthMm ? fmtNum(cs.geoSnapshot.widthMm,0)+' x '+fmtNum(cs.geoSnapshot.heightMm,0)+' mm' : '—') + '</p></div>' +
+        '<div><p class="k">Quantidade</p><p class="v">' + (rec.quantity||1) + ' peças</p></div>';
+    }
+
+    const estTotal = cs.isFinal ? null : cs.totalCost;
+    $('estTotal').textContent = isFinite(cs.totalCost) ? fmtEUR(cs.totalCost) : '—';
+    $('estPerPiece').textContent = isFinite(cs.avgPerPiece) ? fmtEUR(cs.avgPerPiece) : '—';
+    if(cs.isFinal && isFinite(cs.cuttingTimeMin)) $('realTimeInput').value = cs.cuttingTimeMin.toFixed(1);
+    updateFinalPreview();
+  }
+
+  function updateFinalPreview(){
+    const val = parseFloat($('realTimeInput').value);
+    const cs = state.rec.costSnapshot || {};
+    if(!Number.isFinite(val) || val < 0){ $('finalTotal').textContent = isFinite(cs.totalCost) ? fmtEUR(cs.totalCost) : '—'; return; }
+    $('finalTotal').textContent = 'a calcular…';
+    recomputeFinalCost(state.rec, val).then(newCs=>{
+      $('finalTotal').textContent = isFinite(newCs.totalCost) ? fmtEUR(newCs.totalCost) : '—';
+    }).catch(()=>{ $('finalTotal').textContent = '—'; });
+  }
+  let debounceT;
+  $('realTimeInput').addEventListener('input', ()=>{
+    clearTimeout(debounceT);
+    debounceT = setTimeout(updateFinalPreview, 300);
+  });
+
+  async function persist(newCostSnapshot, newState){
+    const rec = state.rec;
+    rec.orderState = newState;
+    if(newCostSnapshot) rec.costSnapshot = newCostSnapshot;
+    if(state.remote.configured){
+      await remoteUpdateFullOrder(state.remote, rec.id, rec);
+    } else {
+      const idx = state.orders.findIndex(o=>o.id===rec.id);
+      if(idx>=0) state.orders[idx] = rec; else state.orders.unshift(rec);
+      await saveOrders(state.orders);
+    }
+  }
+
+  function pRow(label, value){
+    return '<div class="p-row"><span class="p-label">'+label+'</span><span class="p-value">'+value+'</span></div>';
+  }
+  function buildInternalSheet(){
+    const rec = state.rec, cs = rec.costSnapshot || {};
+    const isTube = rec.pieceType === 'tube';
+    const ms = rec.materialSnapshot;
+    const now = new Date();
+    let html = '<div class="p-logo"><img src="logo.svg" alt="Serralharia José Gabriel P. V. do Couto"></div>';
+    html += '<div class="p-title">Ficha Interna — Custos de Fabrico</div>';
+    html += '<div class="p-meta">Gerado em ' + now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) + '</div>';
+    html += '<div class="p-section">';
+    html += pRow('Nº da encomenda', escapeHtml(rec.orderNumber||'—'));
+    html += pRow('Encomenda / peça', escapeHtml(rec.orderName||'—'));
+    html += pRow('Cliente', escapeHtml(rec.client||'—'));
+    html += pRow(isTube?'Perfil':'Material', escapeHtml((ms&&ms.name)||'—') + (isTube||!ms ? '' : ' — '+ms.thickness+'mm'));
+    html += pRow('Quantidade', rec.quantity||1);
+    html += '</div>';
+    html += '<div class="p-section">';
+    html += '<div class="p-costs-title">Custo da encomenda</div>';
+    html += pRow('Custo total do material', isFinite(cs.materialCost) ? fmtEUR(cs.materialCost*(rec.quantity||1)) : '—');
+    html += pRow('Custo pré-corte', isFinite(cs.preCorteCost) ? fmtEUR(cs.preCorteCost) : '—');
+    html += pRow('Custo total do corte', isFinite(cs.corteCost) ? (fmtEUR(cs.corteCost)+' ('+fmtNum(cs.cuttingTimeMin,1)+' min, '+(cs.isFinal?'real':'estimado')+')') : '—');
+    if(cs.adjustmentValue){
+      html += pRow('Subtotal', fmtEUR(cs.subtotal));
+      html += pRow('Ajuste comercial' + (cs.adjustmentReason?' ('+escapeHtml(cs.adjustmentReason)+')':''), (cs.adjustmentValue>0?'+':'')+fmtEUR(cs.adjustmentValue));
+    }
+    html += '</div>';
+    html += '<div class="p-totals">';
+    html += '<div class="p-total-item p-total-main"><span>Total da encomenda — sem IVA</span><strong>' + (isFinite(cs.totalCost)?fmtEUR(cs.totalCost):'—') + '</strong></div>';
+    html += '<div class="p-total-item"><span>Total ÷ nº peças — sem IVA</span><strong>' + (isFinite(cs.avgPerPiece)?fmtEUR(cs.avgPerPiece):'—') + '</strong></div>';
+    html += '</div>';
+    if(isFinite(cs.realCost)){
+      html += '<div class="p-section p-margin-box"><div class="p-costs-title">Margem (uso interno)</div>';
+      html += pRow('Custo real para a empresa', fmtEUR(cs.realCost));
+      html += pRow('Margem', fmtEUR(cs.marginValue) + (cs.marginPct!=null?' · '+fmtNum(cs.marginPct,1)+'%':''));
+      html += '</div>';
+    }
+    const commentsText = (rec.comments||'').trim();
+    html += '<div class="p-notes-box"><div class="p-notes-title">Comentários</div>' +
+      (commentsText ? '<div class="p-notes-text">'+escapeHtml(commentsText).replace(/\n/g,'<br>')+'</div>' : '<div class="p-notes-lines"><span></span><span></span><span></span></div>') + '</div>';
+    html += '<div class="p-sign"><div>Operador: ______________________</div><div>Data: ______________</div></div>';
+    return html;
+  }
+  function doPrintInternal(){
+    $('printSheet').innerHTML = buildInternalSheet();
+    const orig = document.title;
+    document.title = ((state.rec.orderNumber||'')+' (custos) - '+(state.rec.orderName||'encomenda')).replace(/[\\/:*?"<>|]+/g,'_');
+    window.print();
+    setTimeout(()=>{ document.title = orig; }, 500);
+  }
+
+  function showPrintPrompt(){
+    const host = $('printModalHost');
+    host.innerHTML =
+      '<div class="pi-modal-veil"><div class="pi-modal">' +
+        '<p class="pi-modal-title">✓ Encomenda concluída</p>' +
+        '<p class="pi-modal-text">' + escapeHtml(state.rec.orderNumber||'') + ' foi gravada como concluída. Queres imprimir a ficha interna com os custos agora?</p>' +
+        '<div class="pi-modal-btns">' +
+          '<button class="pi-btn pi-btn-done" id="mPrintNow" type="button" style="flex:1;">Imprimir agora</button>' +
+          '<button class="ghost-btn" id="mLater" type="button" style="flex:1;">Agora não</button>' +
+        '</div>' +
+      '</div></div>';
+    $('mPrintNow').addEventListener('click', ()=>{ host.innerHTML=''; doPrintInternal(); setTimeout(()=>{ location.href='producao.html'; }, 300); });
+    $('mLater').addEventListener('click', ()=>{ host.innerHTML=''; location.href='producao.html'; });
+  }
+
+  $('btnDone').addEventListener('click', async ()=>{
+    const btn = $('btnDone'), hint = $('closeHint');
+    const raw = $('realTimeInput').value.trim();
+    const val = parseFloat(raw);
+    btn.disabled = true; $('btnCancel').disabled = true;
+    hint.style.color = ''; hint.textContent = 'A gravar…';
+    try{
+      let newCs = null;
+      if(raw !== '' && Number.isFinite(val) && val >= 0){
+        newCs = await recomputeFinalCost(state.rec, val);
+      }
+      await persist(newCs, 'done');
+      hint.textContent = '';
+      showPrintPrompt();
+    }catch(err){
+      hint.style.color = 'var(--danger)';
+      hint.textContent = 'Não foi possível gravar: ' + err.message;
+      btn.disabled = false; $('btnCancel').disabled = false;
+    }
+  });
+
+  $('btnCancel').addEventListener('click', async ()=>{
+    if(!confirm('Marcar esta encomenda como cancelada?\n\nFica registada no histórico, mas deixa de contar em faturação e totais.')) return;
+    const btn = $('btnCancel'), hint = $('closeHint');
+    btn.disabled = true; $('btnDone').disabled = true;
+    hint.style.color = ''; hint.textContent = 'A gravar…';
+    try{
+      await persist(null, 'cancelled');
+      location.href = 'producao.html';
+    }catch(err){
+      hint.style.color = 'var(--danger)';
+      hint.textContent = 'Não foi possível gravar: ' + err.message;
+      btn.disabled = false; $('btnDone').disabled = false;
+    }
+  });
+
+  async function init(){
+    if(!orderId){
+      document.querySelector('main').innerHTML = '<p class="orders-empty">Nenhuma encomenda indicada. <a href="producao.html">Voltar à Produção</a></p>';
+      $('loadingVeil').classList.add('done');
+      return;
+    }
+    state.remote = await loadRemoteConfig();
+    try{
+      state.orders = state.remote.configured ? await remoteLoadOrders(state.remote) : await loadOrders();
+    }catch(e){ state.orders = []; }
+    state.rec = state.orders.find(o=>o.id===orderId);
+    if(!state.rec){
+      document.querySelector('main').innerHTML = '<p class="orders-empty">Encomenda não encontrada. <a href="producao.html">Voltar à Produção</a></p>';
+      $('loadingVeil').classList.add('done');
+      return;
+    }
+    renderOrder();
+    $('loadingVeil').classList.add('done');
+  }
+  init();
+
+  registerServiceWorker();
+})();
+</script>
+</body>
+</html>

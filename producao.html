@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Produção — Custo de Corte Laser</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111417">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Custo Laser">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('laser_theme')||'dark');</script>
+<style>
+  .layout-single{max-width:1400px; margin:0 auto;}
+  .prod-empty-icon{font-size:13px; color:var(--text-dim); text-align:center; padding:30px 0;}
+</style>
+</head>
+<body>
+<div class="loading-veil" id="loadingVeil"><div class="lv-inner"><span class="lv-spin"></span>A carregar…</div></div>
+
+<div class="wrap">
+
+    <nav class="pagenav">
+      <div class="nav-brand"><img src="logo-mark.svg" alt="" class="nav-logo"><span class="nav-name">JGPVC<em>LASER</em></span></div>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="index.html">Encomenda Chapa</a>
+      <a href="tubo.html">Encomenda Tubo</a>
+      <a href="producao.html" class="active">Produção</a>
+      <a href="encomendas.html">Histórico</a>
+      <a href="definicoes.html">Definições</a>
+      <button class="nav-theme-toggle" id="themeToggleBtn" type="button" title="Alternar modo claro/escuro">
+        <svg class="icon-moon" width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M13.5 9.5A6 6 0 016.5 2.5a6 6 0 106.999 7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <svg class="icon-sun" width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M8 1v1.6M8 13.4V15M15 8h-1.6M2.6 8H1M12.7 3.3l-1.1 1.1M4.4 11.6l-1.1 1.1M12.7 12.7l-1.1-1.1M4.4 4.4L3.3 3.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span id="themeToggleLabel">Modo claro</span>
+      </button>
+    </nav>
+
+  <header class="top">
+    <div class="top-row">
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+          <rect x="1" y="1" width="32" height="32" rx="8" stroke="#2b3138" stroke-width="1.2"/>
+          <line x1="6" y1="17" x2="22" y2="17" stroke="#ff5a2e" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="25" cy="17" r="3.4" fill="#3fe8d4"/>
+          <path d="M4 24L30 24" stroke="#3a4149" stroke-width="1" stroke-dasharray="1 3"/>
+        </svg>
+        <div class="brand-text">
+          <p class="eyebrow">Corte Laser // Produção</p>
+          <h1>Produção</h1>
+        </div>
+      </div>
+      <p class="top-note">Só o que está em curso — abra uma encomenda para registar o tempo real e fechá-la.</p>
+    </div>
+  </header>
+
+  <main class="layout-single">
+
+    <div class="card">
+      <h2 class="card-title with-action">
+        <span class="title-left"><span class="dot"></span>Em produção <span class="conn-badge" id="connBadge" style="margin-left:8px;"></span></span>
+        <span class="alert-count" id="prodCount" style="margin-left:auto;"></span>
+      </h2>
+      <div id="productionList"></div>
+    </div>
+
+  </main>
+
+  <footer class="disclaimer">
+    Esta lista mostra apenas encomendas no estado "Em produção". Para orçamentos, concluídas ou canceladas, consulte o Histórico.
+  </footer>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+(function(){
+  "use strict";
+  const { fmtEUR, escapeHtml, stateBadgeHTML, loadOrders, loadRemoteConfig,
+    remoteLoadOrders, registerServiceWorker } = window.LC;
+
+  const $ = id => document.getElementById(id);
+  const state = { orders: [], remote: { configured:false, url:'', key:'' } };
+
+  function updateConnBadge(){
+    const badge = $('connBadge');
+    if(state.remote.configured){ badge.textContent = '● servidor central'; badge.className = 'conn-badge conn-online'; }
+    else { badge.textContent = '● só este aparelho'; badge.className = 'conn-badge conn-local'; }
+  }
+
+  function renderList(){
+    const rows = state.orders
+      .filter(o => (o.orderState||'production') === 'production')
+      .sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+
+    $('prodCount').textContent = rows.length;
+
+    if(!rows.length){
+      $('productionList').innerHTML = '<p class="prod-empty-icon">Nada em produção neste momento.</p>';
+      return;
+    }
+
+    let html = '<div class="hist-wrap"><table class="hist-table"><thead><tr>' +
+      '<th>Nº</th><th>Cliente</th><th>Peça</th><th>Tipo</th><th>Material</th>' +
+      '<th class="num">Qt.</th><th class="num">Total</th><th>Estado</th><th></th>' +
+      '</tr></thead><tbody>';
+    rows.forEach(o=>{
+      const cs = o.costSnapshot, ms = o.materialSnapshot;
+      const isTube = o.pieceType === 'tube';
+      const mat = ms ? (escapeHtml(ms.name) + (isTube ? '' : ' ' + ms.thickness + 'mm')) : '—';
+      html += '<tr>' +
+        '<td class="hist-num">' + escapeHtml(o.orderNumber||'—') + '</td>' +
+        '<td>' + escapeHtml(o.client||'—') + '</td>' +
+        '<td>' + escapeHtml(o.orderName||'—') + '</td>' +
+        '<td class="hist-dim">' + (isTube ? 'Tubo' : 'Chapa') + '</td>' +
+        '<td class="hist-dim">' + mat + '</td>' +
+        '<td class="num">' + (o.quantity||1) + '</td>' +
+        '<td class="num hist-mono hist-price">' + (cs ? fmtEUR(cs.totalCost) : '—') + '</td>' +
+        '<td>' + stateBadgeHTML(o.orderState) + '</td>' +
+        '<td class="hist-actions"><a class="ghost-btn sm" style="text-decoration:none;" href="producao-item.html?id=' + encodeURIComponent(o.id) + '">Abrir</a></td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+    $('productionList').innerHTML = html;
+  }
+
+  async function init(){
+    state.remote = await loadRemoteConfig();
+    updateConnBadge();
+    try{
+      state.orders = state.remote.configured ? await remoteLoadOrders(state.remote) : await loadOrders();
+    }catch(err){
+      $('productionList').innerHTML = '<p class="orders-empty">Não foi possível carregar as encomendas: ' + escapeHtml(err.message) + '</p>';
+      $('loadingVeil').classList.add('done');
+      return;
+    }
+    renderList();
+    $('loadingVeil').classList.add('done');
+  }
+  init();
+
+  registerServiceWorker();
+})();
+</script>
+</body>
+</html>
