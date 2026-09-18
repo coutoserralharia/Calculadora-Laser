@@ -65,23 +65,21 @@
           <span class="title-left"><span class="dot"></span>Dados da encomenda</span>
           <button class="ghost-btn sm" id="newOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M13 8A5 5 0 113 8" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M13 3v3.5H9.5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Nova encomenda</button>
         </h2>
-        <div class="field-row">
-          <div class="field"><label for="orderName">Nome da encomenda / peça</label><input type="text" id="orderName" placeholder="Ex: Suporte L-240"></div>
-          <div class="field">
+        <div class="field-row4" style="margin-bottom:0;">
+          <div class="field" style="margin-bottom:0;"><label for="orderName">Nome / peça</label><input type="text" id="orderName" placeholder="Ex: Suporte L-240"></div>
+          <div class="field" style="margin-bottom:0;">
             <label for="clientName">Cliente</label>
             <div class="autocomplete-wrap">
               <input type="text" id="clientName" placeholder="Ex: Metalúrgica Silva, Lda." autocomplete="off">
               <div class="autocomplete-list" id="clientSuggestions" hidden></div>
             </div>
           </div>
-        </div>
-        <div class="field-row" style="margin-bottom:0;">
           <div class="field" style="margin-bottom:0;">
-            <label for="orderNumberPreview">Nº da encomenda (automático)</label>
+            <label for="orderNumberPreview">Nº (auto)</label>
             <input type="text" id="orderNumberPreview" readonly>
           </div>
           <div class="field" style="margin-bottom:0;">
-            <label for="qtyInput">Quantidade de peças a produzir</label>
+            <label for="qtyInput">Quantidade</label>
             <input type="number" id="qtyInput" value="1" min="1" step="1">
           </div>
         </div>
@@ -99,7 +97,7 @@
             <option value="unit">1 peça só (multiplicar pela quantidade)</option>
             <option value="batch">Já é a chapa/corte de todas as peças juntas (não multiplicar)</option>
           </select>
-          <p class="save-hint" id="geometryScopeHint" style="margin-top:6px;">Usa a 2ª opção quando aninhas várias peças lado a lado no mesmo ficheiro/chapa para poupar material — a área e o tempo de corte já contam tudo, sem serem multiplicados pela quantidade.</p>
+          <p class="save-hint" id="geometryScopeHint" style="margin-top:6px;">Usa a 2ª opção quando aninhas peças no mesmo ficheiro — não multiplica pela quantidade.</p>
         </div>
 
         <!-- DXF PANEL -->
