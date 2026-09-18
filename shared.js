@@ -168,17 +168,52 @@
       }
     }
 
-    const allPoints = contours.reduce((acc,c)=>acc.concat(c.points), []);
+    // Muitos CAD exportam um contorno fechado como vários segmentos soltos (ex: um retângulo
+    // como 4 LINE separadas, em vez de uma polilinha) — cada um nasce "aberto" mas, juntos,
+    // formam uma forma fechada. Aqui juntam-se pelas pontas que coincidem, para a forma ser
+    // corretamente reconhecida como fechada (conta para as perfurações detetadas automaticamente).
+    // O perímetro total nunca muda com isto — já estava certo antes, é só a contagem de furos.
+    const STITCH_TOL = 0.01; // mm — tolerância para duas pontas serem "a mesma"
+    const same = (a,b) => dist(a,b) <= STITCH_TOL;
+    const closedIn = contours.filter(c=>c.closed);
+    const openIn = contours.filter(c=>!c.closed).map(c=>({points: c.points.slice(), used:false}));
+    const stitched = [];
+    for(let i=0;i<openIn.length;i++){
+      if(openIn[i].used) continue;
+      openIn[i].used = true;
+      let chain = openIn[i].points.slice();
+      let closedLoop = false;
+      let grew = true;
+      while(grew){
+        grew = false;
+        if(same(chain[0], chain[chain.length-1]) && chain.length>2){ closedLoop = true; break; }
+        for(let j=0;j<openIn.length;j++){
+          if(openIn[j].used) continue;
+          const p = openIn[j].points;
+          const tail = chain[chain.length-1];
+          if(same(tail, p[0])){ chain = chain.concat(p.slice(1)); openIn[j].used = true; grew = true; break; }
+          if(same(tail, p[p.length-1])){ chain = chain.concat(p.slice(0,-1).reverse()); openIn[j].used = true; grew = true; break; }
+          const head = chain[0];
+          if(same(head, p[p.length-1])){ chain = p.slice(0,-1).concat(chain); openIn[j].used = true; grew = true; break; }
+          if(same(head, p[0])){ chain = p.slice(1).reverse().concat(chain); openIn[j].used = true; grew = true; break; }
+        }
+      }
+      if(!closedLoop && chain.length>2 && same(chain[0], chain[chain.length-1])) closedLoop = true;
+      stitched.push(finalizeContour(chain, closedLoop));
+    }
+    const finalContours = closedIn.concat(stitched);
+
+    const allPoints = finalContours.reduce((acc,c)=>acc.concat(c.points), []);
     const xs=allPoints.map(p=>p.x), ys=allPoints.map(p=>p.y);
     const bbox = allPoints.length ? { minX:Math.min.apply(null,xs), maxX:Math.max.apply(null,xs), minY:Math.min.apply(null,ys), maxY:Math.max.apply(null,ys) } : null;
 
     return {
-      contours,
+      contours: finalContours,
       warnings: Array.from(warnings),
-      totalLength: contours.reduce((s,c)=>s+c.length,0),
+      totalLength: finalContours.reduce((s,c)=>s+c.length,0),
       bbox,
-      closedContours: contours.filter(c=>c.closed),
-      openContours: contours.filter(c=>!c.closed),
+      closedContours: finalContours.filter(c=>c.closed),
+      openContours: finalContours.filter(c=>!c.closed),
     };
   }
   LC.parseDXF = parseDXF;
