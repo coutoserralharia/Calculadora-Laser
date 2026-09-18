@@ -183,6 +183,7 @@
     height:260px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px;
     color:var(--text-dim); font-size:12.5px; text-align:center; padding:0 30px;
   }
+  .preview-empty[hidden]{display:none;}
   .preview-meta{display:flex; gap:0; padding:12px 16px 14px; border-top:1px solid var(--border-soft);}
   .card .preview-meta{margin:6px -18px -20px; padding:14px 18px 20px;}
   .meta-item{flex:1; text-align:left;}
