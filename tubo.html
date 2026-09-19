@@ -726,7 +726,16 @@
     const orderName = orderNameInp.value.trim();
     const modeTag = mode==='internal' ? ' (custos)' : (mode==='quote' ? ' (orcamento)' : '');
     document.title = sanitizeFileNamePart((orderNumber ? orderNumber + modeTag + ' - ' : '') + (orderName || 'encomenda')) || originalDocTitle;
-    window.print();
+    printWhenLogoReady();
+  }
+  function printWhenLogoReady(){
+    const img = printSheetEl.querySelector('.p-logo img');
+    if(!img || img.complete){ window.print(); return; }
+    let done = false;
+    const go = ()=>{ if(done) return; done = true; window.print(); };
+    img.addEventListener('load', go, {once:true});
+    img.addEventListener('error', go, {once:true});
+    setTimeout(go, 1200);
   }
   window.addEventListener('afterprint', ()=>{ document.title = originalDocTitle; });
   $('printOperatorBtn').addEventListener('click', ()=>doPrint('operator'));

@@ -1009,14 +1009,13 @@
       html += pRow('Dimensões (L × A)', (geo && geo.width) ? (fmtNum(geo.width,1) + ' × ' + fmtNum(geo.height,1) + ' mm') : '—');
       html += pRow('Perímetro de corte', geo ? (fmtNum(geo.perimeterMm/10,1) + ' cm') : '—');
       html += pRow('Nº de perfurações', geo ? geo.pierces : '—');
-      if(result.valid && result.weightPerPiece > 0) html += pRow('Peso de 1 peça', fmtNum(result.weightPerPiece,2) + ' kg');
+      if(result.valid && result.weightPerPiece > 0) html += pRow('Peso unitário (1 peça)', fmtNum(result.weightPerPiece,2) + ' kg');
+      if(result.valid && result.weightTotal > 0) html += pRow('Peso total', fmtNum(result.weightTotal,2) + ' kg');
       html += '</div>';
       html += '</div>';
 
       html += '<div class="p-section">';
       html += '<div class="p-costs-title">Custo da encomenda' + (result.valid ? '' : '') + '</div>';
-      html += pRow('Peso unitário (1 peça)', result.valid ? (fmtNum(result.weightPerPiece,2)+' kg') : '—');
-      html += pRow('Peso total', result.valid ? (fmtNum(result.weightTotal,2)+' kg') : '—');
       html += pRow('Custo total do material', result.valid ? fmtEUR(result.materialCostTotal) : '—');
       html += pRow('Custo pré-corte', result.valid ? fmtEUR(result.preCorteCost) : '—');
       if(result.valid){
@@ -1024,7 +1023,7 @@
         html += pRow('　· Desenho', drawLabel + (result.designTimeMin ? ' — '+result.designTimeMin+' min ('+fmtEUR(result.designCost)+')' : ' — sem custo'));
         html += pRow('　· Setup', result.setupTimeMin+' min ('+fmtEUR(result.setupCost)+')');
       }
-      html += pRow('Custo total do corte', result.valid ? (fmtEUR(result.corteCost)+' ('+fmtNum(result.cuttingTimeMin,1)+' min no total, estimado)') : '—');
+      html += pRow('Custo total do corte', result.valid ? (fmtEUR(result.corteCost)+' ('+fmtNum(result.cuttingTimeMin,1)+' min no total'+(result.isFinalDisplay?', real':', estimado')+')') : '—');
       if(result.valid && result.adjustmentValue){
         html += pRow('Subtotal', fmtEUR(result.subtotal));
         html += pRow('Ajuste comercial' + (result.adjustmentReason ? ' ('+escapeHtml(result.adjustmentReason)+')' : ''), (result.adjustmentValue>0?'+':'') + fmtEUR(result.adjustmentValue));
@@ -1073,7 +1072,16 @@
     const numberPart = orderNumber ? (orderNumber + modeTag + ' - ') : '';
     const fileName = sanitizeFileNamePart(numberPart + (orderName || 'encomenda'));
     document.title = fileName || originalDocTitle;
-    window.print();
+    printWhenLogoReady();
+  }
+  function printWhenLogoReady(){
+    const img = printSheetEl.querySelector('.p-logo img');
+    if(!img || img.complete){ window.print(); return; }
+    let done = false;
+    const go = ()=>{ if(done) return; done = true; window.print(); };
+    img.addEventListener('load', go, {once:true});
+    img.addEventListener('error', go, {once:true});
+    setTimeout(go, 1200); // rede à parte — nunca deixa o utilizador à espera indefinidamente
   }
   window.addEventListener('afterprint', ()=>{ document.title = originalDocTitle; });
 

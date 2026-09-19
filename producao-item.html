@@ -289,8 +289,17 @@
     $('printSheet').innerHTML = buildInternalSheet();
     const orig = document.title;
     document.title = ((state.rec.orderNumber||'')+' (custos) - '+(state.rec.orderName||'encomenda')).replace(/[\\/:*?"<>|]+/g,'_');
-    window.print();
-    setTimeout(()=>{ document.title = orig; }, 500);
+    window.addEventListener('afterprint', ()=>{ document.title = orig; }, {once:true});
+    printWhenLogoReady();
+  }
+  function printWhenLogoReady(){
+    const img = $('printSheet').querySelector('.p-logo img');
+    if(!img || img.complete){ window.print(); return; }
+    let done = false;
+    const go = ()=>{ if(done) return; done = true; window.print(); };
+    img.addEventListener('load', go, {once:true});
+    img.addEventListener('error', go, {once:true});
+    setTimeout(go, 1200);
   }
 
   function showPrintPrompt(){
