@@ -189,10 +189,12 @@
   }
   .preview-empty[hidden]{display:none;}
   .preview-meta{display:flex; gap:0; padding:12px 16px 14px; border-top:1px solid var(--border-soft);}
-  .card .preview-meta{margin:6px -18px -20px; padding:14px 18px 20px;}
+  .card .preview-meta{margin:6px -18px -16px; padding:14px 18px 16px;}
   .preview-card .preview-meta{margin:0; padding:12px 16px 14px;}
   .meta-item{flex:1; text-align:left;}
   .meta-item + .meta-item{border-left:1px solid var(--border-soft); padding-left:14px; margin-left:14px;}
+  .preview-meta-stack{flex-direction:column; gap:8px;}
+  .preview-meta-stack .meta-item + .meta-item{border-left:none; padding-left:0; margin-left:0; border-top:1px solid var(--border-soft); padding-top:8px;}
   .meta-item .k{font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:3px;}
   .meta-item .v{font-family:'JetBrains Mono', monospace; font-size:14.5px; color:var(--readout); font-weight:600;}
 
