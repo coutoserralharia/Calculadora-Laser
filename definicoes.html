@@ -17,10 +17,11 @@
 <link rel="stylesheet" href="shared.css">
 <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('laser_theme')||'dark');</script>
 <style>
-  .layout-single{max-width:1200px; margin:0 auto;}
+  .layout-single{max-width:1400px; margin:0 auto;}
 </style>
 </head>
 <body>
+<a href="#main" class="skip-link">Saltar para o conteúdo</a>
 <div class="wrap">
 
     <nav class="pagenav">
@@ -56,7 +57,7 @@
     </div>
   </header>
 
-  <main class="layout-single">
+  <main class="layout-single" id="main">
 
     <div class="card">
       <h2 class="card-title"><span class="dot"></span>Parâmetros da máquina</h2>
@@ -164,6 +165,24 @@
         </div>
         <p class="save-hint" id="remoteStatus"></p>
 
+        <div id="remoteAuthBox" hidden style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border-soft);">
+          <p class="save-hint" style="margin-bottom:10px;">Sessão de acesso — opcional, mas recomendado: sem sessão, qualquer pessoa com o link e a chave acima consegue aceder aos dados (ver aviso abaixo). Com sessão, só quem tiver este email/palavra-passe consegue.</p>
+          <div id="remoteAuthForm">
+            <div class="field-row">
+              <div class="field" style="margin-bottom:0;"><label for="remoteEmail">Email de acesso</label><input type="email" id="remoteEmail" placeholder="equipa@empresa.pt" autocomplete="username"></div>
+              <div class="field" style="margin-bottom:0;"><label for="remotePassword">Palavra-passe</label><input type="password" id="remotePassword" placeholder="••••••••" autocomplete="current-password"></div>
+            </div>
+            <div class="mat-actions" style="margin-top:10px;">
+              <button class="ghost-btn" id="remoteSignInBtn" type="button">Iniciar sessão</button>
+            </div>
+          </div>
+          <div id="remoteAuthSignedIn" hidden class="mat-actions">
+            <span class="save-hint" id="remoteAuthEmail" style="align-self:center;"></span>
+            <button class="ghost-btn" id="remoteSignOutBtn" type="button">Terminar sessão</button>
+          </div>
+          <p class="save-hint" id="remoteAuthStatus"></p>
+        </div>
+
         <details class="sub-details">
           <summary class="summary-row sub"><span>Como criar o projeto (uma vez, grátis)</span><span class="chev">▸</span></summary>
           <div class="details-body">
@@ -194,8 +213,30 @@ alter table orders enable row level security;
 create policy "public access"
   on orders for all
   using (true) with check (true);</code></pre>
-            <p class="warn">Esta política deixa a tabela acessível a quem tiver o link e a chave (que ficam visíveis no código da página). Adequado para uso interno da empresa, não para dados sensíveis ou públicos. Se um dia precisar de mais segurança (autenticação por utilizador), avise-me.</p>
+            <p class="warn">Esta política deixa a tabela acessível a quem tiver o link e a chave (que ficam visíveis no código da página). Veja abaixo como fechar isto com uma sessão de acesso.</p>
             <p class="save-hint">Se já tinha a tabela criada antes desta atualização, corra também: <code>alter table orders add column if not exists order_number text;</code></p>
+          </div>
+        </details>
+
+        <details class="sub-details">
+          <summary class="summary-row sub"><span>Fechar o acesso — recomendado, já têm dados em produção</span><span class="chev">▸</span></summary>
+          <div class="details-body">
+            <ol class="setup-steps">
+              <li>No painel do Supabase, vá a <strong>Authentication → Users → Add user</strong> e crie um email/palavra-passe para a equipa (pode ser só um, partilhado).</li>
+              <li>Use esse email/palavra-passe na secção "Sessão de acesso" acima e clique em <strong>Iniciar sessão</strong> — confirme que fica ligado sem erros.</li>
+              <li>Só depois de confirmar que a sessão funciona, corra este SQL no <strong>SQL Editor</strong> do Supabase para fechar o acesso público e impedir números de encomenda repetidos:</li>
+            </ol>
+            <pre class="sql-block"><code>-- Impede duas encomendas com o mesmo número (dois dispositivos a gravar ao mesmo tempo)
+alter table orders add constraint orders_order_number_unique unique (order_number);
+
+-- Fecha o acesso público: só quem tiver sessão iniciada (passo 1 e 2 acima) consegue ler/escrever
+drop policy "public access" on orders;
+
+create policy "só utilizadores autenticados"
+  on orders for all
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');</code></pre>
+            <p class="warn">Corra este SQL só depois de confirmar que consegue iniciar sessão — depois de trocar a política, o acesso sem sessão deixa de funcionar (incluindo em qualquer dispositivo antigo que ainda não tenha feito login).</p>
           </div>
         </details>
       </div>
@@ -310,7 +351,7 @@ create policy "public access"
         '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="pricePerKg" value="'+(m.pricePerKg||0)+'"></td>' +
         '<td><input type="number" step="1" min="0" data-i="'+i+'" data-f="markupPct" value="'+(m.markupPct||0)+'"></td>' +
         '<td class="mat-final-price">'+finalPrice.toFixed(2).replace('.',',')+' €</td>' +
-        '<td><button class="rm-btn" data-i="'+i+'" title="Remover">✕</button></td>';
+        '<td><button class="rm-btn" data-i="'+i+'" title="Remover" aria-label="Remover">✕</button></td>';
       materialsTbody.appendChild(tr);
     });
     materialsTbody.querySelectorAll('input').forEach(inp=>{
@@ -351,8 +392,8 @@ create policy "public access"
     renderMaterialsTable();
     saveMaterials(state.materials);
   });
-  $('resetMaterialsBtn').addEventListener('click', ()=>{
-    if(!confirm('Repor a tabela de materiais para os valores por defeito? Isto substitui todos os materiais atuais.')) return;
+  $('resetMaterialsBtn').addEventListener('click', async ()=>{
+    if(!(await window.LC.showConfirm('Repor a tabela de materiais para os valores por defeito? Isto substitui todos os materiais atuais.', {danger:true}))) return;
     state.materials = JSON.parse(JSON.stringify(DEFAULT_MATERIALS));
     renderMaterialsTable();
     saveMaterials(state.materials);
@@ -377,7 +418,7 @@ create policy "public access"
         '<td class="mat-final-price">'+finalPrice.toFixed(2).replace('.',',')+' €</td>' +
         '<td><input type="number" step="1" min="0" data-i="'+i+'" data-f="defaultWastePct" value="'+(p.defaultWastePct??10)+'"></td>' +
         '<td><input type="number" step="100" min="0" data-i="'+i+'" data-f="barLengthMm" value="'+(p.barLengthMm||6000)+'"></td>' +
-        '<td><button class="rm-btn" data-i="'+i+'" title="Remover">✕</button></td>';
+        '<td><button class="rm-btn" data-i="'+i+'" title="Remover" aria-label="Remover">✕</button></td>';
       tubeProfilesTbody.appendChild(tr);
     });
     tubeProfilesTbody.querySelectorAll('input').forEach(inp=>{
@@ -414,8 +455,8 @@ create policy "public access"
     renderTubeProfilesTable();
     saveTubeProfiles(state.tubeProfiles);
   });
-  $('resetTubeProfilesBtn').addEventListener('click', ()=>{
-    if(!confirm('Repor a tabela de perfis de tubo para os valores por defeito? Isto substitui todos os perfis atuais.')) return;
+  $('resetTubeProfilesBtn').addEventListener('click', async ()=>{
+    if(!(await window.LC.showConfirm('Repor a tabela de perfis de tubo para os valores por defeito? Isto substitui todos os perfis atuais.', {danger:true}))) return;
     state.tubeProfiles = JSON.parse(JSON.stringify(DEFAULT_TUBE_PROFILES));
     renderTubeProfilesTable();
     saveTubeProfiles(state.tubeProfiles);
@@ -435,7 +476,7 @@ create policy "public access"
     const file = e.target.files[0];
     if(!file) return;
     const reader = new FileReader();
-    reader.onload = ev => {
+    reader.onload = async ev => {
       try{
         const payload = JSON.parse(ev.target.result);
         if(Array.isArray(payload.materials) && payload.materials.length) state.materials = payload.materials;
@@ -448,7 +489,7 @@ create policy "public access"
         saveTubeProfiles(state.tubeProfiles);
         saveMachine(state.machine);
       }catch(err){
-        alert('Não foi possível ler este ficheiro de definições. Verifique se é o ficheiro exportado por esta ferramenta.');
+        await window.LC.showAlert('Não foi possível ler este ficheiro de definições. Verifique se é o ficheiro exportado por esta ferramenta.');
       }
       e.target.value = '';
     };
@@ -460,6 +501,20 @@ create policy "public access"
   /* ---------------------------------------------------------------- */
   const remoteUrlInp = $('remoteUrl'), remoteKeyInp = $('remoteKey');
   const remoteConnectBtn = $('remoteConnectBtn'), remoteDisconnectBtn = $('remoteDisconnectBtn'), remoteStatusEl = $('remoteStatus');
+  const remoteAuthBox = $('remoteAuthBox'), remoteAuthForm = $('remoteAuthForm'), remoteAuthSignedIn = $('remoteAuthSignedIn');
+  const remoteEmailInp = $('remoteEmail'), remotePasswordInp = $('remotePassword');
+  const remoteSignInBtn = $('remoteSignInBtn'), remoteSignOutBtn = $('remoteSignOutBtn');
+  const remoteAuthEmailEl = $('remoteAuthEmail'), remoteAuthStatusEl = $('remoteAuthStatus');
+
+  async function applyRemoteAuthUIState(){
+    remoteAuthBox.hidden = !state.remote.configured;
+    if(!state.remote.configured) return;
+    const session = await window.LC.loadRemoteSession();
+    const signedIn = !!(session && session.refresh_token);
+    remoteAuthForm.hidden = signedIn;
+    remoteAuthSignedIn.hidden = !signedIn;
+    if(signedIn) remoteAuthEmailEl.textContent = 'Sessão iniciada como ' + session.email;
+  }
 
   function applyRemoteUIState(){
     remoteUrlInp.value = state.remote.url || '';
@@ -476,7 +531,39 @@ create policy "public access"
       badge.textContent = '● só este aparelho';
       badge.className = 'conn-badge conn-local';
     }
+    applyRemoteAuthUIState();
   }
+
+  remoteSignInBtn.addEventListener('click', async ()=>{
+    const email = remoteEmailInp.value.trim();
+    const password = remotePasswordInp.value;
+    if(!email || !password){
+      remoteAuthStatusEl.style.color = 'var(--danger)';
+      remoteAuthStatusEl.textContent = 'Preencha o email e a palavra-passe.';
+      return;
+    }
+    remoteSignInBtn.disabled = true;
+    remoteAuthStatusEl.style.color = '';
+    remoteAuthStatusEl.textContent = 'A iniciar sessão…';
+    try{
+      await window.LC.remoteSignIn(state.remote, email, password);
+      remotePasswordInp.value = '';
+      remoteAuthStatusEl.style.color = 'var(--readout)';
+      remoteAuthStatusEl.textContent = 'Sessão iniciada.';
+      await applyRemoteAuthUIState();
+    }catch(err){
+      remoteAuthStatusEl.style.color = 'var(--danger)';
+      remoteAuthStatusEl.textContent = 'Não foi possível iniciar sessão: ' + err.message;
+    }
+    remoteSignInBtn.disabled = false;
+  });
+
+  remoteSignOutBtn.addEventListener('click', async ()=>{
+    await window.LC.remoteSignOut();
+    remoteAuthStatusEl.style.color = '';
+    remoteAuthStatusEl.textContent = 'Sessão terminada.';
+    await applyRemoteAuthUIState();
+  });
 
   remoteConnectBtn.addEventListener('click', async ()=>{
     const url = remoteUrlInp.value.trim();
@@ -608,7 +695,7 @@ create policy "public access"
 
   function bindApplyButtons(){
     $('accuracyResults').querySelectorAll('[data-apply]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
+      btn.addEventListener('click', async ()=>{
         const row = lastSummary[parseInt(btn.getAttribute('data-apply'),10)];
         const newSpeed = parseInt(btn.getAttribute('data-speed'),10);
         const list = row.pieceType==='tube' ? state.tubeProfiles : state.materials;
@@ -619,7 +706,7 @@ create policy "public access"
           'Nova: '+newSpeed+' mm/min\n\n' +
           'Baseado em '+row.count+' encomendas com tempo real registado. ' +
           'Só afeta cálculos novos — encomendas já guardadas não mudam.';
-        if(!confirm(msg)) return;
+        if(!(await window.LC.showConfirm(msg))) return;
         mat.speed = newSpeed;
         mat.speedCalibratedAt = new Date().toISOString();
         if(row.pieceType==='tube'){ saveTubeProfiles(state.tubeProfiles); renderTubeProfilesTable(); }
@@ -639,7 +726,7 @@ create policy "public access"
     try{
       let orders;
       if(state.remote.configured){
-        orders = await remoteLoadOrders(state.remote);
+        orders = await remoteLoadOrders(state.remote, {light:true});
       } else {
         orders = await loadOrders();
       }

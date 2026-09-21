@@ -22,6 +22,7 @@
 </style>
 </head>
 <body>
+<a href="#main" class="skip-link">Saltar para o conteúdo</a>
 <div class="loading-veil" id="loadingVeil"><div class="lv-inner"><span class="lv-spin"></span>A carregar…</div></div>
 
 <div class="wrap">
@@ -59,7 +60,7 @@
     </div>
   </header>
 
-  <main class="layout-single">
+  <main class="layout-single" id="main">
 
     <div class="card">
       <h2 class="card-title with-action">
@@ -133,7 +134,7 @@
     state.remote = await loadRemoteConfig();
     updateConnBadge();
     try{
-      state.orders = state.remote.configured ? await remoteLoadOrders(state.remote) : await loadOrders();
+      state.orders = state.remote.configured ? await remoteLoadOrders(state.remote, {light:true}) : await loadOrders();
     }catch(err){
       $('productionList').innerHTML = '<p class="orders-empty">Não foi possível carregar as encomendas: ' + escapeHtml(err.message) + '</p>';
       $('loadingVeil').classList.add('done');

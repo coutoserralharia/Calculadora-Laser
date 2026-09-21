@@ -328,11 +328,76 @@
   };
 
   /* ---------------------------------------------------------------- */
+  /* SESSÃO REMOTA (Supabase Auth) — opcional: se não houver sessão,    */
+  /* os pedidos continuam a usar só a anon key, como sempre.           */
+  /* ---------------------------------------------------------------- */
+  LC.loadRemoteSession = async function(){
+    const raw = await storageGet('laser_remote_session_v1');
+    if(raw){ try{ return JSON.parse(raw); }catch(e){} }
+    return null;
+  };
+  LC.saveRemoteSession = async function(session){
+    await storageSet('laser_remote_session_v1', JSON.stringify(session));
+  };
+  LC.clearRemoteSession = async function(){
+    await storageSet('laser_remote_session_v1', '');
+  };
+  LC.remoteSignIn = async function(remoteCfg, email, password){
+    const res = await fetch(remoteBase(remoteCfg) + '/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers: { apikey: remoteCfg.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error_description || data.msg || data.error || ('HTTP ' + res.status));
+    const session = {
+      access_token: data.access_token, refresh_token: data.refresh_token,
+      expires_at: Date.now() + (data.expires_in||3600)*1000, email: (data.user && data.user.email) || email,
+    };
+    await LC.saveRemoteSession(session);
+    return session;
+  };
+  LC.remoteSignOut = async function(){
+    await LC.clearRemoteSession();
+  };
+  async function remoteRefreshSession(remoteCfg, session){
+    try{
+      const res = await fetch(remoteBase(remoteCfg) + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        headers: { apikey: remoteCfg.key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: session.refresh_token }),
+      });
+      if(!res.ok) return null;
+      const data = await res.json();
+      const fresh = {
+        access_token: data.access_token, refresh_token: data.refresh_token || session.refresh_token,
+        expires_at: Date.now() + (data.expires_in||3600)*1000, email: session.email,
+      };
+      await LC.saveRemoteSession(fresh);
+      return fresh;
+    }catch(e){ return null; }
+  }
+  // Devolve um token de acesso válido (renovando-o se estiver perto de expirar), ou null se
+  // não houver sessão iniciada — nesse caso os pedidos caem para a anon key, como acontecia
+  // antes de existir login.
+  async function remoteEnsureSession(remoteCfg){
+    let session = await LC.loadRemoteSession();
+    if(!session || !session.refresh_token) return null;
+    if(session.expires_at - Date.now() < 60000){
+      session = await remoteRefreshSession(remoteCfg, session);
+      if(!session){ await LC.clearRemoteSession(); return null; }
+    }
+    return session.access_token;
+  }
+  LC.remoteEnsureSession = remoteEnsureSession;
+
+  /* ---------------------------------------------------------------- */
   /* REMOTE (Supabase REST) — all functions take remoteCfg explicitly  */
   /* ---------------------------------------------------------------- */
   function remoteBase(remoteCfg){ return remoteCfg.url.replace(/\/$/, ''); }
-  function remoteHeaders(remoteCfg, extra){
-    return Object.assign({ apikey: remoteCfg.key, Authorization: 'Bearer ' + remoteCfg.key }, extra || {});
+  async function remoteHeaders(remoteCfg, extra){
+    const token = (await remoteEnsureSession(remoteCfg)) || remoteCfg.key;
+    return Object.assign({ apikey: remoteCfg.key, Authorization: 'Bearer ' + token }, extra || {});
   }
   function orderToRow(o){
     return {
@@ -367,25 +432,27 @@
     try{ const j = await res.json(); msg = j.message || j.hint || ''; }catch(e){}
     return new Error('HTTP ' + res.status + (msg ? (' — ' + msg) : ''));
   }
-  LC.remoteLoadOrders = async function(remoteCfg){
-    const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?select=*&order=created_at.desc', { headers: remoteHeaders(remoteCfg) });
+  // Campos usados pelas páginas que só mostram tabelas/listagens — deliberadamente sem
+  // dxf_text, que pode ser um ficheiro DXF inteiro em texto e não serve para nada numa lista.
+  const ORDERS_LIST_FIELDS = 'id,client,order_name,order_number,created_at,mode,dxf_file_name,manual,material_id,material_snapshot,quantity,machine_snapshot,cost_snapshot,comments,client_ref,order_state,piece_type,was_quoted,tube_inputs';
+  LC.remoteLoadOrders = async function(remoteCfg, opts){
+    const fields = (opts && opts.light) ? ORDERS_LIST_FIELDS : '*';
+    const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?select=' + fields + '&order=created_at.desc', { headers: await remoteHeaders(remoteCfg) });
     if(!res.ok) throw await remoteRequestError(res);
     const rows = await res.json();
     return rows.map(rowToOrder);
   };
+  LC.remoteLoadOrderById = async function(remoteCfg, id){
+    const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?select=*&id=eq.' + encodeURIComponent(id), { headers: await remoteHeaders(remoteCfg) });
+    if(!res.ok) throw await remoteRequestError(res);
+    const rows = await res.json();
+    return rows.length ? rowToOrder(rows[0]) : null;
+  };
   LC.remoteInsertOrder = async function(remoteCfg, rec){
     const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders', {
       method: 'POST',
-      headers: remoteHeaders(remoteCfg, { 'Content-Type':'application/json', Prefer:'return=minimal' }),
+      headers: await remoteHeaders(remoteCfg, { 'Content-Type':'application/json', Prefer:'return=minimal' }),
       body: JSON.stringify(orderToRow(rec)),
-    });
-    if(!res.ok) throw await remoteRequestError(res);
-  };
-  LC.remoteUpdateOrder = async function(remoteCfg, id, costSnapshot){
-    const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?id=eq.' + encodeURIComponent(id), {
-      method: 'PATCH',
-      headers: remoteHeaders(remoteCfg, { 'Content-Type':'application/json', Prefer:'return=minimal' }),
-      body: JSON.stringify({ cost_snapshot: costSnapshot }),
     });
     if(!res.ok) throw await remoteRequestError(res);
   };
@@ -394,14 +461,14 @@
     delete row.id;
     const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?id=eq.' + encodeURIComponent(id), {
       method: 'PATCH',
-      headers: remoteHeaders(remoteCfg, { 'Content-Type':'application/json', Prefer:'return=minimal' }),
+      headers: await remoteHeaders(remoteCfg, { 'Content-Type':'application/json', Prefer:'return=minimal' }),
       body: JSON.stringify(row),
     });
     if(!res.ok) throw await remoteRequestError(res);
   };
   LC.remoteDeleteOrder = async function(remoteCfg, id){
     const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?id=eq.' + encodeURIComponent(id), {
-      method: 'DELETE', headers: remoteHeaders(remoteCfg),
+      method: 'DELETE', headers: await remoteHeaders(remoteCfg),
     });
     if(!res.ok) throw await remoteRequestError(res);
   };
@@ -427,7 +494,7 @@
     };
     if(remoteCfg && remoteCfg.configured){
       try{
-        const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?select=order_number&order_number=like.' + year + '_*', { headers: remoteHeaders(remoteCfg) });
+        const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?select=order_number&order_number=like.' + year + '_*', { headers: await remoteHeaders(remoteCfg) });
         if(res.ok) scan(await res.json());
       }catch(e){ /* fall back to whatever is already loaded locally */ }
     }
@@ -870,6 +937,67 @@
       sync();
     });
   })();
+
+  /* ---------------------------------------------------------------- */
+  /* MODAL DE CONFIRMAÇÃO / AVISO — substitui confirm()/alert() nativos */
+  /* para manter o estilo customizado da app em ações destrutivas.     */
+  /* ---------------------------------------------------------------- */
+  function buildModalOverlay(){
+    let overlay = document.getElementById('lcModalOverlay');
+    if(overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.id = 'lcModalOverlay';
+    overlay.className = 'lc-modal-overlay';
+    overlay.innerHTML = '<div class="lc-modal" role="alertdialog" aria-modal="true">' +
+      '<p class="lc-modal-msg"></p><div class="lc-modal-actions"></div></div>';
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+  function openModal(message, buttons){
+    return new Promise(resolve=>{
+      const overlay = buildModalOverlay();
+      overlay.querySelector('.lc-modal-msg').textContent = message;
+      const actions = overlay.querySelector('.lc-modal-actions');
+      actions.innerHTML = '';
+      let focusEl = null;
+      function close(result){
+        overlay.classList.remove('open');
+        document.removeEventListener('keydown', onKey);
+        resolve(result);
+      }
+      function onKey(e){
+        if(e.key==='Escape') close(buttons.escResult);
+      }
+      buttons.items.forEach(b=>{
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ghost-btn' + (b.cls ? ' '+b.cls : '');
+        btn.textContent = b.label;
+        btn.addEventListener('click', ()=>close(b.result), {once:true});
+        actions.appendChild(btn);
+        if(b.autofocus) focusEl = btn;
+      });
+      document.addEventListener('keydown', onKey);
+      overlay.classList.add('open');
+      if(focusEl) focusEl.focus();
+    });
+  }
+  LC.showConfirm = function(message, opts){
+    opts = opts || {};
+    return openModal(message, {
+      escResult: false,
+      items: [
+        { label: opts.cancelLabel || 'Cancelar', result:false },
+        { label: opts.okLabel || 'Confirmar', result:true, cls: opts.danger ? 'danger' : 'accent', autofocus:true },
+      ],
+    });
+  };
+  LC.showAlert = function(message){
+    return openModal(message, {
+      escResult: undefined,
+      items: [ { label:'OK', result:undefined, cls:'accent', autofocus:true } ],
+    });
+  };
 
   window.LC = LC;
 })();

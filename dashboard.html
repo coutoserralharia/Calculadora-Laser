@@ -66,6 +66,7 @@
 </style>
 </head>
 <body>
+<a href="#main" class="skip-link">Saltar para o conteúdo</a>
 <div class="wrap">
 
     <nav class="pagenav">
@@ -101,7 +102,7 @@
     </div>
   </header>
 
-  <main class="layout-single">
+  <main class="layout-single" id="main">
 
     <div class="kpi-grid" id="kpiGrid">
       <p class="orders-empty" style="grid-column:1/-1;">A carregar…</p>
@@ -335,7 +336,7 @@
     state.tubeProfiles = await loadTubeProfiles();
     updateConnBadge();
     try{
-      state.orders = state.remote.configured ? await remoteLoadOrders(state.remote) : await loadOrders();
+      state.orders = state.remote.configured ? await remoteLoadOrders(state.remote, {light:true}) : await loadOrders();
     }catch(err){
       state.orders = [];
       $('kpiGrid').innerHTML = '<p class="orders-empty" style="grid-column:1/-1;">Não foi possível carregar as encomendas: ' + escapeHtml(err.message) + '</p>';

@@ -21,6 +21,7 @@
 </style>
 </head>
 <body>
+<a href="#main" class="skip-link">Saltar para o conteúdo</a>
 <div class="wrap">
 
     <nav class="pagenav">
@@ -56,7 +57,7 @@
     </div>
   </header>
 
-  <main class="layout-single">
+  <main class="layout-single" id="main">
 
     <div class="card">
       <div class="hist-filters">
@@ -281,7 +282,7 @@
       html += '<td class="hist-actions">' +
         '<button class="ghost-btn sm" data-load="'+o.id+'" data-page="'+page+'">Abrir</button>' +
         '<button class="ghost-btn sm" data-dup="'+o.id+'" data-page="'+page+'" title="Criar encomenda nova a partir desta">Duplicar</button>' +
-        '<button class="rm-btn" data-del="'+o.id+'" title="Eliminar">✕</button>' +
+        '<button class="rm-btn" data-del="'+o.id+'" title="Eliminar" aria-label="Eliminar">✕</button>' +
       '</td>';
       html += '</tr>';
     });
@@ -340,11 +341,11 @@
       b.addEventListener('click', async ()=>{
         const id = b.getAttribute('data-del');
         const rec = state.orders.find(o=>o.id===id);
-        if(!confirm('Eliminar a encomenda "' + (rec ? (rec.orderName||'sem nome') : '') + '"?')) return;
+        if(!(await window.LC.showConfirm('Eliminar a encomenda "' + (rec ? (rec.orderName||'sem nome') : '') + '"?', {danger:true}))) return;
         b.disabled = true;
         if(state.remote.configured){
           try{ await remoteDeleteOrder(state.remote, id); }
-          catch(err){ alert('Não foi possível eliminar no servidor: ' + err.message); b.disabled = false; return; }
+          catch(err){ await window.LC.showAlert('Não foi possível eliminar no servidor: ' + err.message); b.disabled = false; return; }
         }
         state.orders = state.orders.filter(o=>o.id!==id);
         if(!state.remote.configured) saveOrders(state.orders);
@@ -476,7 +477,7 @@
         saveOrderHint.textContent = newOnes.length + ' encomenda(s) importada(s).';
         setTimeout(()=>{ saveOrderHint.textContent=''; }, 4000);
       }catch(err){
-        alert('Não foi possível importar este ficheiro de encomendas.');
+        await window.LC.showAlert('Não foi possível importar este ficheiro de encomendas.');
       }
       e.target.value = '';
     };
@@ -489,7 +490,7 @@
     if(state.remote.configured){
       showOrdersLoading('A carregar encomendas do servidor…');
       try{
-        state.orders = await remoteLoadOrders(state.remote);
+        state.orders = await remoteLoadOrders(state.remote, {light:true});
       }catch(err){
         state.orders = [];
         showOrdersLoading('Não foi possível contactar o servidor agora: ' + err.message);

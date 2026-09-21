@@ -18,6 +18,7 @@
 <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('laser_theme')||'dark');</script>
 </head>
 <body>
+<a href="#main" class="skip-link">Saltar para o conteúdo</a>
 <div class="loading-veil" id="loadingVeil"><div class="lv-inner"><span class="lv-spin"></span>A carregar materiais e definições…</div></div>
 
 <div class="wrap">
@@ -55,7 +56,7 @@
     </div>
   </header>
 
-  <main class="layout">
+  <main class="layout" id="main">
 
     <!-- LEFT: CONTROLS -->
     <section class="col">
@@ -254,7 +255,7 @@
         </div>
         <p class="save-hint" id="saveOrderHint"></p>
         <div class="next-steps" id="nextSteps" hidden>
-          <div class="ns-head"><span id="nextStepsMsg"></span><button type="button" class="ns-close" id="nsClose" title="Fechar">✕</button></div>
+          <div class="ns-head"><span id="nextStepsMsg"></span><button type="button" class="ns-close" id="nsClose" title="Fechar" aria-label="Fechar">✕</button></div>
           <div class="ns-actions">
             <button class="ghost-btn sm" id="nsPrintOperator" type="button">Ficha do operador</button>
             <button class="ghost-btn sm" id="nsPrintQuote" type="button">Orçamento</button>
@@ -272,7 +273,7 @@
         <div class="preview-head">
           <h2 class="card-title" style="margin-bottom:8px;"><span class="dot"></span>Pré-visualização do corte</h2>
         </div>
-        <canvas id="preview" width="600" height="260"></canvas>
+        <canvas id="preview" width="600" height="260" role="img" aria-label="Pré-visualização do percurso de corte da peça"></canvas>
         <div id="previewEmpty" class="preview-empty">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 3"/></svg>
           <span>Carregue um ficheiro DXF para ver o percurso de corte, ou use o modo manual</span>
@@ -743,9 +744,6 @@
     };
   }
 
-  function getEffectiveCostResult(){
-    return computeCost();
-  }
   realCuttingTimeInput.addEventListener('input', recalcAndRender);
   adjustmentValueInput.addEventListener('input', recalcAndRender);
   adjustmentReasonSelect.addEventListener('change', recalcAndRender);
@@ -828,6 +826,7 @@
       const longest = contoursToDraw.slice().sort((a,b)=>(b.points.length)-(a.points.length))[0];
       if(longest && longest.points.length>2){
         const animate = () => {
+          if(document.hidden){ animFrame = requestAnimationFrame(animate); return; }
           animT += 0.0032;
           const idxF = (animT % 1) * (longest.points.length-1);
           const i0 = Math.floor(idxF), i1 = Math.min(i0+1, longest.points.length-1);
@@ -923,7 +922,7 @@
   }
 
   function printSheetHTML(mode){
-    const result = getEffectiveCostResult();
+    const result = computeCost();
     const geo = result.geo;
     const material = result.material;
     const source = escapeHtml(state.dxfResult ? (state.dxfFileName || 'Ficheiro DXF') : describeManualShape());
@@ -1057,7 +1056,7 @@
     return String(s||'').trim().replace(/[\\/:*?"<>|]+/g,'_');
   }
   function doPrint(mode){
-    const result = getEffectiveCostResult();
+    const result = computeCost();
     if(!result.geo || !result.geo.perimeterMm){
       printHint.textContent = 'Adicione um ficheiro DXF ou preencha as dimensões antes de imprimir.';
       printHint.style.color = 'var(--danger)';
@@ -1198,10 +1197,10 @@
     });
   }
   statePicker.querySelectorAll('button').forEach(b=>{
-    b.addEventListener('click', ()=>{
+    b.addEventListener('click', async ()=>{
       const next = b.getAttribute('data-state');
       if(next === 'cancelled' && state.orderState !== 'cancelled'){
-        if(!confirm('Marcar esta encomenda como cancelada?\n\nFica registada no histórico com o mesmo número, mas deixa de contar em faturação, orçamentos pendentes e totais.')) return;
+        if(!(await window.LC.showConfirm('Marcar esta encomenda como cancelada?\n\nFica registada no histórico com o mesmo número, mas deixa de contar em faturação, orçamentos pendentes e totais.', {danger:true}))) return;
       }
       state.orderState = next;
       if(next === 'quote') state.wasQuoted = true;  // marca permanente, para a taxa de conversão
@@ -1214,7 +1213,7 @@
   /* RENDER                                                            */
   /* ---------------------------------------------------------------- */
   function recalcAndRender(){
-    const result = getEffectiveCostResult();
+    const result = computeCost();
     const geo = result.geo;
 
     drawPreview(geo);
@@ -1353,8 +1352,8 @@
     markClean();
     setMode('dxf');
   }
-  $('newOrderBtn').addEventListener('click', ()=>{
-    if(hasUnsavedFormContent() && !confirm('Isto limpa o formulário atual (nome, cliente, ficheiro/dimensões). Continuar?')) return;
+  $('newOrderBtn').addEventListener('click', async ()=>{
+    if(hasUnsavedFormContent() && !(await window.LC.showConfirm('Isto limpa o formulário atual (nome, cliente, ficheiro/dimensões). Continuar?'))) return;
     resetOrderForm();
   });
 
@@ -1488,7 +1487,7 @@
       return;
     }
     if(state.loadedOrderId && state.loadedCostSnapshot && state.loadedCostSnapshot.isFinal){
-      const ok = confirm('Esta encomenda (' + (state.loadedOrderNumber||'') + ') já está marcada como Final, com preço fechado. Tens a certeza que queres substituir os dados gravados?');
+      const ok = await window.LC.showConfirm('Esta encomenda (' + (state.loadedOrderNumber||'') + ') já está marcada como Final, com preço fechado. Tens a certeza que queres substituir os dados gravados?', {danger:true});
       if(!ok) return;
     }
     const saveLabelEl = $('saveOrderBtnLabel');
@@ -1496,11 +1495,11 @@
     saveOrderBtn.disabled = true;
     saveLabelEl.textContent = 'A guardar…';
     try{
-      const result = getEffectiveCostResult();
+      const result = computeCost();
       const material = getSelectedMaterial();
       const isUpdate = !!state.loadedOrderId;
       const id = isUpdate ? state.loadedOrderId : ('o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8));
-      const orderNumber = isUpdate ? state.loadedOrderNumber : await computeNextOrderNumber(state.remote, state.orders);
+      let orderNumber = isUpdate ? state.loadedOrderNumber : await computeNextOrderNumber(state.remote, state.orders);
       const createdAt = isUpdate ? state.loadedOrderCreatedAt : new Date().toISOString();
       const rec = {
         id,
@@ -1553,8 +1552,22 @@
         saveOrderHint.style.color = '';
         saveOrderHint.textContent = 'A guardar no servidor…';
         try{
-          if(isUpdate) await remoteUpdateFullOrder(state.remote, id, rec);
-          else await remoteInsertOrder(state.remote, rec);
+          if(isUpdate){
+            await remoteUpdateFullOrder(state.remote, id, rec);
+          } else {
+            // Dois dispositivos podem gerar o mesmo número quase ao mesmo tempo; a restrição
+            // UNIQUE na base de dados rejeita o duplicado e aqui tenta-se outra vez com o
+            // número seguinte em vez de deixar cair silenciosamente.
+            for(let attempt=0; ; attempt++){
+              try{ await remoteInsertOrder(state.remote, rec); break; }
+              catch(err){
+                const isDupNumber = /orders_order_number_unique|duplicate key/i.test(err.message||'');
+                if(!isDupNumber || attempt>=3) throw err;
+                orderNumber = await computeNextOrderNumber(state.remote, state.orders);
+                rec.orderNumber = orderNumber;
+              }
+            }
+          }
         }catch(err){
           saveOrderHint.style.color = 'var(--danger)';
           saveOrderHint.textContent = 'Não foi possível guardar no servidor: ' + err.message;

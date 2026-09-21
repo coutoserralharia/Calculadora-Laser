@@ -18,6 +18,7 @@
 <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('laser_theme')||'dark');</script>
 </head>
 <body>
+<a href="#main" class="skip-link">Saltar para o conteúdo</a>
 <div class="loading-veil" id="loadingVeil"><div class="lv-inner"><span class="lv-spin"></span>A carregar perfis e definições…</div></div>
 
 <div class="wrap">
@@ -55,7 +56,7 @@
     </div>
   </header>
 
-  <main class="layout">
+  <main class="layout" id="main">
 
     <!-- LEFT: CONTROLS -->
     <section class="col">
@@ -168,7 +169,7 @@
         </div>
         <p class="save-hint" id="saveOrderHint"></p>
         <div class="next-steps" id="nextSteps" hidden>
-          <div class="ns-head"><span id="nextStepsMsg"></span><button type="button" class="ns-close" id="nsClose" title="Fechar">✕</button></div>
+          <div class="ns-head"><span id="nextStepsMsg"></span><button type="button" class="ns-close" id="nsClose" title="Fechar" aria-label="Fechar">✕</button></div>
           <div class="ns-actions">
             <button class="ghost-btn sm" id="nsPrintOperator" type="button">Ficha do operador</button>
             <button class="ghost-btn sm" id="nsPrintQuote" type="button">Orçamento</button>
@@ -572,10 +573,10 @@
     });
   }
   statePicker.querySelectorAll('button').forEach(b=>{
-    b.addEventListener('click', ()=>{
+    b.addEventListener('click', async ()=>{
       const next = b.getAttribute('data-state');
       if(next === 'cancelled' && state.orderState !== 'cancelled'){
-        if(!confirm('Marcar esta encomenda como cancelada?\n\nFica registada no histórico com o mesmo número, mas deixa de contar em faturação, orçamentos pendentes e totais.')) return;
+        if(!(await window.LC.showConfirm('Marcar esta encomenda como cancelada?\n\nFica registada no histórico com o mesmo número, mas deixa de contar em faturação, orçamentos pendentes e totais.', {danger:true}))) return;
       }
       state.orderState = next;
       if(next === 'quote') state.wasQuoted = true;  // marca permanente, para a taxa de conversão
@@ -772,9 +773,9 @@
     recalcAndRender();
     markClean();
   }
-  $('newOrderBtn').addEventListener('click', ()=>{
+  $('newOrderBtn').addEventListener('click', async ()=>{
     if((orderNameInp.value.trim() || clientNameInp.value.trim()) &&
-       !confirm('Isto limpa o formulário atual. Continuar?')) return;
+       !(await window.LC.showConfirm('Isto limpa o formulário atual. Continuar?'))) return;
     resetOrderForm();
   });
 
@@ -870,7 +871,7 @@
       return;
     }
     if(state.loadedOrderId && state.loadedCostSnapshot && state.loadedCostSnapshot.isFinal){
-      if(!confirm('Esta encomenda (' + (state.loadedOrderNumber||'') + ') já está marcada como Final, com preço fechado. Tens a certeza que queres substituir os dados gravados?')) return;
+      if(!(await window.LC.showConfirm('Esta encomenda (' + (state.loadedOrderNumber||'') + ') já está marcada como Final, com preço fechado. Tens a certeza que queres substituir os dados gravados?', {danger:true}))) return;
     }
 
     const saveLabelEl = $('saveOrderBtnLabel');
@@ -880,7 +881,7 @@
     try{
       const isUpdate = !!state.loadedOrderId;
       const id = isUpdate ? state.loadedOrderId : ('o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8));
-      const orderNumber = isUpdate ? state.loadedOrderNumber : await computeNextOrderNumber(state.remote, state.orders);
+      let orderNumber = isUpdate ? state.loadedOrderNumber : await computeNextOrderNumber(state.remote, state.orders);
       const createdAt = isUpdate ? state.loadedOrderCreatedAt : new Date().toISOString();
 
       const rec = {
@@ -924,8 +925,19 @@
         saveOrderHint.style.color = '';
         saveOrderHint.textContent = 'A guardar no servidor…';
         try{
-          if(isUpdate) await remoteUpdateFullOrder(state.remote, id, rec);
-          else await remoteInsertOrder(state.remote, rec);
+          if(isUpdate){
+            await remoteUpdateFullOrder(state.remote, id, rec);
+          } else {
+            for(let attempt=0; ; attempt++){
+              try{ await remoteInsertOrder(state.remote, rec); break; }
+              catch(err){
+                const isDupNumber = /orders_order_number_unique|duplicate key/i.test(err.message||'');
+                if(!isDupNumber || attempt>=3) throw err;
+                orderNumber = await computeNextOrderNumber(state.remote, state.orders);
+                rec.orderNumber = orderNumber;
+              }
+            }
+          }
         }catch(err){
           saveOrderHint.style.color = 'var(--danger)';
           saveOrderHint.textContent = 'Não foi possível guardar no servidor: ' + err.message;
@@ -996,7 +1008,7 @@
     applyOrderStateUI();
 
     try{
-      state.orders = state.remote.configured ? await remoteLoadOrders(state.remote) : await loadOrders();
+      state.orders = state.remote.configured ? await remoteLoadOrders(state.remote, {light:true}) : await loadOrders();
     }catch(e){ state.orders = []; }
 
     await refreshOrderNumberPreview();
