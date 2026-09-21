@@ -926,9 +926,9 @@
     const result = getEffectiveCostResult();
     const geo = result.geo;
     const material = result.material;
-    const source = state.dxfResult ? (state.dxfFileName || 'Ficheiro DXF') : describeManualShape();
-    const orderName = orderNameInp.value.trim() || '—';
-    const client = clientNameInp.value.trim() || '—';
+    const source = escapeHtml(state.dxfResult ? (state.dxfFileName || 'Ficheiro DXF') : describeManualShape());
+    const orderName = escapeHtml(orderNameInp.value.trim() || '—');
+    const client = escapeHtml(clientNameInp.value.trim() || '—');
     const qty = Math.max(1, parseInt(qtyInput.value,10) || 1);
     const now = new Date();
     const dateStr = now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'});
