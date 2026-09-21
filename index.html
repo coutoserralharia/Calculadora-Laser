@@ -465,11 +465,20 @@
         pierceDetectedNote.textContent = '(detetado automaticamente: ' + detected + ')';
         pierceOverrideWrap.hidden = false;
         let msg = '';
+        if(!result.unitsInfo.isMm){
+          msg += '<div class="warn">Unidades do ficheiro: ' + result.unitsInfo.label + '. Esta aplicação assume milímetros — confirme as dimensões em baixo antes de orçamentar, pode ter de escalar o desenho.</div>';
+        }
+        if(result.hasInserts){
+          msg += '<div class="warn">O ficheiro usa blocos (INSERT) — furos ou detalhes definidos como bloco não são lidos. Confirme visualmente e o nº de perfurações antes de orçamentar.</div>';
+        }
+        if(result.closedContours.length > 1 && geometryScopeSelect.value !== 'batch'){
+          msg += '<div class="warn">Foram detetadas ' + result.closedContours.length + ' formas fechadas separadas neste ficheiro — se são peças diferentes (aninhadas no mesmo ficheiro), mude "O que representa este ficheiro" para a 2ª opção.</div>';
+        }
         if(result.openContours.length){
           msg += '<div class="warn">Foram detetados ' + result.openContours.length + ' troço(s) aberto(s) — confirme se o desenho está fechado corretamente antes de orçamentar.</div>';
         }
         if(result.warnings.length){
-          msg += '<div class="warn">O ficheiro contém entidades ' + result.warnings.join(', ') + ', aproximadas por segmentos de reta — o comprimento pode ficar ligeiramente subestimado.</div>';
+          msg += '<div class="warn">O ficheiro contém entidades ' + result.warnings.join(', ') + ' aproximadas por segmentos de reta — verifique visualmente a pré-visualização e o perímetro antes de confirmar o orçamento.</div>';
         }
         dxfMsg.innerHTML = msg;
       }catch(err){

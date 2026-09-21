@@ -79,6 +79,20 @@
       if(!Number.isFinite(code)) continue;
       tokens.push({code,value});
     }
+
+    // Unidades do desenho ($INSUNITS no HEADER) — só para avisar o utilizador; não se converte
+    // automaticamente (evita "corrigir" um ficheiro que já estava certo em mm por engano).
+    let insUnitsCode = null;
+    for(let i=0;i<tokens.length-1;i++){
+      if(tokens[i].code===9 && tokens[i].value==='$INSUNITS'){ insUnitsCode = parseInt(tokens[i+1].value,10); break; }
+    }
+    const UNITS_LABELS = {0:'não especificadas', 1:'polegadas', 2:'pés', 4:'milímetros', 5:'centímetros', 6:'metros'};
+    const unitsInfo = {
+      code: insUnitsCode,
+      label: insUnitsCode==null ? 'não especificadas' : (UNITS_LABELS[insUnitsCode] || 'outra unidade'),
+      isMm: insUnitsCode===4,
+    };
+
     let start=-1, end=-1;
     for(let i=0;i<tokens.length;i++){
       if(tokens[i].code===2 && tokens[i].value==='ENTITIES' && tokens[i-1] && tokens[i-1].code===0 && tokens[i-1].value==='SECTION'){
@@ -102,6 +116,7 @@
 
     const contours=[];
     const warnings=new Set();
+    let hasInserts=false;
     const get=(ent,code)=>ent.items.filter(i=>i.code===code);
 
     for(let idx=0; idx<rawEntities.length; idx++){
@@ -156,15 +171,47 @@
         }
         if(j<rawEntities.length && rawEntities[j].type==='SEQEND') idx=j; else idx=j-1;
         if(verts.length>=2) contours.push(finalizeContour(expandBulgePolyline(verts, closed), closed));
-      } else if(ent.type==='SPLINE' || ent.type==='ELLIPSE'){
-        warnings.add(ent.type);
-        const pts=[]; let cur=null;
-        for(const it of ent.items){
-          if(it.code===10 || it.code===11){ if(cur) pts.push(cur); cur={x:parseFloat(it.value), y:0}; }
-          else if((it.code===20 || it.code===21) && cur) cur.y=parseFloat(it.value);
+      } else if(ent.type==='ELLIPSE'){
+        const cx=parseFloat((get(ent,10)[0]||{}).value), cy=parseFloat((get(ent,20)[0]||{}).value);
+        const mx=parseFloat((get(ent,11)[0]||{}).value), my=parseFloat((get(ent,21)[0]||{}).value);
+        const ratioTok=get(ent,40)[0], t1Tok=get(ent,41)[0], t2Tok=get(ent,42)[0];
+        const ratio = ratioTok ? parseFloat(ratioTok.value) : 1;
+        let t1 = t1Tok ? parseFloat(t1Tok.value) : 0;
+        let t2 = t2Tok ? parseFloat(t2Tok.value) : Math.PI*2;
+        if([cx,cy,mx,my,ratio].every(Number.isFinite)){
+          const a = Math.hypot(mx,my), rot = Math.atan2(my,mx), b = a*ratio;
+          let sweep = t2-t1; if(sweep<=0) sweep += Math.PI*2;
+          const N = Math.max(16, Math.round(sweep/(Math.PI/32)));
+          const pts=[];
+          for(let i=0;i<=N;i++){
+            const t = t1 + sweep*i/N;
+            const ex = a*Math.cos(t), ey = b*Math.sin(t);
+            pts.push({ x: cx + ex*Math.cos(rot) - ey*Math.sin(rot), y: cy + ex*Math.sin(rot) + ey*Math.cos(rot) });
+          }
+          const closed = sweep >= Math.PI*2 - 1e-6;
+          contours.push(finalizeContour(pts, closed));
         }
-        if(cur) pts.push(cur);
+      } else if(ent.type==='SPLINE'){
+        warnings.add('SPLINE');
+        // Pontos de controlo (10/20) e fit points (11/21) podem coexistir na mesma entidade —
+        // nunca se devem concatenar (produz um traço reto a ligar os dois conjuntos). Os fit
+        // points seguem melhor a curva desenhada, por isso têm preferência quando existem.
+        const controlPts=[], fitPts=[];
+        let curC=null, curF=null;
+        for(const it of ent.items){
+          if(it.code===10){ if(curC) controlPts.push(curC); curC={x:parseFloat(it.value), y:0}; }
+          else if(it.code===20 && curC) curC.y=parseFloat(it.value);
+          else if(it.code===11){ if(curF) fitPts.push(curF); curF={x:parseFloat(it.value), y:0}; }
+          else if(it.code===21 && curF) curF.y=parseFloat(it.value);
+        }
+        if(curC) controlPts.push(curC);
+        if(curF) fitPts.push(curF);
+        const pts = fitPts.length>=2 ? fitPts : controlPts;
         if(pts.length>=2) contours.push(finalizeContour(pts, false));
+      } else if(ent.type==='INSERT'){
+        // Bloco reutilizável (ex: padrão de furos definido uma vez e inserido várias vezes) —
+        // não é resolvido, só assinalado, porque pode esconder geometria de corte real.
+        hasInserts = true;
       }
     }
 
@@ -176,7 +223,21 @@
     const STITCH_TOL = 0.01; // mm — tolerância para duas pontas serem "a mesma"
     const same = (a,b) => dist(a,b) <= STITCH_TOL;
     const closedIn = contours.filter(c=>c.closed);
-    const openIn = contours.filter(c=>!c.closed).map(c=>({points: c.points.slice(), used:false}));
+    // Desenhos com geometria redundante (a mesma aresta desenhada duas vezes, comum em blocos
+    // "explodidos" ou em exports com camadas sobrepostas) podiam, antes desta deduplicação, fazer
+    // esta função "coser" o troço duplicado a ele próprio e criar um contorno fechado fantasma —
+    // inflacionando a contagem de perfurações e o perímetro total sem qualquer aviso ao utilizador.
+    const segsEqual = (pa,pb) => {
+      if(pa.length !== pb.length) return false;
+      if(pa.every((p,i)=>same(p, pb[i]))) return true;
+      return pa.every((p,i)=>same(p, pb[pb.length-1-i]));
+    };
+    const dedupedOpen = [];
+    contours.filter(c=>!c.closed).forEach(c=>{
+      if(dedupedOpen.some(s=>segsEqual(s.points, c.points))) return;
+      dedupedOpen.push(c);
+    });
+    const openIn = dedupedOpen.map(c=>({points: c.points.slice(), used:false}));
     const stitched = [];
     for(let i=0;i<openIn.length;i++){
       if(openIn[i].used) continue;
@@ -214,6 +275,8 @@
       bbox,
       closedContours: finalContours.filter(c=>c.closed),
       openContours: finalContours.filter(c=>!c.closed),
+      unitsInfo,
+      hasInserts,
     };
   }
   LC.parseDXF = parseDXF;
