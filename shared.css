@@ -18,6 +18,7 @@
     --readout:#3fe8d4;
     --readout-dim:#1f8c80;
     --danger:#ff6b6b;
+    --canvas-bg:#14181c;
     --radius:10px;
     font-size:16px;
   }
@@ -37,6 +38,7 @@
     --readout:#0d8f80;
     --readout-dim:#0a6f66;
     --danger:#d33;
+    --canvas-bg:#e9ebee;
   }
   /* Cores de estado mais saturadas em fundo claro, para manter contraste de leitura. */
   :root[data-theme="light"] .state-quote,
@@ -140,7 +142,7 @@
   .field-row{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .field-row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;}
   .field-row4{display:grid; grid-template-columns:1.6fr 1.6fr 1fr 1fr; gap:10px;}
-  @media (max-width:560px){ .field-row4{grid-template-columns:1fr 1fr;} }
+  @media (max-width:960px){ .field-row4{grid-template-columns:1fr 1fr;} }
   input[type=number], input[type=text], select{
     width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text);
     padding:7px 10px; border-radius:7px; font-family:'JetBrains Mono', monospace; font-size:13.5px;
@@ -163,7 +165,12 @@
 
   table.mat-table{width:100%; border-collapse:collapse; font-size:12.5px;}
   .mat-table-wrap{overflow-x:auto; margin:0 -2px;}
-  table.mat-table{min-width:560px;}
+  /* min-width generoso + coluna do nome com largura própria: numa tabela com 8-9 colunas, um
+     min-width baixo deixava a coluna de texto (nome do material/perfil) espremida a poucos
+     caracteres mesmo com scroll horizontal disponível — o scroll só ajuda se houver espaço
+     suficiente para o texto lá dentro. */
+  table.mat-table{min-width:900px;}
+  table.mat-table td:first-child, table.mat-table th:first-child{min-width:160px;}
   table.mat-table th{text-align:left; color:var(--text-dim); font-weight:500; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; padding:0 6px 8px; border-bottom:1px solid var(--border-soft);}
   table.mat-table td{padding:4px 6px; border-bottom:1px solid var(--border-soft);}
   table.mat-table td.mat-final-price{font-family:'JetBrains Mono', monospace; color:var(--readout); font-weight:600; white-space:nowrap;}
@@ -187,7 +194,7 @@
   canvas#preview{width:100%; height:260px; display:block; background:
     linear-gradient(var(--panel-2) 1px, transparent 1px) 0 0/24px 24px,
     linear-gradient(90deg, var(--panel-2) 1px, transparent 1px) 0 0/24px 24px,
-    #14181c;
+    var(--canvas-bg);
   }
   .preview-empty{
     height:260px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px;

@@ -805,6 +805,18 @@
     document.body.appendChild(div);
     document.getElementById('updateReloadBtn').addEventListener('click', ()=> window.location.reload());
   }
+  // A barra de ações fixa (index.html/tubo.html) quebra para várias linhas em ecrãs estreitos,
+  // ficando bem mais alta do que o padding-bottom fixo do body — sem isto, o rodapé da página
+  // fica escondido atrás da barra. Mede a altura real e ajusta sempre que ela muda.
+  LC.syncActionBarPadding = function(){
+    const bar = document.querySelector('.action-bar');
+    if(!bar) return;
+    const apply = () => { document.body.style.paddingBottom = (bar.offsetHeight + 16) + 'px'; };
+    apply();
+    window.addEventListener('resize', apply);
+    if(typeof ResizeObserver !== 'undefined') new ResizeObserver(apply).observe(bar);
+  };
+
   LC.registerServiceWorker = function(){
     if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){
       window.addEventListener('load', ()=>{

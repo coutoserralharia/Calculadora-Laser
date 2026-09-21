@@ -359,7 +359,7 @@
     loadedOrderNumber: null,
     loadedOrderCreatedAt: null,
     loadedCostSnapshot: null,
-    orderState: 'production',
+    orderState: 'quote',
     wasQuoted: false,
     dirty: false,
   };
@@ -1330,7 +1330,7 @@
     state.loadedCostSnapshot = null;
     realCuttingTimeInput.value = '';
     geometryScopeSelect.value = 'unit';
-    state.orderState = 'production';
+    state.orderState = 'quote';
     state.wasQuoted = false;
     applyOrderStateUI();
     adjustmentValueInput.value = '';
@@ -1714,6 +1714,7 @@
   });
 
   registerServiceWorker();
+  window.LC.syncActionBarPadding();
 })();
 </script>
 </body>

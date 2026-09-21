@@ -298,7 +298,7 @@
     loadedOrderNumber: null,
     loadedOrderCreatedAt: null,
     loadedCostSnapshot: null,
-    orderState: 'production',
+    orderState: 'quote',
     wasQuoted: false,
     dirty: false,
   };
@@ -754,7 +754,7 @@
   function resetOrderForm(){
     state.loadedOrderId = null; state.loadedOrderNumber = null;
     state.loadedOrderCreatedAt = null; state.loadedCostSnapshot = null;
-    state.orderState = 'production';
+    state.orderState = 'quote';
     state.wasQuoted = false;
     orderNameInp.value = ''; clientNameInp.value = ''; orderCommentsInp.value = '';
     qtyInput.value = 1;
@@ -1032,6 +1032,7 @@
   init();
 
   registerServiceWorker();
+  window.LC.syncActionBarPadding();
 })();
 </script>
 </body>
