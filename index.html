@@ -16,6 +16,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared.css">
 <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('laser_theme')||'dark');</script>
+<style>
+  /* Esta página deixa de usar 2 colunas independentes (.layout .col) e passa a ser uma
+     sequência de .card-row (já usadas no resto da app) empilhadas a toda a largura. */
+  #main.layout{display:block;}
+</style>
 </head>
 <body>
 <a href="#main" class="skip-link">Saltar para o conteúdo</a>
@@ -58,14 +63,16 @@
 
   <main class="layout" id="main">
 
-    <!-- LEFT: CONTROLS -->
-    <section class="col">
-
+    <div class="card-row">
       <div class="card">
         <h2 class="card-title with-action">
           <span class="title-left"><span class="dot"></span>Dados da encomenda</span>
-          <button class="ghost-btn sm" id="newOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M13 8A5 5 0 113 8" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M13 3v3.5H9.5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Nova encomenda</button>
+          <span style="display:flex; align-items:center; gap:8px;">
+            <span class="conn-badge" id="connBadge"></span>
+            <button class="ghost-btn sm" id="newOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M13 8A5 5 0 113 8" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M13 3v3.5H9.5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Nova encomenda</button>
+          </span>
         </h2>
+        <p class="save-hint" id="editingNote" hidden style="color:var(--accent); margin-bottom:10px;"></p>
         <div class="field-row4" style="margin-bottom:0;">
           <div class="field" style="margin-bottom:0;"><label for="orderName">Nome / peça</label><input type="text" id="orderName" placeholder="Ex: Suporte L-240"></div>
           <div class="field" style="margin-bottom:0;">
@@ -84,10 +91,27 @@
             <input type="number" id="qtyInput" value="1" min="1" step="1">
           </div>
         </div>
+        <div class="field" style="margin-top:12px; margin-bottom:0;">
+          <label for="orderComments">Comentários (internos — aparecem na ficha interna)</label>
+          <textarea id="orderComments" rows="2" placeholder="Notas para esta encomenda…" style="width:100%; resize:vertical; background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:9px 10px; border-radius:7px; font-family:'Inter',sans-serif; font-size:13.5px; outline:none;"></textarea>
+        </div>
+        <div class="mat-actions" style="margin-top:12px;">
+          <button class="ghost-btn" id="saveOrderBtn" type="button" hidden><span id="saveOrderBtnLabel">Guardar encomenda atual</span></button>
+          <a class="ghost-btn sm" href="encomendas.html" style="text-decoration:none;">Ver encomendas guardadas →</a>
+        </div>
+        <p class="save-hint" id="saveOrderHint"></p>
+        <div class="next-steps" id="nextSteps" hidden>
+          <div class="ns-head"><span id="nextStepsMsg"></span><button type="button" class="ns-close" id="nsClose" title="Fechar" aria-label="Fechar">✕</button></div>
+          <div class="ns-actions">
+            <button class="ghost-btn sm" id="nsPrintOperator" type="button">Ficha do operador</button>
+            <button class="ghost-btn sm" id="nsPrintQuote" type="button">Orçamento</button>
+            <button class="ghost-btn sm" id="nsNew" type="button">Nova encomenda</button>
+          </div>
+        </div>
       </div>
 
-      <div class="card-row">
-        <div class="card" style="margin-bottom:0;">
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Ficheiro / Dimensões</h2>
         <div class="tabs">
           <button class="tab-btn active" id="tabDxfBtn" type="button">Ficheiro DXF</button>
           <button class="tab-btn" id="tabManualBtn" type="button">Dimensões manuais</button>
@@ -157,118 +181,86 @@
             <input type="number" id="manualHoles" value="0" min="0" step="1">
           </div>
         </div>
-        </div>
 
-        <div class="card" style="margin-bottom:0;">
-          <h2 class="card-title"><span class="dot"></span>Dimensões</h2>
-          <div class="preview-meta preview-meta-stack" id="previewMeta" hidden>
-            <div class="meta-item"><div class="k">Dimensões (L × A)</div><div class="v" id="metaDim">—</div></div>
-            <div class="meta-item"><div class="k">Perímetro</div><div class="v" id="metaPerim">—</div></div>
-            <div class="meta-item"><div class="k">Perfurações</div><div class="v" id="metaPierces">—</div></div>
-          </div>
-          <p class="orders-empty" id="dimEmpty" style="padding:14px 0 4px;">Carregue um ficheiro ou preencha as dimensões para confirmar aqui.</p>
+        <div class="preview-meta" id="previewMeta" hidden>
+          <div class="meta-item"><div class="k">Dimensões (L × A)</div><div class="v" id="metaDim">—</div></div>
+          <div class="meta-item"><div class="k">Perímetro</div><div class="v" id="metaPerim">—</div></div>
+          <div class="meta-item"><div class="k">Perfurações</div><div class="v" id="metaPierces">—</div></div>
         </div>
+        <p class="orders-empty" id="dimEmpty" style="padding:14px 0 4px;">Carregue um ficheiro ou preencha as dimensões para confirmar aqui.</p>
       </div>
+    </div>
 
-      <div class="card-row">
-        <div class="card" style="margin-bottom:0;">
-          <h2 class="card-title"><span class="dot"></span>Material</h2>
-          <div class="field">
-            <label for="materialTypeSelect">Tipo</label>
-            <select id="materialTypeSelect"></select>
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label for="materialThicknessSelect">Espessura</label>
-            <select id="materialThicknessSelect"></select>
-          </div>
-          <select id="materialSelect" style="display:none;" aria-hidden="true" tabindex="-1"></select>
-          <div class="breakdown-row" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-soft);"><span class="lbl">Peso unitário (1 peça)</span><span class="val" id="valWeightUnit">—</span></div>
-          <div class="breakdown-row" style="border-bottom:none; padding-bottom:0;"><span class="lbl">Peso total<small id="weightTotalSub">—</small></span><span class="val" id="valWeightTotal">—</span></div>
-        </div>
-
-        <details class="card" id="setupDetails" open style="margin-bottom:0;">
-          <summary class="summary-row"><span>Preparação (setup) <span class="conn-badge conn-local" id="setupBadge"></span></span><span class="chev">▸</span></summary>
-          <div class="details-body">
-            <div class="field">
-              <label for="drawingType">Origem do desenho</label>
-              <select id="drawingType">
-                <option value="client_direct">Desenho do cliente, pronto a usar</option>
-                <option value="client_convert">Converter desenho do cliente</option>
-                <option value="from_scratch">Desenho de raiz</option>
-              </select>
-            </div>
-            <div class="field" id="designTimeField" hidden>
-              <label for="designTimeInput">Tempo de desenho</label>
-              <div class="unit-suffix"><input type="number" id="designTimeInput" min="0" step="1" value="0"><span>min</span></div>
-            </div>
-            <div class="field" style="margin-bottom:0;">
-              <label for="setupTimeInput">Tempo de setup</label>
-              <div class="unit-suffix"><input type="number" id="setupTimeInput" min="0" step="1" value="5"><span>min</span></div>
-            </div>
-          </div>
-        </details>
-      </div>
-
-      <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Ajustes</h2>
-        <div class="field" style="margin-bottom:0;">
-          <label for="realCuttingTimeInput">Tempo de corte real — total da encomenda, todas as peças (opcional)</label>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <div class="unit-suffix" style="flex:1;"><input type="number" id="realCuttingTimeInput" min="0" step="0.1" placeholder="deixe vazio para usar a estimativa"><span>min</span></div>
-            <button class="ghost-btn sm" id="clearRealTimeBtn" type="button">Repor estimativa</button>
-          </div>
-        </div>
-
-        <button class="ghost-btn sm" id="showAdjustmentBtn" type="button" style="margin:12px 0 4px;">+ Ajuste comercial</button>
-        <div class="field" id="adjustmentFields" hidden style="margin:12px 0 0;">
-          <label for="adjustmentValueInput">Ajuste comercial (opcional — use valor negativo para desconto)</label>
-          <div class="field-row" style="margin-bottom:0;">
-            <div class="field" style="margin-bottom:0;">
-              <div class="unit-suffix"><input type="number" id="adjustmentValueInput" step="0.5" placeholder="0,00"><span>€</span></div>
-            </div>
-            <div class="field" style="margin-bottom:0;">
-              <select id="adjustmentReasonSelect">
-                <option value="">Motivo do ajuste…</option>
-                <option value="Pequena quantidade">Pequena quantidade</option>
-                <option value="Urgência">Urgência</option>
-                <option value="Cliente habitual">Cliente habitual</option>
-                <option value="Concorrência">Concorrência</option>
-                <option value="Complexidade">Complexidade</option>
-                <option value="Desperdício de chapa">Desperdício de chapa</option>
-                <option value="Outro">Outro</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Guardar encomenda <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
-        <p class="save-hint" id="editingNote" hidden style="color:var(--accent); margin-bottom:10px;"></p>
+    <div class="card-row">
+      <div class="card" style="margin-bottom:0;">
+        <h2 class="card-title"><span class="dot"></span>Material</h2>
         <div class="field">
-          <label for="orderComments">Comentários (internos — aparecem na ficha interna)</label>
-          <textarea id="orderComments" rows="2" placeholder="Notas para esta encomenda…" style="width:100%; resize:vertical; background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:9px 10px; border-radius:7px; font-family:'Inter',sans-serif; font-size:13.5px; outline:none;"></textarea>
+          <label for="materialTypeSelect">Tipo</label>
+          <select id="materialTypeSelect"></select>
         </div>
-        <div class="mat-actions">
-          <button class="ghost-btn" id="saveOrderBtn" type="button" hidden><span id="saveOrderBtnLabel">Guardar encomenda atual</span></button>
-          <a class="ghost-btn sm" href="encomendas.html" style="text-decoration:none;">Ver encomendas guardadas →</a>
+        <div class="field" style="margin-bottom:0;">
+          <label for="materialThicknessSelect">Espessura</label>
+          <select id="materialThicknessSelect"></select>
         </div>
-        <p class="save-hint" id="saveOrderHint"></p>
-        <div class="next-steps" id="nextSteps" hidden>
-          <div class="ns-head"><span id="nextStepsMsg"></span><button type="button" class="ns-close" id="nsClose" title="Fechar" aria-label="Fechar">✕</button></div>
-          <div class="ns-actions">
-            <button class="ghost-btn sm" id="nsPrintOperator" type="button">Ficha do operador</button>
-            <button class="ghost-btn sm" id="nsPrintQuote" type="button">Orçamento</button>
-            <button class="ghost-btn sm" id="nsNew" type="button">Nova encomenda</button>
-          </div>
-        </div>
+        <select id="materialSelect" style="display:none;" aria-hidden="true" tabindex="-1"></select>
+        <div class="breakdown-row" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-soft);"><span class="lbl">Peso unitário (1 peça)</span><span class="val" id="valWeightUnit">—</span></div>
+        <div class="breakdown-row" style="border-bottom:none; padding-bottom:0;"><span class="lbl">Peso total<small id="weightTotalSub">—</small></span><span class="val" id="valWeightTotal">—</span></div>
       </div>
 
-    </section>
+      <details class="card" id="setupDetails" open style="margin-bottom:0;">
+        <summary class="summary-row"><span>Preparação &amp; ajustes <span class="conn-badge conn-local" id="setupBadge"></span></span><span class="chev">▸</span></summary>
+        <div class="details-body">
+          <div class="field">
+            <label for="drawingType">Origem do desenho</label>
+            <select id="drawingType">
+              <option value="client_direct">Desenho do cliente, pronto a usar</option>
+              <option value="client_convert">Converter desenho do cliente</option>
+              <option value="from_scratch">Desenho de raiz</option>
+            </select>
+          </div>
+          <div class="field" id="designTimeField" hidden>
+            <label for="designTimeInput">Tempo de desenho</label>
+            <div class="unit-suffix"><input type="number" id="designTimeInput" min="0" step="1" value="0"><span>min</span></div>
+          </div>
+          <div class="field">
+            <label for="setupTimeInput">Tempo de setup</label>
+            <div class="unit-suffix"><input type="number" id="setupTimeInput" min="0" step="1" value="5"><span>min</span></div>
+          </div>
 
-    <!-- RIGHT: RESULTS -->
-    <section class="col">
+          <div class="field" style="margin-top:6px;">
+            <label for="realCuttingTimeInput">Tempo de corte real — total da encomenda, todas as peças (opcional)</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <div class="unit-suffix" style="flex:1;"><input type="number" id="realCuttingTimeInput" min="0" step="0.1" placeholder="deixe vazio para usar a estimativa"><span>min</span></div>
+              <button class="ghost-btn sm" id="clearRealTimeBtn" type="button">Repor estimativa</button>
+            </div>
+          </div>
 
+          <button class="ghost-btn sm" id="showAdjustmentBtn" type="button" style="margin:12px 0 4px;">+ Ajuste comercial</button>
+          <div class="field" id="adjustmentFields" hidden style="margin:12px 0 0;">
+            <label for="adjustmentValueInput">Ajuste comercial (opcional — use valor negativo para desconto)</label>
+            <div class="field-row" style="margin-bottom:0;">
+              <div class="field" style="margin-bottom:0;">
+                <div class="unit-suffix"><input type="number" id="adjustmentValueInput" step="0.5" placeholder="0,00"><span>€</span></div>
+              </div>
+              <div class="field" style="margin-bottom:0;">
+                <select id="adjustmentReasonSelect">
+                  <option value="">Motivo do ajuste…</option>
+                  <option value="Pequena quantidade">Pequena quantidade</option>
+                  <option value="Urgência">Urgência</option>
+                  <option value="Cliente habitual">Cliente habitual</option>
+                  <option value="Concorrência">Concorrência</option>
+                  <option value="Complexidade">Complexidade</option>
+                  <option value="Desperdício de chapa">Desperdício de chapa</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="card-row">
       <div class="card preview-card">
         <div class="preview-head">
           <h2 class="card-title" style="margin-bottom:8px;"><span class="dot"></span>Pré-visualização do corte</h2>
@@ -299,12 +291,12 @@
         <p class="save-hint" style="margin-top:8px;">"Ficha do operador" está sempre disponível na barra inferior.</p>
         <p class="save-hint" id="printHint"></p>
       </div>
+    </div>
 
-    </section>
   </main>
 
   <footer class="disclaimer">
-    Ferramenta de cálculo interno. As velocidades de corte, preços de material e custo/hora são valores de referência editáveis em <a href="definicoes.html" style="color:var(--text-dim);">Definições avançadas</a> — ajuste-os à realidade da sua máquina e fornecedores antes de orçamentar. A área de material calculada com base no retângulo envolvente é uma aproximação à ocupação de chapa; para peças aninhadas em conjunto, o consumo real de chapa pode ser inferior.
+    Ferramenta de cálculo interno. Valores de referência (velocidades, preços de material, custo/hora) editáveis em <a href="definicoes.html" style="color:var(--text-dim);">Definições avançadas</a>.
   </footer>
 
 </div>
