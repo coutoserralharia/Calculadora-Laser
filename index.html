@@ -17,9 +17,15 @@
 <link rel="stylesheet" href="shared.css">
 <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('laser_theme')||'dark');</script>
 <style>
-  /* Esta página deixa de usar 2 colunas independentes (.layout .col) e passa a ser uma
-     sequência de .card-row (já usadas no resto da app) empilhadas a toda a largura. */
+  /* Esta página deixa de usar 2 colunas independentes (.layout .col) — o conteúdo principal
+     passa a ser uma grelha de 3 colunas (.grid3), com "Dados da encomenda" a ocupar as duas
+     primeiras (grid-column:span 2) e o resto a preencher automaticamente à sua volta. */
   #main.layout{display:block;}
+  .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:13px;}
+  .col-stack{display:flex; flex-direction:column; gap:13px; min-width:0;}
+  .grid3-wide{grid-column:span 2;}
+  @media (max-width:900px){ .grid3{grid-template-columns:1fr 1fr;} }
+  @media (max-width:600px){ .grid3{grid-template-columns:1fr;} .grid3-wide{grid-column:span 1;} }
 </style>
 </head>
 <body>
@@ -63,8 +69,8 @@
 
   <main class="layout" id="main">
 
-    <div class="card-row">
-      <div class="card">
+    <div class="grid3">
+      <div class="card grid3-wide">
         <h2 class="card-title with-action">
           <span class="title-left"><span class="dot"></span>Dados da encomenda</span>
           <span style="display:flex; align-items:center; gap:8px;">
@@ -73,7 +79,7 @@
           </span>
         </h2>
         <p class="save-hint" id="editingNote" hidden style="color:var(--accent); margin-bottom:10px;"></p>
-        <div class="field-row4" style="margin-bottom:0;">
+        <div class="field-row3" style="margin-bottom:12px;">
           <div class="field" style="margin-bottom:0;"><label for="orderName">Nome / peça</label><input type="text" id="orderName" placeholder="Ex: Suporte L-240"></div>
           <div class="field" style="margin-bottom:0;">
             <label for="clientName">Cliente</label>
@@ -83,16 +89,22 @@
             </div>
           </div>
           <div class="field" style="margin-bottom:0;">
-            <label for="orderNumberPreview">Nº (auto)</label>
+            <label for="orderNumberPreview">Nº da encomenda (auto)</label>
             <input type="text" id="orderNumberPreview" readonly>
           </div>
+        </div>
+        <div class="field-row3" style="margin-bottom:0;">
           <div class="field" style="margin-bottom:0;">
-            <label for="qtyInput">Quantidade</label>
+            <label for="orderDatePreview">Data</label>
+            <input type="text" id="orderDatePreview" readonly class="mono">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="qtyInput">Quantidade peças</label>
             <input type="number" id="qtyInput" value="1" min="1" step="1">
           </div>
         </div>
         <div class="field" style="margin-top:12px; margin-bottom:0;">
-          <label for="orderComments">Comentários (internos — aparecem na ficha interna)</label>
+          <label for="orderComments">Comentários internos (aparecem na ficha interna)</label>
           <textarea id="orderComments" rows="2" placeholder="Notas para esta encomenda…" style="width:100%; resize:vertical; background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:9px 10px; border-radius:7px; font-family:'Inter',sans-serif; font-size:13.5px; outline:none;"></textarea>
         </div>
         <div class="mat-actions" style="margin-top:12px;">
@@ -107,6 +119,17 @@
             <button class="ghost-btn sm" id="nsPrintQuote" type="button">Orçamento</button>
             <button class="ghost-btn sm" id="nsNew" type="button">Nova encomenda</button>
           </div>
+        </div>
+      </div>
+
+      <div class="card preview-card">
+        <div class="preview-head">
+          <h2 class="card-title" style="margin-bottom:8px;"><span class="dot"></span>Pré-visualização do corte</h2>
+        </div>
+        <canvas id="preview" width="600" height="260" role="img" aria-label="Pré-visualização do percurso de corte da peça"></canvas>
+        <div id="previewEmpty" class="preview-empty">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 3"/></svg>
+          <span>Carregue um ficheiro DXF para ver o percurso de corte, ou use o modo manual</span>
         </div>
       </div>
 
@@ -189,9 +212,8 @@
         </div>
         <p class="orders-empty" id="dimEmpty" style="padding:14px 0 4px;">Carregue um ficheiro ou preencha as dimensões para confirmar aqui.</p>
       </div>
-    </div>
 
-    <div class="card-row">
+      <div class="col-stack">
       <div class="card" style="margin-bottom:0;">
         <h2 class="card-title"><span class="dot"></span>Material</h2>
         <div class="field">
@@ -258,18 +280,6 @@
           </div>
         </div>
       </details>
-    </div>
-
-    <div class="card-row">
-      <div class="card preview-card">
-        <div class="preview-head">
-          <h2 class="card-title" style="margin-bottom:8px;"><span class="dot"></span>Pré-visualização do corte</h2>
-        </div>
-        <canvas id="preview" width="600" height="260" role="img" aria-label="Pré-visualização do percurso de corte da peça"></canvas>
-        <div id="previewEmpty" class="preview-empty">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 3"/></svg>
-          <span>Carregue um ficheiro DXF para ver o percurso de corte, ou use o modo manual</span>
-        </div>
       </div>
 
       <div class="card">
@@ -1296,6 +1306,7 @@
   async function refreshOrderNumberPreview(){
     try{ $('orderNumberPreview').value = await computeNextOrderNumber(state.remote, state.orders); }
     catch(e){ $('orderNumberPreview').value = ''; }
+    $('orderDatePreview').value = new Date().toLocaleDateString('pt-PT');
   }
 
   function updateEditingUI(){
@@ -1446,6 +1457,7 @@
     await populateFormFromOrder(o, sourceNote);
 
     $('orderNumberPreview').value = o.orderNumber || '';
+    $('orderDatePreview').value = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '';
     markClean();
     saveOrderHint.style.color = 'var(--readout)';
     saveOrderHint.textContent = 'Encomenda ' + (o.orderNumber ? o.orderNumber+' ' : '') + '"' + (o.orderName||'sem nome') + '" reposta — se guardar de novo, atualiza esta mesma encomenda (mesmo número), com os valores recalculados com os preços/definições atuais.';
@@ -1615,6 +1627,7 @@
         else if(!folderResult.skipped) saveOrderHint.textContent += ' (falhou a gravação na pasta local: ' + folderResult.error + ')';
       }
       $('orderNumberPreview').value = orderNumber;
+      $('orderDatePreview').value = createdAt ? new Date(createdAt).toLocaleDateString('pt-PT') : '';
       markClean();
       if(saveOrderHint.style.color !== 'var(--danger)'){
         showNextSteps(orderNumber);
