@@ -890,13 +890,14 @@
     return 'Forma manual (perímetro/área introduzidos)';
   }
 
-  function buildPrintSVG(big){
-    let contours = [], bbox = null;
+  function buildPrintSVG(big, withDims){
+    let contours = [], bbox = null, closedForHoles = null;
     // Mostra sempre o desenho do DXF na ficha, se houver um carregado — o operador precisa de ver
     // a peça real, mesmo que o cálculo do custo esteja a usar dimensões manuais.
     if(state.dxfResult){
       contours = state.dxfResult.contours;
       bbox = state.dxfResult.bbox;
+      closedForHoles = state.dxfResult.closedContours;
     } else if(state.mode==='manual'){
       const g = getManualGeometry();
       if(g.kind==='rect' && g.w>0 && g.h>0){
@@ -912,9 +913,15 @@
     if(!contours.length || !bbox) return '';
     const w = big ? 400 : 300, h = big ? 260 : 200, pad = big ? 20 : 16;
     const cssMaxWidth = big ? 340 : 220;
+    // Com cotas, reserva-se uma faixa extra em baixo/à esquerda para as linhas de cota e o texto,
+    // para nunca sobrepor o desenho — o resto do enquadramento mantém-se igual.
+    const dimBand = big ? 32 : 26;
+    const padBottom = withDims ? dimBand : pad;
+    const padLeft = withDims ? dimBand : pad;
     const gw=bbox.maxX-bbox.minX, gh=bbox.maxY-bbox.minY;
-    const scale = Math.min((w-pad*2)/(gw||1), (h-pad*2)/(gh||1));
-    const offX = pad + ((w-pad*2)-gw*scale)/2, offY = pad + ((h-pad*2)-gh*scale)/2;
+    const availW = w-padLeft-pad, availH = h-pad-padBottom;
+    const scale = Math.min(availW/(gw||1), availH/(gh||1));
+    const offX = padLeft + (availW-gw*scale)/2, offY = padBottom + (availH-gh*scale)/2;
     function tx(p){ return { x: offX+(p.x-bbox.minX)*scale, y: h-(offY+(p.y-bbox.minY)*scale) }; }
     let paths = '';
     contours.forEach(c=>{
@@ -925,7 +932,59 @@
       if(c.closed) d += 'Z';
       paths += '<path d="'+d+'" fill="none" stroke="#111" stroke-width="1.2"/>';
     });
-    return '<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:'+cssMaxWidth+'px;height:auto;border:1px solid #ccc;display:block;margin:0 auto;">'+paths+'</svg>';
+
+    let extra = '';
+    if(withDims){
+      const shapeLeft = tx({x:bbox.minX,y:bbox.minY}).x, shapeRight = tx({x:bbox.maxX,y:bbox.minY}).x;
+      const shapeBottom = tx({x:bbox.minX,y:bbox.minY}).y, shapeTop = tx({x:bbox.minX,y:bbox.maxY}).y;
+      const gap = 7, tick = 3.5, fs = big ? 8.5 : 7.5, dc = '#555';
+      const dimY = shapeBottom + gap, dimX = shapeLeft - gap;
+      const ln = (x1,y1,x2,y2,sw)=>'<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="'+dc+'" stroke-width="'+sw+'"/>';
+      // Cota de largura (linha horizontal por baixo da peça)
+      extra += ln(shapeLeft, shapeBottom, shapeLeft, dimY, 0.6);
+      extra += ln(shapeRight, shapeBottom, shapeRight, dimY, 0.6);
+      extra += ln(shapeLeft, dimY, shapeRight, dimY, 0.7);
+      extra += ln(shapeLeft, dimY-tick, shapeLeft, dimY+tick, 0.9);
+      extra += ln(shapeRight, dimY-tick, shapeRight, dimY+tick, 0.9);
+      extra += '<text x="'+((shapeLeft+shapeRight)/2).toFixed(1)+'" y="'+(dimY+fs+1).toFixed(1)+'" font-size="'+fs+'" font-family="Inter,sans-serif" fill="'+dc+'" text-anchor="middle">'+fmtNum(gw,1)+' mm</text>';
+      // Cota de altura (linha vertical à esquerda da peça)
+      extra += ln(shapeLeft, shapeTop, dimX, shapeTop, 0.6);
+      extra += ln(shapeLeft, shapeBottom, dimX, shapeBottom, 0.6);
+      extra += ln(dimX, shapeTop, dimX, shapeBottom, 0.7);
+      extra += ln(dimX-tick, shapeTop, dimX+tick, shapeTop, 0.9);
+      extra += ln(dimX-tick, shapeBottom, dimX+tick, shapeBottom, 0.9);
+      const midY = (shapeTop+shapeBottom)/2;
+      extra += '<text x="'+(dimX-2).toFixed(1)+'" y="'+midY.toFixed(1)+'" font-size="'+fs+'" font-family="Inter,sans-serif" fill="'+dc+'" text-anchor="middle" transform="rotate(-90 '+(dimX-2).toFixed(1)+' '+midY.toFixed(1)+')">'+fmtNum(gh,1)+' mm</text>';
+
+      // Furos circulares — agrupados por diâmetro para não poluir o desenho quando há vários furos iguais.
+      if(closedForHoles && closedForHoles.length>1){
+        const holeContours = closedForHoles.slice().sort((a,b)=>b.area-a.area).slice(1);
+        const groups = new Map();
+        holeContours.forEach(c=>{
+          const pts = c.points;
+          if(pts.length<8) return;
+          let cx=0, cy=0;
+          pts.forEach(p=>{ cx+=p.x; cy+=p.y; });
+          cx/=pts.length; cy/=pts.length;
+          const dists = pts.map(p=>Math.hypot(p.x-cx, p.y-cy));
+          const rMean = dists.reduce((a,b)=>a+b,0)/dists.length;
+          const rMax = Math.max.apply(null,dists), rMin = Math.min.apply(null,dists);
+          if(rMean<=0 || (rMax-rMin)/rMean > 0.04) return; // não é circular o suficiente — não se rotula
+          const diameter = rMean*2;
+          const key = diameter.toFixed(1);
+          if(!groups.has(key)) groups.set(key, {diameter, count:0, center:{x:cx,y:cy}});
+          groups.get(key).count++;
+        });
+        groups.forEach(g=>{
+          const c = tx(g.center);
+          const label = 'Ø' + fmtNum(g.diameter,1) + (g.count>1 ? ' (×'+g.count+')' : '');
+          extra += '<circle cx="'+c.x.toFixed(1)+'" cy="'+c.y.toFixed(1)+'" r="1.3" fill="'+dc+'"/>';
+          extra += '<text x="'+c.x.toFixed(1)+'" y="'+(c.y-4).toFixed(1)+'" font-size="'+(fs-0.5)+'" font-family="Inter,sans-serif" fill="'+dc+'" text-anchor="middle">'+label+'</text>';
+        });
+      }
+    }
+
+    return '<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:'+cssMaxWidth+'px;height:auto;border:1px solid #ccc;display:block;margin:0 auto;">'+paths+extra+'</svg>';
   }
 
   function pRow(label, value){
@@ -950,7 +1009,7 @@
     html += '<div class="p-meta">Gerado em ' + dateStr + '</div>';
 
     if(mode==='quote'){
-      const svg = buildPrintSVG(true);
+      const svg = buildPrintSVG(true, true);
       html += '<div class="p-section">';
       html += pRow('Cliente', client);
       html += pRow('Nº da encomenda', $('orderNumberPreview').value || '—');
