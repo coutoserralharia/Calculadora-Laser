@@ -915,6 +915,10 @@
             designTimeMin: parseFloat(designTimeInput.value)||0,
             setupTimeMin: parseFloat(setupTimeInput.value)||0,
           },
+          // Data de conclusão — só a 1ª vez que fica "Concluído"; alimenta o "Resumo do dia".
+          completedAt: state.orderState === 'done'
+            ? ((state.loadedCostSnapshot && state.loadedCostSnapshot.completedAt) || new Date().toISOString())
+            : null,
         },
       };
 

@@ -233,6 +233,11 @@
     const rec = state.rec;
     rec.orderState = newState;
     if(newCostSnapshot) rec.costSnapshot = newCostSnapshot;
+    // Marca a data de conclusão só da primeira vez — fica dentro do cost_snapshot (não precisa
+    // de coluna nova no Supabase) e alimenta o "Resumo do dia" no Dashboard.
+    if(newState === 'done' && rec.costSnapshot && !rec.costSnapshot.completedAt){
+      rec.costSnapshot.completedAt = new Date().toISOString();
+    }
     if(state.remote.configured){
       await remoteUpdateFullOrder(state.remote, rec.id, rec);
     } else {

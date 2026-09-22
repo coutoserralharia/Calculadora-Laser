@@ -992,6 +992,46 @@
   };
 
   /* ---------------------------------------------------------------- */
+  /* MATERIAIS MAIS USADOS num período — para o gráfico de barras do    */
+  /* Dashboard. Conta encomendas por material/perfil (chapa e tubo).    */
+  /* ---------------------------------------------------------------- */
+  LC.summarizeMaterialUsage = function(orders, sinceDate){
+    const since = sinceDate ? new Date(sinceDate).getTime() : 0;
+    const counts = {};
+    (orders||[]).forEach(o=>{
+      if(o.orderState === 'cancelled') return;
+      if(!o.createdAt || new Date(o.createdAt).getTime() < since) return;
+      const ms = o.materialSnapshot;
+      if(!ms || !ms.name) return;
+      const key = o.pieceType==='tube' ? ms.name : (ms.name + ' ' + ms.thickness + 'mm');
+      counts[key] = (counts[key]||0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name,count])=>({name, count}))
+      .sort((a,b)=>b.count-a.count);
+  };
+
+  /* ---------------------------------------------------------------- */
+  /* RESUMO DO DIA — encomendas criadas/concluídas hoje e o que está    */
+  /* em produção neste momento. "Concluída hoje" usa costSnapshot.      */
+  /* completedAt, gravado só na primeira vez que a encomenda passa a    */
+  /* "Concluído" (dentro do cost_snapshot já existente — sem precisar   */
+  /* de alterar a tabela do Supabase).                                  */
+  /* ---------------------------------------------------------------- */
+  LC.summarizeToday = function(orders){
+    const now = new Date();
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const isToday = iso => !!iso && new Date(iso).getTime() >= dayStart;
+    let created = 0, completed = 0, inProduction = 0;
+    (orders||[]).forEach(o=>{
+      if(isToday(o.createdAt)) created++;
+      if(o.costSnapshot && isToday(o.costSnapshot.completedAt)) completed++;
+      if((o.orderState||'production') === 'production') inProduction++;
+    });
+    return { created, completed, inProduction };
+  };
+
+  /* ---------------------------------------------------------------- */
   /* MODO CLARO / ESCURO                                               */
   /* Aplicado já no <head> de cada página (evita o "flash" errado);    */
   /* isto só liga o botão do menu e mantém a etiqueta em sincronia.    */

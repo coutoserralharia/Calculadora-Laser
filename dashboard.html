@@ -63,6 +63,12 @@
   .kpi .v.accent{color:var(--accent);}
   .kpi .v.readout{color:var(--readout);}
   .kpi .sub{font-size:11px; color:var(--text-dim); margin-top:4px;}
+  .matusage-row{display:flex; align-items:center; gap:10px; margin-bottom:9px;}
+  .matusage-row:last-child{margin-bottom:0;}
+  .matusage-label{flex:0 0 auto; width:38%; font-size:12px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .matusage-bar-wrap{flex:1; height:8px; background:var(--panel-2); border-radius:99px; overflow:hidden; min-width:0;}
+  .matusage-bar{display:block; height:100%; background:var(--readout); border-radius:99px;}
+  .matusage-count{flex:0 0 auto; min-width:16px; text-align:right; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:var(--text);}
 </style>
 </head>
 <body>
@@ -124,11 +130,12 @@
 
       <div class="dash-stack">
         <div class="card" style="margin-bottom:0;">
-          <h2 class="card-title with-action">
-            <span class="title-left"><span class="dot"></span>Precisão dos tempos</span>
-            <a href="definicoes.html" class="ghost-btn sm" style="text-decoration:none;">Detalhes →</a>
-          </h2>
-          <div id="accuracyBox"></div>
+          <h2 class="card-title"><span class="dot"></span>Resumo do dia</h2>
+          <div class="week-grid" id="todayBox"></div>
+        </div>
+        <div class="card" style="margin-bottom:0;">
+          <h2 class="card-title"><span class="dot"></span>Material mais usado <span class="week-range" id="matUsageMonth"></span></h2>
+          <div id="materialUsageBox"></div>
         </div>
         <div class="card" style="margin-bottom:0;">
           <h2 class="card-title"><span class="dot"></span>Conversão de orçamentos</h2>
@@ -155,7 +162,7 @@
 (function(){
   "use strict";
   const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, loadMachine, loadMaterials, loadTubeProfiles, loadRemoteConfig,
-    remoteLoadOrders, summarizeAccuracy, summarizeWeek, buildAlerts, summarizeConversion, overallAccuracy, registerServiceWorker } = window.LC;
+    remoteLoadOrders, summarizeAccuracy, summarizeWeek, buildAlerts, summarizeConversion, summarizeMaterialUsage, summarizeToday, registerServiceWorker } = window.LC;
 
   const $ = id => document.getElementById(id);
   const state = { orders: [], machine: {}, materials: [], tubeProfiles: [], remote: { configured:false, url:'', key:'' } };
@@ -254,22 +261,29 @@
     $('productionTable').innerHTML = html;
   }
 
-  function renderAccuracyBox(){
-    const rows = summarizeAccuracy(state.orders, state.materials, state.tubeProfiles);
-    const acc = overallAccuracy(rows);
-    if(!acc){
-      $('accuracyBox').innerHTML = '<p class="orders-empty">Ainda sem encomendas com tempo real registado.</p>';
+  function renderToday(){
+    const t = summarizeToday(state.orders);
+    $('todayBox').innerHTML =
+      '<div class="wk"><p class="wk-k">Criadas hoje</p><p class="wk-v">' + t.created + '</p></div>' +
+      '<div class="wk"><p class="wk-k">Concluídas hoje</p><p class="wk-v">' + t.completed + '</p></div>' +
+      '<div class="wk"><p class="wk-k">Em produção</p><p class="wk-v">' + t.inProduction + '</p></div>';
+  }
+
+  function renderMaterialUsage(){
+    $('matUsageMonth').textContent = new Date().toLocaleDateString('pt-PT', { month:'long' });
+    const rows = summarizeMaterialUsage(state.orders, startOfMonth()).slice(0, 6);
+    if(!rows.length){
+      $('materialUsageBox').innerHTML = '<p class="orders-empty">Ainda sem encomendas este mês.</p>';
       return;
     }
-    const dev = acc.avgDeviationPct;
-    const abs = Math.abs(dev);
-    const cls = abs>15 ? 'danger' : (abs>5 ? 'warn' : 'readout');
-    const pctBar = Math.min(abs, 50) / 50 * 100;   // 50% de desvio enche a barra
-    $('accuracyBox').innerHTML =
-      '<div class="stat-line"><span class="stat-big ' + cls + '">' + (dev>=0?'+':'') + fmtNum(dev,0) + '%</span>' +
-      '<span class="stat-label">real vs. estimado</span></div>' +
-      '<div class="stat-bar"><div class="stat-bar-fill ' + cls + '" style="width:' + pctBar.toFixed(0) + '%"></div></div>' +
-      '<p class="stat-sub">média de ' + acc.count + ' encomenda(s) com tempo real</p>';
+    const max = rows[0].count;
+    $('materialUsageBox').innerHTML = rows.map(r =>
+      '<div class="matusage-row">' +
+        '<span class="matusage-label" title="' + escapeHtml(r.name) + '">' + escapeHtml(r.name) + '</span>' +
+        '<span class="matusage-bar-wrap"><span class="matusage-bar" style="width:' + Math.max(6, Math.round(r.count/max*100)) + '%"></span></span>' +
+        '<span class="matusage-count">' + r.count + '</span>' +
+      '</div>'
+    ).join('');
   }
 
   function renderConversionBox(){
@@ -345,7 +359,8 @@
     renderKPIs();
     renderProductionTable();
     renderAlerts();
-    renderAccuracyBox();
+    renderToday();
+    renderMaterialUsage();
     renderConversionBox();
     renderWeek();
   }
