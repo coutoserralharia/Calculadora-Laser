@@ -19,7 +19,7 @@
 <style>
   .layout-single{max-width:1400px; margin:0 auto;}
   .page-sub{margin:4px 0 0; font-size:13px; color:var(--text-muted);}
-  .dash-grid{display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:16px; margin-bottom:16px;}
+  .dash-grid{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; margin-bottom:16px;}
   @media (max-width:800px){ .dash-grid{grid-template-columns:1fr;} }
   .alert-count{margin-left:auto; background:rgba(226,75,74,0.16); color:#e24b4a;
     font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px;}
@@ -41,7 +41,6 @@
   .kpi .v.warn{color:#f0b429;}
   .kpi .v.prod{color:#ff8c3a;}
   .kpi .v.danger{color:#e24b4a;}
-  .dash-stack{display:flex; flex-direction:column; gap:16px;}
   .stat-line{display:flex; align-items:baseline; gap:9px; margin-bottom:9px; flex-wrap:wrap;}
   .stat-big{font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; line-height:1;}
   .stat-big.readout{color:var(--readout);}
@@ -63,12 +62,27 @@
   .kpi .v.accent{color:var(--accent);}
   .kpi .v.readout{color:var(--readout);}
   .kpi .sub{font-size:11px; color:var(--text-dim); margin-top:4px;}
-  .matusage-row{display:flex; align-items:center; gap:10px; margin-bottom:9px;}
-  .matusage-row:last-child{margin-bottom:0;}
-  .matusage-label{flex:0 0 auto; width:38%; font-size:12px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .matusage-bar-wrap{flex:1; height:8px; background:var(--panel-2); border-radius:99px; overflow:hidden; min-width:0;}
-  .matusage-bar{display:block; height:100%; background:var(--readout); border-radius:99px;}
-  .matusage-count{flex:0 0 auto; min-width:16px; text-align:right; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:var(--text);}
+  /* Categorias do gráfico de materiais — ordem fixa (não cíclica), distinta das cores de
+     estado (badges) já usadas na app, para as duas coisas nunca se confundirem visualmente. */
+  :root{
+    --mat-1:#3987e5; --mat-2:#d95926; --mat-3:#199e70; --mat-4:#c98500; --mat-5:#d55181; --mat-other:#6b7280;
+  }
+  :root[data-theme="light"]{
+    --mat-1:#2a78d6; --mat-2:#eb6834; --mat-3:#1baf7a; --mat-4:#eda100; --mat-5:#e87ba4; --mat-other:#9099a3;
+  }
+  .donut-wrap{display:flex; align-items:center; gap:22px; flex-wrap:wrap;}
+  .donut-chart{position:relative; width:132px; height:132px; border-radius:50%; flex:0 0 auto;}
+  .donut-hole{
+    position:absolute; inset:20px; background:var(--panel); border-radius:50%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+  }
+  .donut-total{font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; color:var(--text); line-height:1.1;}
+  .donut-total-label{font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.04em; margin-top:2px;}
+  .donut-legend{list-style:none; margin:0; padding:0; flex:1 1 160px; min-width:150px;}
+  .donut-legend li{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted); padding:5px 0;}
+  .donut-legend .dot{width:9px; height:9px; border-radius:50%; flex:0 0 auto;}
+  .donut-legend .name{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .donut-legend .pct{margin-left:auto; flex:0 0 auto; font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--text); padding-left:8px;}
 </style>
 </head>
 <body>
@@ -128,19 +142,20 @@
         <div id="alertsList"><p class="orders-empty">A carregar…</p></div>
       </div>
 
-      <div class="dash-stack">
-        <div class="card" style="margin-bottom:0;">
-          <h2 class="card-title"><span class="dot"></span>Resumo do dia</h2>
-          <div class="week-grid" id="todayBox"></div>
-        </div>
-        <div class="card" style="margin-bottom:0;">
-          <h2 class="card-title"><span class="dot"></span>Material mais usado <span class="week-range" id="matUsageMonth"></span></h2>
-          <div id="materialUsageBox"></div>
-        </div>
-        <div class="card" style="margin-bottom:0;">
-          <h2 class="card-title"><span class="dot"></span>Conversão de orçamentos</h2>
-          <div id="conversionBox"></div>
-        </div>
+      <div class="card" style="margin-bottom:0;">
+        <h2 class="card-title"><span class="dot"></span>Materiais mais usados <span class="week-range" id="matUsageMonth"></span></h2>
+        <div id="materialUsageBox"></div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="card" style="margin-bottom:0;">
+        <h2 class="card-title"><span class="dot"></span>Resumo do dia</h2>
+        <div class="week-grid" id="todayBox"></div>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <h2 class="card-title"><span class="dot"></span>Conversão de orçamentos</h2>
+        <div id="conversionBox"></div>
       </div>
     </div>
 
@@ -269,21 +284,54 @@
       '<div class="wk"><p class="wk-k">Em produção</p><p class="wk-v">' + t.inProduction + '</p></div>';
   }
 
+  // Gradiente cónico com um pequeno intervalo (gap) entre fatias — dá o efeito de "anel"
+  // em vez de um círculo sólido, e separa visualmente cada categoria.
+  function buildDonutGradient(slices, total){
+    if(slices.length <= 1) return 'conic-gradient(' + (slices[0] ? slices[0].color : 'var(--panel-2)') + ' 0deg 360deg)';
+    const GAP_DEG = 3;
+    let acc = 0;
+    const stops = ['var(--panel) 0deg'];
+    slices.forEach(s=>{
+      const start = acc;
+      acc += (s.count/total) * 360;
+      const half = Math.min(GAP_DEG/2, (acc-start)/2 * 0.8);
+      stops.push('var(--panel) ' + start.toFixed(3) + 'deg');
+      stops.push(s.color + ' ' + (start+half).toFixed(3) + 'deg');
+      stops.push(s.color + ' ' + (acc-half).toFixed(3) + 'deg');
+      stops.push('var(--panel) ' + acc.toFixed(3) + 'deg');
+    });
+    return 'conic-gradient(' + stops.join(', ') + ')';
+  }
+
   function renderMaterialUsage(){
     $('matUsageMonth').textContent = new Date().toLocaleDateString('pt-PT', { month:'long' });
-    const rows = summarizeMaterialUsage(state.orders, startOfMonth()).slice(0, 6);
-    if(!rows.length){
+    const rows = summarizeMaterialUsage(state.orders, startOfMonth());
+    const total = rows.reduce((s,r)=>s+r.count,0);
+    if(!total){
       $('materialUsageBox').innerHTML = '<p class="orders-empty">Ainda sem encomendas este mês.</p>';
       return;
     }
-    const max = rows[0].count;
-    $('materialUsageBox').innerHTML = rows.map(r =>
-      '<div class="matusage-row">' +
-        '<span class="matusage-label" title="' + escapeHtml(r.name) + '">' + escapeHtml(r.name) + '</span>' +
-        '<span class="matusage-bar-wrap"><span class="matusage-bar" style="width:' + Math.max(6, Math.round(r.count/max*100)) + '%"></span></span>' +
-        '<span class="matusage-count">' + r.count + '</span>' +
-      '</div>'
+    const MAT_COLORS = ['var(--mat-1)','var(--mat-2)','var(--mat-3)','var(--mat-4)','var(--mat-5)'];
+    const MAX_SLICES = 5;
+    const top = rows.slice(0, MAX_SLICES);
+    const restCount = rows.slice(MAX_SLICES).reduce((s,r)=>s+r.count,0);
+    const slices = top.map((r,i)=>({ name:r.name, count:r.count, color:MAT_COLORS[i] }));
+    if(restCount) slices.push({ name:'Outros', count:restCount, color:'var(--mat-other)' });
+
+    const gradient = buildDonutGradient(slices, total);
+    const legend = slices.map(s=>
+      '<li><span class="dot" style="background:' + s.color + '"></span>' +
+        '<span class="name" title="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + '</span>' +
+        '<span class="pct">' + Math.round(s.count/total*100) + '%</span></li>'
     ).join('');
+
+    $('materialUsageBox').innerHTML =
+      '<div class="donut-wrap">' +
+        '<div class="donut-chart" style="background:' + gradient + '">' +
+          '<div class="donut-hole"><span class="donut-total">' + total + '</span><span class="donut-total-label">' + (total===1?'Encomenda':'Encomendas') + '</span></div>' +
+        '</div>' +
+        '<ul class="donut-legend">' + legend + '</ul>' +
+      '</div>';
   }
 
   function renderConversionBox(){

@@ -992,8 +992,10 @@
   };
 
   /* ---------------------------------------------------------------- */
-  /* MATERIAIS MAIS USADOS num período — para o gráfico de barras do    */
-  /* Dashboard. Conta encomendas por material/perfil (chapa e tubo).    */
+  /* MATERIAIS MAIS USADOS num período — para o gráfico circular do     */
+  /* Dashboard. Conta encomendas por material (chapa e tubo juntos),    */
+  /* agrupado só pelo nome — espessuras/perfis diferentes do mesmo      */
+  /* material contam para a mesma fatia.                                */
   /* ---------------------------------------------------------------- */
   LC.summarizeMaterialUsage = function(orders, sinceDate){
     const since = sinceDate ? new Date(sinceDate).getTime() : 0;
@@ -1003,7 +1005,7 @@
       if(!o.createdAt || new Date(o.createdAt).getTime() < since) return;
       const ms = o.materialSnapshot;
       if(!ms || !ms.name) return;
-      const key = o.pieceType==='tube' ? ms.name : (ms.name + ' ' + ms.thickness + 'mm');
+      const key = ms.name;
       counts[key] = (counts[key]||0) + 1;
     });
     return Object.entries(counts)
