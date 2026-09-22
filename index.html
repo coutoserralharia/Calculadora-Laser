@@ -1001,6 +1001,13 @@
 
       html += '<div class="p-realtime-box">Tempo de corte real (TOTAL da encomenda, todas as peças): __________________ min &nbsp;&nbsp;&nbsp; Nº de perfurações (se diferente): __________</div>';
 
+      const operatorCommentsText = orderCommentsInp.value.trim();
+      if(operatorCommentsText){
+        html += '<div class="p-notes-box"><div class="p-notes-title">Comentários internos</div>' +
+          '<div class="p-notes-text">' + escapeHtml(operatorCommentsText).replace(/\n/g,'<br>') + '</div>' +
+          '</div>';
+      }
+
     } else {
       const svg = buildPrintSVG(false);
       html += '<div class="p-section">';
@@ -1366,6 +1373,7 @@
   $('newOrderBtn').addEventListener('click', async ()=>{
     if(hasUnsavedFormContent() && !(await window.LC.showConfirm('Isto limpa o formulário atual (nome, cliente, ficheiro/dimensões). Continuar?'))) return;
     resetOrderForm();
+    window.scrollTo({top:0, behavior:'smooth'});
   });
 
   function collectManualInputs(){
