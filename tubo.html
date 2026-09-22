@@ -239,11 +239,10 @@
       <div class="card">
         <h2 class="card-title"><span class="dot"></span>Imprimir</h2>
         <div class="print-btns">
-          <button class="ghost-btn print-btn" id="printOperatorBtn" type="button">Ficha do operador</button>
           <button class="ghost-btn print-btn" id="printInternalBtn" type="button">Ficha interna (com custos)</button>
           <button class="ghost-btn print-btn" id="printQuoteBtn" type="button">Orçamento p/ cliente</button>
         </div>
-        <p class="save-hint">A ficha do operador não mostra preços. A ficha interna inclui a decomposição de custos.</p>
+        <p class="save-hint">A ficha do operador está sempre disponível na barra inferior; não mostra preços. A ficha interna inclui a decomposição de custos.</p>
         <p class="save-hint" id="printHint"></p>
       </div>
 
@@ -271,7 +270,7 @@
     </div>
     <div class="ab-buttons">
       <button class="ghost-btn sm" id="barNewBtn" type="button">Nova</button>
-      <button class="ghost-btn sm" id="barPrintOperatorBtn" type="button">Ficha operador</button>
+      <button class="ghost-btn sm" id="barPrintOperatorBtn" type="button">Ficha do operador</button>
       <button class="ghost-btn sm accent" id="barSaveBtn" type="button"><span id="barSaveLabel">Guardar encomenda atual</span></button>
     </div>
   </div>
@@ -739,7 +738,6 @@
     setTimeout(go, 1200);
   }
   window.addEventListener('afterprint', ()=>{ document.title = originalDocTitle; });
-  $('printOperatorBtn').addEventListener('click', ()=>doPrint('operator'));
   $('printInternalBtn').addEventListener('click', ()=>doPrint('internal'));
   $('printQuoteBtn').addEventListener('click', ()=>doPrint('quote'));
 

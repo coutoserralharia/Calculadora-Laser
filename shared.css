@@ -535,8 +535,11 @@
   .sel-col{width:34px; text-align:center;}
   .sel-col input[type="checkbox"]{width:15px; height:15px; cursor:pointer; accent-color:var(--accent);}
   .selection-bar{
+    /* Neutra por omissão — isto é uma barra de ações em lote (exportar/limpar seleção), não um
+       aviso; o tom de alerta laranja ficava reservado para quando há mesmo algo a assinalar
+       (ver .sb-warn, usado só quando os itens selecionados têm clientes diferentes). */
     display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
-    background:rgba(255,90,46,0.08); border:1px solid rgba(255,90,46,0.35);
+    background:var(--panel-2); border:1px solid var(--border);
     border-radius:8px; padding:10px 14px; margin-bottom:14px;
   }
   .sb-info{display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:13px; color:var(--text-muted);}

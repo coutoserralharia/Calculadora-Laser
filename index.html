@@ -293,10 +293,10 @@
         <div class="total-sub" id="totalTimeSub" hidden style="margin-top:10px; padding-top:10px;"></div>
 
         <div class="print-btns" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border-soft);">
-          <button class="ghost-btn print-btn" id="printOperatorBtn" type="button">Ficha do operador</button>
           <button class="ghost-btn print-btn" id="printInternalBtn" type="button">Ficha interna (com custos)</button>
           <button class="ghost-btn print-btn" id="printQuoteBtn" type="button">Orçamento p/ cliente</button>
         </div>
+        <p class="save-hint" style="margin-top:8px;">"Ficha do operador" está sempre disponível na barra inferior.</p>
         <p class="save-hint" id="printHint"></p>
       </div>
 
@@ -324,7 +324,7 @@
     </div>
     <div class="ab-buttons">
       <button class="ghost-btn sm" id="barNewBtn" type="button">Nova</button>
-      <button class="ghost-btn sm" id="barPrintOperatorBtn" type="button">Ficha operador</button>
+      <button class="ghost-btn sm" id="barPrintOperatorBtn" type="button">Ficha do operador</button>
       <button class="ghost-btn sm accent" id="barSaveBtn" type="button"><span id="barSaveLabel">Guardar encomenda atual</span></button>
     </div>
   </div>
@@ -878,7 +878,7 @@
   /* ---------------------------------------------------------------- */
   /* PRINT SHEETS                                                      */
   /* ---------------------------------------------------------------- */
-  const printOperatorBtn = $('printOperatorBtn'), printInternalBtn = $('printInternalBtn'), printQuoteBtn = $('printQuoteBtn'), printHint = $('printHint');
+  const printInternalBtn = $('printInternalBtn'), printQuoteBtn = $('printQuoteBtn'), printHint = $('printHint');
   const printSheetEl = $('printSheet');
 
   function describeManualShape(){
@@ -1093,7 +1093,6 @@
   }
   window.addEventListener('afterprint', ()=>{ document.title = originalDocTitle; });
 
-  printOperatorBtn.addEventListener('click', ()=>doPrint('operator'));
   printQuoteBtn.addEventListener('click', ()=>doPrint('quote'));
   printInternalBtn.addEventListener('click', ()=>doPrint('internal'));
 
