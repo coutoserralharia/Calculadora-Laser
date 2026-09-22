@@ -911,6 +911,33 @@
     holeContours.forEach(c=>{ const circle = checkCircle(c.points); if(circle) holes.push(circle); });
     return holes;
   }
+  function classifyHole(contour){
+    // Furos redondos, ovais/rasgos e retangulares — cobre os casos mais comuns em chapa cortada
+    // a laser. Um furo que não encaixe em nenhum destes fica marcado como "forma irregular", com
+    // as dimensões do seu retângulo envolvente como aproximação (melhor que não dar indicação nenhuma).
+    const pts = contour.points;
+    const circle = checkCircle(pts);
+    if(circle) return { kind:'circle', diameter:circle.diameter, center:circle.center };
+    let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+    pts.forEach(p=>{ if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; });
+    const w = maxX-minX, h = maxY-minY;
+    const center = {x:(minX+maxX)/2, y:(minY+maxY)/2};
+    const corners = [{x:minX,y:minY},{x:maxX,y:minY},{x:maxX,y:maxY},{x:minX,y:maxY}];
+    const tol = Math.max(0.5, Math.min(w,h)*0.03);
+    const sharpCorners = corners.filter(co => pts.some(p => Math.hypot(p.x-co.x, p.y-co.y) < tol)).length;
+    let kind = 'other';
+    if(sharpCorners>=3){
+      kind = 'rect';
+    } else {
+      const hull = convexHullPts(pts);
+      if(hull.length >= pts.length*0.9) kind = 'oval'; // convexo e sem cantos vivos — oval/rasgo arredondado
+    }
+    return { kind, width:w, height:h, center, minX, maxX, minY, maxY };
+  }
+  function detectAllHoles(closedContours){
+    if(!closedContours || closedContours.length<2) return [];
+    return closedContours.slice().sort((a,b)=>b.area-a.area).slice(1).map(classifyHole);
+  }
   function convexHullPts(points){
     const pts = points.slice().sort((a,b)=> a.x-b.x || a.y-b.y);
     if(pts.length<3) return pts.slice();
@@ -1074,10 +1101,16 @@
           extra += '<text x="'+c.x.toFixed(1)+'" y="'+(c.y-4).toFixed(1)+'" font-size="'+(fs-0.5)+'" font-family="Inter,sans-serif" fill="'+dc+'" text-anchor="middle">'+label+'</text>';
         });
       } else if(dimsMode==='full'){
-        // Ficha do operador: cada furo numerado individualmente (posição/diâmetro na lista abaixo)
-        // e cada entalhe assinalado com a sua área e uma etiqueta com a largura×profundidade.
-        detectHoles(closedForHoles).forEach((hh,i)=>{
+        // Ficha do operador: cada furo (redondo, oval ou retangular) numerado individualmente
+        // (posição/dimensões na lista abaixo) e cada entalhe assinalado com a sua área e uma
+        // etiqueta com a largura×profundidade.
+        detectAllHoles(closedForHoles).forEach((hh,i)=>{
           const c = tx(hh.center);
+          if(hh.kind!=='circle'){
+            const p1 = tx({x:hh.minX,y:hh.minY}), p2 = tx({x:hh.maxX,y:hh.maxY});
+            const rx = Math.min(p1.x,p2.x), ry = Math.min(p1.y,p2.y), rw = Math.abs(p2.x-p1.x), rh = Math.abs(p2.y-p1.y);
+            extra += '<rect x="'+rx.toFixed(1)+'" y="'+ry.toFixed(1)+'" width="'+rw.toFixed(1)+'" height="'+rh.toFixed(1)+'" fill="none" stroke="'+dc+'" stroke-width="0.5" stroke-dasharray="1.5,1.2"/>';
+          }
           extra += '<circle cx="'+c.x.toFixed(1)+'" cy="'+c.y.toFixed(1)+'" r="1.3" fill="'+dc+'"/>';
           extra += '<text x="'+c.x.toFixed(1)+'" y="'+(c.y-4).toFixed(1)+'" font-size="'+(fs-0.5)+'" font-family="Inter,sans-serif" fill="'+dc+'" font-weight="700" text-anchor="middle">'+(i+1)+'</text>';
         });
@@ -1171,12 +1204,16 @@
 
       if(state.dxfResult){
         const dBbox = state.dxfResult.bbox;
-        const holesFull = detectHoles(state.dxfResult.closedContours);
+        const holesFull = detectAllHoles(state.dxfResult.closedContours);
+        const holeShapeName = { rect:'retangular', oval:'oval', other:'forma irregular — aprox.' };
         if(holesFull.length){
           html += '<div class="p-section"><div class="p-costs-title">Furos (posição a partir do canto inferior esquerdo)</div>';
           holesFull.forEach((hh,i)=>{
             const x = hh.center.x - dBbox.minX, y = hh.center.y - dBbox.minY;
-            html += pRow((i+1) + ' — Ø' + fmtNum(hh.diameter,1) + ' mm', 'X: ' + fmtNum(x,1) + ' mm · Y: ' + fmtNum(y,1) + ' mm');
+            const label = hh.kind==='circle'
+              ? 'Ø' + fmtNum(hh.diameter,1) + ' mm'
+              : fmtNum(hh.width,1) + ' × ' + fmtNum(hh.height,1) + ' mm (' + holeShapeName[hh.kind] + ')';
+            html += pRow((i+1) + ' — ' + label, 'X: ' + fmtNum(x,1) + ' mm · Y: ' + fmtNum(y,1) + ' mm');
           });
           html += '</div>';
         }
