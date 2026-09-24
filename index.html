@@ -251,9 +251,10 @@
 
           <div class="field" style="margin-top:6px;">
             <label for="realCuttingTimeInput">Tempo de corte real — total da encomenda, todas as peças (opcional)</label>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <div class="unit-suffix" style="flex:1;"><input type="number" id="realCuttingTimeInput" min="0" step="0.1" placeholder="deixe vazio para usar a estimativa"><span>min</span></div>
-              <button class="ghost-btn sm" id="clearRealTimeBtn" type="button">Repor estimativa</button>
+            <div class="unit-suffix"><input type="number" id="realCuttingTimeInput" min="0" step="0.1" placeholder="deixe vazio para usar a estimativa"><span>min</span></div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <button class="ghost-btn sm" id="useEstimateAsRealBtn" type="button" style="flex:1;">Confirmar estimativa</button>
+              <button class="ghost-btn sm" id="clearRealTimeBtn" type="button" style="flex:1;">Repor estimativa</button>
             </div>
           </div>
 
@@ -760,6 +761,15 @@
   adjustmentReasonSelect.addEventListener('change', recalcAndRender);
   clearRealTimeBtn.addEventListener('click', ()=>{
     realCuttingTimeInput.value = '';
+    recalcAndRender();
+  });
+  $('useEstimateAsRealBtn').addEventListener('click', ()=>{
+    // Copia o valor exato da estimativa (não o número arredondado mostrado no ecrã) — digitar o
+    // valor arredondado à mão pode mudar ligeiramente o custo, porque a estimativa tem mais casas
+    // decimais do que as apresentadas.
+    const result = computeCost();
+    if(!result.valid) return;
+    realCuttingTimeInput.value = Math.round(result.estimatedCuttingTimeMin*100)/100;
     recalcAndRender();
   });
 
@@ -1502,7 +1512,7 @@
 
     $('cutTimeSub').textContent = result.isFinalDisplay
       ? (fmtNum(result.cuttingTimeMin,1)+' min no total (tempo real, todas as peças)')
-      : (fmtNum(result.cuttingTimeMin,1)+' min no total (estimado, '+result.qty+(result.qty===1?' peça':' peças')+' · '+result.geo.pierces+' perfuração(ões)/peça)');
+      : (fmtNum(result.cuttingTimeMin,2)+' min no total (estimado, '+result.qty+(result.qty===1?' peça':' peças')+' · '+result.geo.pierces+' perfuração(ões)/peça)');
     $('costCorte').textContent = fmtEUR(result.corteCost);
 
     $('subtotalValue').textContent = fmtEUR(result.subtotal);
