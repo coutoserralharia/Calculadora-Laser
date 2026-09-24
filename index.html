@@ -274,6 +274,7 @@
                   <option value="Concorrência">Concorrência</option>
                   <option value="Complexidade">Complexidade</option>
                   <option value="Desperdício de chapa">Desperdício de chapa</option>
+                  <option value="Quinagem">Quinagem</option>
                   <option value="Outro">Outro</option>
                 </select>
               </div>
@@ -339,7 +340,7 @@
 <script>
 (function(){
   "use strict";
-  const { parseDXF, fmtEUR, fmtNum, escapeHtml, sanitizeFileName,
+  const { parseDXF, fmtEUR, fmtNum, escapeHtml, sanitizeFileName, searchKey,
     loadMaterials, saveMachine, loadMachine, loadOrders, loadRemoteConfig,
     remoteLoadOrders, remoteInsertOrder, remoteUpdateFullOrder, computeNextOrderNumber,
     idbGet, writeOrderToLocalFolder, registerServiceWorker } = window.LC;
@@ -1381,7 +1382,7 @@
     state.orders.forEach(o=>{
       const n = (o.client||'').trim();
       if(!n) return;
-      const key = n.toLowerCase();
+      const key = searchKey(n);
       if(!seen.has(key)) seen.set(key, n);
     });
     return Array.from(seen.values()).sort((a,b)=>a.localeCompare(b,'pt'));
@@ -1394,15 +1395,15 @@
   }
 
   function renderClientSuggestions(){
-    const q = clientNameInp.value.trim().toLowerCase();
+    const q = searchKey(clientNameInp.value.trim());
     if(!q){ hideClientSuggestions(); return; }
     const matches = knownClients().filter(n=>{
-      const ln = n.toLowerCase();
+      const ln = searchKey(n);
       return ln.includes(q) && ln !== q;
     }).slice(0, 6);
     if(!matches.length){ hideClientSuggestions(); return; }
     clientSuggestionsEl.innerHTML = matches.map((n,i)=>{
-      const idx = n.toLowerCase().indexOf(q);
+      const idx = searchKey(n).indexOf(q);
       const html = escapeHtml(n.slice(0,idx)) + '<mark>' + escapeHtml(n.slice(idx, idx+q.length)) + '</mark>' + escapeHtml(n.slice(idx+q.length));
       return '<button type="button" class="autocomplete-item" data-i="'+i+'" data-name="'+escapeHtml(n)+'">'+html+'</button>';
     }).join('');

@@ -224,6 +224,7 @@
                 <option value="Concorrência">Concorrência</option>
                 <option value="Complexidade">Complexidade</option>
                 <option value="Desperdício de barra">Desperdício de barra</option>
+                <option value="Quinagem">Quinagem</option>
                 <option value="Outro">Outro</option>
               </select>
             </div>
@@ -282,7 +283,7 @@
 <script>
 (function(){
   "use strict";
-  const { fmtEUR, fmtNum, escapeHtml, loadTubeProfiles, loadMachine, loadOrders, loadRemoteConfig,
+  const { fmtEUR, fmtNum, escapeHtml, searchKey, loadTubeProfiles, loadMachine, loadOrders, loadRemoteConfig,
     remoteLoadOrders, remoteInsertOrder, remoteUpdateFullOrder, computeNextOrderNumber,
     registerServiceWorker } = window.LC;
 
@@ -515,19 +516,19 @@
     state.orders.forEach(o=>{
       const n = (o.client||'').trim();
       if(!n) return;
-      const k = n.toLowerCase();
+      const k = searchKey(n);
       if(!seen.has(k)) seen.set(k, n);
     });
     return Array.from(seen.values()).sort((a,b)=>a.localeCompare(b,'pt'));
   }
   function hideClientSuggestions(){ clientSuggestionsEl.hidden = true; clientSuggestionsEl.innerHTML = ''; suggestIndex = -1; }
   function renderClientSuggestions(){
-    const q = clientNameInp.value.trim().toLowerCase();
+    const q = searchKey(clientNameInp.value.trim());
     if(!q){ hideClientSuggestions(); return; }
-    const matches = knownClients().filter(n=>{ const ln=n.toLowerCase(); return ln.includes(q) && ln!==q; }).slice(0,6);
+    const matches = knownClients().filter(n=>{ const ln=searchKey(n); return ln.includes(q) && ln!==q; }).slice(0,6);
     if(!matches.length){ hideClientSuggestions(); return; }
     clientSuggestionsEl.innerHTML = matches.map(n=>{
-      const idx = n.toLowerCase().indexOf(q);
+      const idx = searchKey(n).indexOf(q);
       const html = escapeHtml(n.slice(0,idx)) + '<mark>' + escapeHtml(n.slice(idx, idx+q.length)) + '</mark>' + escapeHtml(n.slice(idx+q.length));
       return '<button type="button" class="autocomplete-item" data-name="'+escapeHtml(n)+'">'+html+'</button>';
     }).join('');

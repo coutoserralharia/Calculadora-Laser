@@ -163,7 +163,7 @@
 <script>
 (function(){
   "use strict";
-  const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, saveOrders, loadRemoteConfig,
+  const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, searchKey, loadOrders, saveOrders, loadRemoteConfig,
     remoteLoadOrders, remoteInsertOrder, remoteDeleteOrder, registerServiceWorker } = window.LC;
 
   const $ = id => document.getElementById(id);
@@ -216,7 +216,7 @@
   }
 
   function getFilteredOrders(){
-    const q = (orderSearchInp.value||'').toLowerCase().trim();
+    const q = searchKey((orderSearchInp.value||'').trim());
     const fState = filterStateSel.value;
     const fType = filterTypeSel.value;
     const fMat = filterMaterialSel.value;
@@ -227,7 +227,7 @@
     return state.orders.filter(o=>{
       if(q){
         const hay = (o.client||'') + ' ' + (o.orderName||'') + ' ' + (o.orderNumber||'') + ' ' + (o.clientRef||'') + ' ' + (o.dxfFileName||'');
-        if(!hay.toLowerCase().includes(q)) return false;
+        if(!searchKey(hay).includes(q)) return false;
       }
       if(fState && (o.orderState||'production') !== fState) return false;
       if(fType && (o.pieceType||'sheet') !== fType) return false;
@@ -361,7 +361,7 @@
     if(!n){ bar.hidden = true; return; }
     const chosen = state.orders.filter(o=>selectedIds.has(o.id));
     const total = chosen.filter(o=>o.orderState!=='cancelled').reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
-    const clients = new Set(chosen.map(o=>(o.client||'').trim().toLowerCase()).filter(Boolean));
+    const clients = new Set(chosen.map(o=>searchKey((o.client||'').trim())).filter(Boolean));
     $('selCount').textContent = n + (n===1 ? ' encomenda' : ' encomendas');
     $('selTotal').textContent = fmtEUR(total);
     $('selWarn').hidden = clients.size <= 1;
@@ -586,9 +586,11 @@
     const byClient = {};
     invoiced.forEach(o=>{
       const c = (o.client && o.client.trim()) || 'Sem cliente';
-      byClient[c] = (byClient[c]||0) + val(o);
+      const key = searchKey(c);
+      if(!byClient[key]) byClient[key] = { name:c, total:0 };
+      byClient[key].total += val(o);
     });
-    const clientRows = Object.entries(byClient).sort((a,b)=>b[1]-a[1]);
+    const clientRows = Object.values(byClient).sort((a,b)=>b.total-a.total).map(r=>[r.name, r.total]);
 
     let html = '<div class="preview-meta" style="padding:14px 0 4px;">';
     html += '<div class="meta-item"><div class="k">Encomendas</div><div class="v">'+invoiced.length+'</div></div>';

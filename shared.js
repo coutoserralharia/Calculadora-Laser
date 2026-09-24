@@ -15,6 +15,11 @@
   LC.fmtNum = (n, d) => isFinite(n) ? n.toLocaleString('pt-PT', {minimumFractionDigits:d||0, maximumFractionDigits:d||0}) : '—';
   LC.escapeHtml = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   LC.sanitizeFileName = s => String(s||'').trim().replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,' ').slice(0,120) || 'sem-nome';
+  // Para pesquisa/comparação de texto sem distinguir acentos nem maiúsculas — "Zé" e "Ze"
+  // devem contar como o mesmo nome de cliente.
+  LC.searchKey = s => Array.from(String(s||'').normalize('NFD'))
+    .filter(ch => { const c = ch.codePointAt(0); return c < 0x0300 || c > 0x036f; }) // remove marcas de acentuação (combining diacritics)
+    .join('').toLowerCase();
 
   /* ---------------------------------------------------------------- */
   /* DXF PARSER                                                        */
@@ -873,15 +878,16 @@
       }
       const c = (o.client||'').trim();
       if(c){
-        if(!byClient[c]) byClient[c] = { count:0, value:0 };
-        byClient[c].count++;
-        byClient[c].value += cs ? (cs.totalCost||0) : 0;
+        const k = LC.searchKey(c);
+        if(!byClient[k]) byClient[k] = { name:c, count:0, value:0 };
+        byClient[k].count++;
+        byClient[k].value += cs ? (cs.totalCost||0) : 0;
       }
       if(cs && isFinite(cs.cuttingTimeMin)) cuttingMin += cs.cuttingTimeMin;
     });
 
     const topMaterial = Object.entries(byMaterial).sort((a,b)=>b[1]-a[1])[0] || null;
-    const topClient = Object.entries(byClient).sort((a,b)=>b[1].count-a[1].count)[0] || null;
+    const topClient = Object.values(byClient).sort((a,b)=>b.count-a.count)[0] || null;
 
     // semana anterior, só para comparar a contagem
     const prevRef = new Date(start); prevRef.setDate(prevRef.getDate() - 1);
@@ -895,7 +901,7 @@
     return {
       start, end, count: inWeek.length, prevCount, cuttingMin,
       topMaterial: topMaterial ? { name: topMaterial[0], count: topMaterial[1] } : null,
-      topClient: topClient ? { name: topClient[0], count: topClient[1].count, value: topClient[1].value } : null,
+      topClient: topClient ? { name: topClient.name, count: topClient.count, value: topClient.value } : null,
     };
   };
 
