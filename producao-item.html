@@ -100,6 +100,28 @@
       <div class="pi-price-row"><span class="lbl">Custo total estimado</span><span class="val" id="estTotal">—</span></div>
       <div class="pi-price-row"><span class="lbl">Preço por peça estimado</span><span class="val" id="estPerPiece">—</span></div>
 
+      <button class="ghost-btn sm" id="showAdjustmentBtn" type="button" style="margin:10px 0 4px;">+ Ajuste comercial</button>
+      <div class="field" id="adjustmentFields" hidden style="margin:10px 0 0;">
+        <label for="adjustmentValueInput">Ajuste comercial (opcional — use valor negativo para desconto)</label>
+        <div class="field-row" style="margin-bottom:0;">
+          <div class="field" style="margin-bottom:0;">
+            <div class="unit-suffix"><input type="number" id="adjustmentValueInput" step="0.5" placeholder="0,00"><span>€</span></div>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <select id="adjustmentReasonSelect">
+              <option value="">Motivo do ajuste…</option>
+              <option value="Pequena quantidade">Pequena quantidade</option>
+              <option value="Urgência">Urgência</option>
+              <option value="Cliente habitual">Cliente habitual</option>
+              <option value="Concorrência">Concorrência</option>
+              <option value="Complexidade">Complexidade</option>
+              <option value="Desperdício de chapa">Desperdício de chapa</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div class="pi-real-input">
         <label for="realTimeInput">Tempo de corte real — total, todas as peças (min)</label>
         <div class="unit-suffix"><input type="number" id="realTimeInput" min="0" step="0.1" placeholder="deixe vazio para manter a estimativa"><span>min</span></div>
@@ -132,6 +154,38 @@
   const orderId = params.get('id');
 
   const state = { rec: null, orders: [], remote: { configured:false, url:'', key:'' }, dirty: false, closed: false };
+
+  const showAdjustmentBtn = $('showAdjustmentBtn'), adjustmentFields = $('adjustmentFields');
+  const adjustmentValueInput = $('adjustmentValueInput'), adjustmentReasonSelect = $('adjustmentReasonSelect');
+  function revealAdjustment(){ adjustmentFields.hidden = false; showAdjustmentBtn.hidden = true; }
+  function hideAdjustmentIfEmpty(){
+    if(!adjustmentValueInput.value && !adjustmentReasonSelect.value){
+      adjustmentFields.hidden = true; showAdjustmentBtn.hidden = false;
+    }
+  }
+  showAdjustmentBtn.addEventListener('click', ()=>{ revealAdjustment(); adjustmentValueInput.focus(); });
+
+  // Ajustar aqui aplica-se por soma (delta) diretamente ao total já gravado — não mexe no tempo
+  // de corte nem no estado "final/estimado", que só o campo de tempo real controla.
+  function applyAdjustmentChange(){
+    const cs = state.rec.costSnapshot || (state.rec.costSnapshot = {});
+    const newVal = parseFloat(adjustmentValueInput.value) || 0;
+    const delta = newVal - (cs.adjustmentValue || 0);
+    cs.adjustmentValue = newVal;
+    cs.adjustmentReason = adjustmentReasonSelect.value;
+    if(delta){
+      if(isFinite(cs.totalCost)) cs.totalCost += delta;
+      if(isFinite(cs.marginValue)) cs.marginValue += delta;
+      if(isFinite(cs.marginValue) && cs.realCost > 0) cs.marginPct = (cs.marginValue/cs.realCost)*100;
+      cs.avgPerPiece = isFinite(cs.totalCost) ? cs.totalCost/(state.rec.quantity||1) : cs.avgPerPiece;
+    }
+    $('estTotal').textContent = isFinite(cs.totalCost) ? fmtEUR(cs.totalCost) : '—';
+    $('estPerPiece').textContent = isFinite(cs.avgPerPiece) ? fmtEUR(cs.avgPerPiece) : '—';
+    state.dirty = true;
+    updateFinalPreview();
+  }
+  adjustmentValueInput.addEventListener('input', applyAdjustmentChange);
+  adjustmentReasonSelect.addEventListener('change', applyAdjustmentChange);
 
   $('realTimeInput').addEventListener('input', ()=>{ state.dirty = true; });
   window.addEventListener('beforeunload', e=>{
@@ -211,13 +265,17 @@
     $('estTotal').textContent = isFinite(cs.totalCost) ? fmtEUR(cs.totalCost) : '—';
     $('estPerPiece').textContent = isFinite(cs.avgPerPiece) ? fmtEUR(cs.avgPerPiece) : '—';
     if(cs.isFinal && isFinite(cs.cuttingTimeMin)) $('realTimeInput').value = cs.cuttingTimeMin.toFixed(1);
+    adjustmentValueInput.value = cs.adjustmentValue ? cs.adjustmentValue : '';
+    adjustmentReasonSelect.value = cs.adjustmentReason || '';
+    if(adjustmentValueInput.value || adjustmentReasonSelect.value) revealAdjustment(); else hideAdjustmentIfEmpty();
     updateFinalPreview();
   }
 
   function updateFinalPreview(){
     const val = parseFloat($('realTimeInput').value);
     const cs = state.rec.costSnapshot || {};
-    if(!Number.isFinite(val) || val < 0){ $('finalTotal').textContent = isFinite(cs.totalCost) ? fmtEUR(cs.totalCost) : '—'; return; }
+    const hasRealInput = Number.isFinite(val) && val >= 0;
+    if(!hasRealInput){ $('finalTotal').textContent = isFinite(cs.totalCost) ? fmtEUR(cs.totalCost) : '—'; return; }
     $('finalTotal').textContent = 'a calcular…';
     recomputeFinalCost(state.rec, val).then(newCs=>{
       $('finalTotal').textContent = isFinite(newCs.totalCost) ? fmtEUR(newCs.totalCost) : '—';
