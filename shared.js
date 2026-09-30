@@ -922,7 +922,7 @@
       alerts.push({
         kind:'warning', title:'Orçamentos parados',
         detail: staleQuotes.length + (staleQuotes.length===1?' sem resposta há +':' sem resposta há +') + quoteDays + ' dias',
-        action:'Ver lista', href:'encomendas.html?filter=quote',
+        action:'Ver lista', href:'orcamentos.html',
       });
     }
 

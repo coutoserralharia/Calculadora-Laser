@@ -29,6 +29,7 @@
       <a href="dashboard.html">Dashboard</a>
       <a href="index.html">Encomenda Chapa</a>
       <a href="tubo.html">Encomenda Tubo</a>
+      <a href="orcamentos.html">Orçamentos</a>
       <a href="producao.html">Produção</a>
       <a href="encomendas.html">Histórico</a>
       <a href="definicoes.html" class="active">Definições</a>
@@ -59,8 +60,9 @@
 
   <main class="layout-single" id="main">
 
-    <div class="card">
-      <h2 class="card-title"><span class="dot"></span>Parâmetros da máquina</h2>
+    <details class="card" id="machineParamsDetails">
+      <summary class="summary-row"><span>Parâmetros da máquina</span><span class="chev">▸</span></summary>
+      <div class="details-body">
       <div class="field-row3">
         <div class="field"><label>Preço custo/hora</label><div class="unit-suffix"><input type="number" id="hourlyRate" step="0.5" min="0"><span>€/h</span></div></div>
         <div class="field"><label>Custo de desenho</label><div class="unit-suffix"><input type="number" id="designRate" step="0.5" min="0"><span>€/h</span></div></div>
@@ -110,10 +112,12 @@
         </div>
       </div>
       <p class="save-hint" style="margin:-6px 0 0;">Um corte em ângulo demora mais do que um corte reto — este fator multiplica o tempo estimado desse corte. 1,4× significa 40% mais lento que um corte reto equivalente.</p>
-    </div>
+      </div>
+    </details>
 
-    <div class="card">
-      <h2 class="card-title"><span class="dot"></span>Gerir perfis de tubo</h2>
+    <details class="card" id="tubeProfilesDetails">
+      <summary class="summary-row"><span>Gerir perfis de tubo</span><span class="chev">▸</span></summary>
+      <div class="details-body">
       <div class="mat-table-wrap">
         <table class="mat-table">
           <thead><tr><th>Perfil</th><th>Perím. secção (mm)</th><th>Veloc. (mm/min)</th><th>€/m base</th><th>% extra</th><th>€/m final</th><th>% desperdício</th><th>Barra (mm)</th><th></th></tr></thead>
@@ -125,10 +129,12 @@
         <button class="ghost-btn" id="resetTubeProfilesBtn" type="button">Repor valores por defeito</button>
       </div>
       <p class="save-hint" style="margin-top:8px;">O tubo é orçamentado ao metro: indique o preço por metro do seu fornecedor e a % extra a aplicar. O perímetro da secção é a soma dos lados (tubo quadrado/retangular) ou π×diâmetro (tubo redondo) — mede-se uma vez por perfil. A "% desperdício" aplica-se automaticamente quando escolheres esse modo na Orçamentação; "Barra (mm)" é só informativo, para referência do comprimento normal de compra.</p>
-    </div>
+      </div>
+    </details>
 
-    <div class="card">
-      <h2 class="card-title"><span class="dot"></span>Gerir tabela de materiais</h2>
+    <details class="card" id="materialsDetails">
+      <summary class="summary-row"><span>Gerir tabela de materiais</span><span class="chev">▸</span></summary>
+      <div class="details-body">
       <div class="mat-table-wrap">
         <table class="mat-table">
           <thead><tr><th>Material</th><th>Esp. (mm)</th><th>Veloc. (mm/min)</th><th>Densidade (kg/dm³)</th><th>€/kg base</th><th>% extra</th><th>€/kg final</th><th></th></tr></thead>
@@ -145,7 +151,8 @@
         <input type="file" id="importSettingsInput" accept="application/json" style="display:none;">
       </div>
       <p class="save-hint" id="saveHint">As alterações são guardadas automaticamente neste navegador.</p>
-    </div>
+      </div>
+    </details>
 
     <details class="card" id="remoteDetails">
       <summary class="summary-row"><span><svg class="btn-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.3" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Armazenamento central <span class="conn-badge" id="connBadge"></span></span><span class="chev">▸</span></summary>

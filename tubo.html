@@ -28,6 +28,7 @@
       <a href="dashboard.html">Dashboard</a>
       <a href="index.html">Encomenda Chapa</a>
       <a href="tubo.html" class="active">Encomenda Tubo</a>
+      <a href="orcamentos.html">Orçamentos</a>
       <a href="producao.html">Produção</a>
       <a href="encomendas.html">Histórico</a>
       <a href="definicoes.html">Definições</a>
@@ -1018,9 +1019,11 @@
 
     const params = new URLSearchParams(location.search);
     const loadId = params.get('loadOrder'), dupId = params.get('duplicateOrder');
+    let autoPrintOperator = false;
     if(loadId){
       const o = state.orders.find(x=>x.id===loadId);
       if(o) await loadOrderIntoForm(o);
+      if(o && params.get('print')==='operator') autoPrintOperator = true;
       history.replaceState(null, '', 'tubo.html');
     } else if(dupId){
       const o = state.orders.find(x=>x.id===dupId);
@@ -1031,6 +1034,8 @@
     recalcAndRender();
     markClean();
     $('loadingVeil').classList.add('done');
+    // Vindo de "Aceitar" nos Orçamentos — abre logo a impressão da ordem de corte.
+    if(autoPrintOperator) doPrint('operator');
   }
   init();
 
