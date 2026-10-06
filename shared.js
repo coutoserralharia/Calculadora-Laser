@@ -586,6 +586,7 @@
       if(!cs || !cs.isFinal) return;
       if(cs.estimadoCuttingTimeMin==null || !isFinite(cs.estimadoCuttingTimeMin)) return;
       if(!isFinite(cs.cuttingTimeMin)) return;
+      if(cs.cuttingTimeMin <= 0) return; // tempo real 0 min = não houve corte medido (ex.: encomenda sem corte) — não serve para calibrar velocidades
       if(cs.estimadoCuttingTimeMin <= 0) return; // avoid divide-by-zero on the deviation %
       const cal = o.materialId ? calibratedAt[o.materialId] : null;
       if(cal && o.createdAt && new Date(o.createdAt).getTime() <= cal) return;
