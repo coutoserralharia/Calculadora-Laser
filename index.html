@@ -80,6 +80,7 @@
           </span>
         </h2>
         <p class="save-hint" id="editingNote" hidden style="color:var(--accent); margin-bottom:10px;"></p>
+        <p class="save-hint" id="priceChangeNote" hidden style="color:#e08a1e; margin-bottom:10px; font-weight:500;"></p>
         <div class="field-row3" style="margin-bottom:12px;">
           <div class="field" style="margin-bottom:0;"><label for="orderName">Nome / peça</label><input type="text" id="orderName" placeholder="Ex: Suporte L-240"></div>
           <div class="field" style="margin-bottom:0;">
@@ -1574,6 +1575,7 @@
   }
 
   function resetOrderForm(){
+    $('priceChangeNote').hidden = true;
     state.loadedOrderId = null;
     state.loadedOrderNumber = null;
     state.loadedOrderCreatedAt = null;
@@ -1695,6 +1697,19 @@
     recalcAndRender();
   }
 
+  // Ao reabrir uma encomenda, avisa se os preços/definições atuais dão um total diferente do guardado.
+  function showPriceChangeNote(savedCs){
+    const el = $('priceChangeNote');
+    const r = computeCost();
+    if(!savedCs || !isFinite(savedCs.totalCost) || !r.valid){ el.hidden = true; return; }
+    const diff = r.totalCost - savedCs.totalCost;
+    if(Math.abs(diff) < 0.005){ el.hidden = true; return; }
+    el.textContent = 'Atenção: o preço guardado desta encomenda era ' + fmtEUR(savedCs.totalCost) +
+      ', mas com os preços/definições atuais seria ' + fmtEUR(r.totalCost) + ' (' + (diff>0 ? '+' : '−') + fmtEUR(Math.abs(diff)) +
+      '). Se gravar, passa para ' + fmtEUR(r.totalCost) + '.';
+    el.hidden = false;
+  }
+
   async function loadOrderIntoForm(o){
     state.loadedOrderId = o.id;
     state.loadedOrderNumber = o.orderNumber;
@@ -1708,6 +1723,7 @@
     $('orderNumberPreview').value = o.orderNumber || '';
     $('orderDatePreview').value = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '';
     markClean();
+    showPriceChangeNote(o.costSnapshot);
     saveOrderHint.style.color = 'var(--readout)';
     saveOrderHint.textContent = 'Encomenda ' + (o.orderNumber ? o.orderNumber+' ' : '') + '"' + (o.orderName||'sem nome') + '" reposta — se guardar de novo, atualiza esta mesma encomenda (mesmo número), com os valores recalculados com os preços/definições atuais.';
     setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
@@ -1877,6 +1893,7 @@
       }
       $('orderNumberPreview').value = orderNumber;
       $('orderDatePreview').value = createdAt ? new Date(createdAt).toLocaleDateString('pt-PT') : '';
+      $('priceChangeNote').hidden = true;
       markClean();
       if(saveOrderHint.style.color !== 'var(--danger)'){
         showNextSteps(orderNumber);

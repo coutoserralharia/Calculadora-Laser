@@ -179,6 +179,7 @@
       <div class="card">
         <h2 class="card-title"><span class="dot"></span>Guardar encomenda <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
         <p class="save-hint" id="editingNote" hidden style="color:var(--accent); margin-bottom:10px;"></p>
+        <p class="save-hint" id="priceChangeNote" hidden style="color:#e08a1e; margin-bottom:10px; font-weight:500;"></p>
         <div class="mat-actions">
           <button class="ghost-btn" id="saveOrderBtn" type="button" hidden><span id="saveOrderBtnLabel">Guardar encomenda atual</span></button>
           <a class="ghost-btn sm" href="encomendas.html" style="text-decoration:none;">Ver encomendas guardadas →</a>
@@ -1087,6 +1088,7 @@
   }
 
   function resetOrderForm(){
+    $('priceChangeNote').hidden = true;
     state.loadedOrderId = null; state.loadedOrderNumber = null;
     state.loadedOrderCreatedAt = null; state.loadedCostSnapshot = null;
     state.orderState = 'quote';
@@ -1159,6 +1161,19 @@
     return isV2;
   }
 
+  // Ao reabrir uma encomenda, avisa se os preços/definições atuais dão um total diferente do guardado.
+  function showPriceChangeNote(savedCs){
+    const el = $('priceChangeNote');
+    const r = computeCost();
+    if(!savedCs || !isFinite(savedCs.totalCost) || !r.valid){ el.hidden = true; return; }
+    const diff = r.totalCost - savedCs.totalCost;
+    if(Math.abs(diff) < 0.005){ el.hidden = true; return; }
+    el.textContent = 'Atenção: o preço guardado desta encomenda era ' + fmtEUR(savedCs.totalCost) +
+      ', mas com os preços/definições atuais seria ' + fmtEUR(r.totalCost) + ' (' + (diff>0 ? '+' : '−') + fmtEUR(Math.abs(diff)) +
+      '). Se gravar, passa para ' + fmtEUR(r.totalCost) + '.';
+    el.hidden = false;
+  }
+
   async function loadOrderIntoForm(o){
     state.loadedOrderId = o.id;
     state.loadedOrderNumber = o.orderNumber;
@@ -1168,6 +1183,7 @@
     $('orderNumberPreview').value = o.orderNumber || '';
     $('orderDatePreview').value = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '';
     markClean();
+    if(isV2) showPriceChangeNote(o.costSnapshot); else $('priceChangeNote').hidden = true;
     saveOrderHint.style.color = 'var(--readout)';
     saveOrderHint.textContent = isV2
       ? 'Encomenda ' + (o.orderNumber||'') + ' reposta — gravar atualiza esta mesma encomenda.'
@@ -1320,6 +1336,7 @@
       state.loadedOrderCreatedAt = createdAt;
       state.loadedCostSnapshot = rec.costSnapshot;
       $('orderNumberPreview').value = orderNumber;
+      $('priceChangeNote').hidden = true;
       markClean();
       showNextSteps(orderNumber);
     }catch(err){
