@@ -248,7 +248,21 @@
 
     if(isTube){
       const t = rec.tubeInputs || {};
-      $('drawingBox').innerHTML = '<span class="pi-noprev">Peça em tubo — ' + escapeHtml((ms&&ms.name)||'') + '</span>';
+      const ig = t.iges;
+      if(ig && ig.lengthMm && ig.A){
+        // Desenho dos rasgos lido do IGES anexado (mesma tira da ordem de fabrico) + resumo.
+        const box = $('drawingBox');
+        const W = Math.max(280, (box.clientWidth || 520) - 20);
+        const z = window.LC.igesZoomRange(ig);
+        const lines = window.LC.igesSummaryLines(ig);
+        box.style.height = 'auto'; box.style.minHeight = '220px'; // o resumo pode ter várias linhas
+        box.innerHTML = '<div style="width:100%; padding:6px 10px; text-align:left;">' +
+          window.LC.igesStripSVG(ig, window.LC.igesMainView(ig), 0, ig.lengthMm, W, 80, z ? { zoomFrom:z.from, zoomTo:z.to } : {}) +
+          (lines.length ? '<div style="font-size:12.5px; line-height:1.5; margin-top:6px;">' + lines.map(l=>'<div>• '+escapeHtml(l)+'</div>').join('') + '</div>' : '') +
+          '</div>';
+      } else {
+        $('drawingBox').innerHTML = '<span class="pi-noprev">Peça em tubo — ' + escapeHtml((ms&&ms.name)||'') + ' (sem ficheiro IGES anexado)</span>';
+      }
       if(t.v === 2){
         $('specsGrid').innerHTML =
           '<div><p class="k">Material</p><p class="v">' + escapeHtml((ms&&ms.name)||'—') + '</p></div>' +

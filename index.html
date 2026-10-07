@@ -1580,6 +1580,7 @@
     state.loadedOrderNumber = null;
     state.loadedOrderCreatedAt = null;
     state.loadedCostSnapshot = null;
+    state.loadedClientRef = null;
     realCuttingTimeInput.value = '';
     geometryScopeSelect.value = 'unit';
     state.orderState = 'quote';
@@ -1639,7 +1640,8 @@
     clientNameInp.value = o.client || '';
     orderCommentsInp.value = o.comments || '';
     qtyInput.value = o.quantity || 1;
-    geometryScopeSelect.value = o.geometryScope || 'unit';
+    const savedBatch = o.costSnapshot && o.costSnapshot.geoSnapshot && o.costSnapshot.geoSnapshot.batch;
+    geometryScopeSelect.value = o.geometryScope || (savedBatch ? 'batch' : 'unit');
     state.orderState = o.orderState || 'production';
     state.wasQuoted = !!o.wasQuoted || state.orderState === 'quote';
     applyOrderStateUI();
@@ -1715,6 +1717,7 @@
     state.loadedOrderNumber = o.orderNumber;
     state.loadedOrderCreatedAt = o.createdAt;
     state.loadedCostSnapshot = o.costSnapshot || null;
+    state.loadedClientRef = o.clientRef || null; // campo antigo, já sem caixa no formulário — só se preserva
     realCuttingTimeInput.value = (o.costSnapshot && o.costSnapshot.isFinal && isFinite(o.costSnapshot.cuttingTimeMin)) ? o.costSnapshot.cuttingTimeMin : '';
 
     const sourceNote = 'Ficheiro reposto do histórico de encomendas (guardado em ' + (o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—') + ').';
@@ -1736,8 +1739,15 @@
     state.loadedCostSnapshot = null;
     realCuttingTimeInput.value = ''; // um novo corte ainda não tem tempo real medido
 
+    state.loadedClientRef = null;
+
     const sourceNote = 'Ficheiro copiado da encomenda ' + (o.orderNumber||'') + ' — esta vai ficar com um número novo ao gravar.';
     await populateFormFromOrder(o, sourceNote);
+    // A cópia é uma encomenda nova: começa sempre como orçamento, nunca herda "Concluído"/"Cancelada".
+    state.orderState = 'quote';
+    state.wasQuoted = false;
+    applyOrderStateUI();
+    recalcAndRender();
 
     await refreshOrderNumberPreview();
     markClean();
@@ -1782,6 +1792,7 @@
         id,
         client: clientNameInp.value.trim(),
         comments: orderCommentsInp.value.trim(),
+        clientRef: isUpdate ? (state.loadedClientRef || null) : null,
         orderState: state.orderState,
         wasQuoted: state.wasQuoted || state.orderState === 'quote',
         orderName,
@@ -1816,6 +1827,9 @@
           geoSnapshot: {
             widthMm: result.geo.width, heightMm: result.geo.height,
             perimeterMm: result.geo.perimeterMm, netAreaMm2: result.geo.netAreaMm2,
+            // Também aqui porque o servidor não tem coluna para geometryScope — sem isto, ao
+            // reabrir do servidor uma encomenda "todas as peças" voltava a "1 peça".
+            batch: result.isBatchGeometry,
           },
           setupInputs: {
             drawingType: drawingTypeSel.value,
@@ -1920,9 +1934,12 @@
     applyDrawingTypeUI();
     applyOrderStateUI();
 
+    // Lista sem os ficheiros DXF (só serve para clientes e números) — o DXF da encomenda a abrir
+    // vem à parte, já abaixo. Antes descarregava todos os DXF de sempre a cada abertura da página.
+    let ordersLoadError = null;
     if(state.remote.configured){
-      try{ state.orders = await remoteLoadOrders(state.remote); }
-      catch(e){ state.orders = []; }
+      try{ state.orders = await remoteLoadOrders(state.remote, {light:true}); }
+      catch(e){ state.orders = []; ordersLoadError = e; }
     } else {
       state.orders = await loadOrders();
     }
@@ -1942,22 +1959,36 @@
     const params = new URLSearchParams(location.search);
     const loadId = params.get('loadOrder');
     const dupId = params.get('duplicateOrder');
-    let autoPrintOperator = false;
-    if(loadId){
-      const o = state.orders.find(x=>x.id===loadId);
-      if(o) await loadOrderIntoForm(o);
-      if(o && params.get('print')==='operator') autoPrintOperator = true;
+    let autoPrintOperator = false, openFailMsg = null;
+    if(loadId || dupId){
+      const wantedId = loadId || dupId;
+      let o = null, err = ordersLoadError;
+      if(state.remote.configured){
+        try{ o = await window.LC.remoteLoadOrderById(state.remote, wantedId); err = null; }
+        catch(e){ err = e; }
+      } else {
+        o = state.orders.find(x=>x.id===wantedId) || null;
+      }
+      if(o && loadId){
+        await loadOrderIntoForm(o);
+        if(params.get('print')==='operator') autoPrintOperator = true;
+      } else if(o){
+        await loadOrderAsDuplicate(o);
+      }
       history.replaceState(null, '', 'index.html');
-    } else if(dupId){
-      const o = state.orders.find(x=>x.id===dupId);
-      if(o) await loadOrderAsDuplicate(o);
-      history.replaceState(null, '', 'index.html');
+      if(!o){
+        // Sem isto ficava um formulário vazio sem explicação — e gravar criava uma encomenda nova.
+        openFailMsg = err
+          ? 'Não foi possível abrir a encomenda pedida (sem ligação ao servidor: ' + err.message + ').\n\nEste formulário está vazio — se gravar, cria uma encomenda NOVA. Tente abrir de novo mais tarde.'
+          : 'A encomenda pedida não foi encontrada (pode ter sido eliminada).\n\nEste formulário está vazio — se gravar, cria uma encomenda nova.';
+      }
     }
 
     window.addEventListener('resize', ()=>drawPreview(getGeometry()));
     recalcAndRender();
     markClean();
     $('loadingVeil').classList.add('done');
+    if(openFailMsg) window.LC.showAlert(openFailMsg);
     // Vindo de "Aceitar" nos Orçamentos — abre logo a impressão da ordem de corte.
     if(autoPrintOperator) doPrint('operator');
   }

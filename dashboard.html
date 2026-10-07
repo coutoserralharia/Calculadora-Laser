@@ -178,7 +178,7 @@
 (function(){
   "use strict";
   const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, loadMachine, loadMaterials, loadTubeProfiles, loadRemoteConfig,
-    remoteLoadOrders, summarizeAccuracy, summarizeWeek, buildAlerts, summarizeConversion, summarizeMaterialUsage, summarizeToday, registerServiceWorker } = window.LC;
+    remoteLoadOrders, summarizeAccuracy, summarizeWeek, buildAlerts, summarizeConversion, summarizeMaterialUsage, summarizeToday, registerServiceWorker, billedAt } = window.LC;
 
   const $ = id => document.getElementById(id);
   const state = { orders: [], machine: {}, materials: [], tubeProfiles: [], remote: { configured:false, url:'', key:'' } };
@@ -207,10 +207,10 @@
     const live = orders.filter(o => !isCancelled(o));
     const thisMonth = live.filter(o => o.createdAt && new Date(o.createdAt) >= monthStart);
     const pending = live.filter(o => (o.orderState||'production') === 'production' && o.costSnapshot && !o.costSnapshot.isFinal);
-    // Faturado real = só o que foi mesmo produzido (Em produção + Concluído).
-    // Orçamentos ainda por confirmar contam à parte, para não inflacionar o valor do mês.
+    // Faturado = só encomendas concluídas, contadas no mês em que foram concluídas.
+    // Em produção e orçamentos ainda por confirmar ficam de fora.
     const isQuote = o => o.orderState === 'quote';
-    const monthRevenue = thisMonth.filter(o=>!isQuote(o))
+    const monthRevenue = orders.filter(o=>{ const b = billedAt(o); return b && new Date(b) >= monthStart; })
       .reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
     const quotedValue = live.filter(isQuote)
       .reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
@@ -226,7 +226,7 @@
 
     $('kpiGrid').innerHTML =
       kpiHTML('Encomendas · ' + monthLabel, thisMonth.length, live.length + ' no total', '') +
-      kpiHTML('Faturado · ' + monthLabel, fmtEUR(monthRevenue), 'sem IVA · exclui orçamentos', 'readout') +
+      kpiHTML('Faturado · ' + monthLabel, fmtEUR(monthRevenue), 'sem IVA · só concluídas', 'readout') +
       kpiHTML('Em orçamento', fmtEUR(quotedValue), quoted + ' por confirmar', 'warn') +
       kpiHTML('Em produção', inProduction, quoted + ' orçamentado(s)', 'prod') +
       kpiHTML('Falta tempo real', pending.length, 'ainda em estimativa', pending.length ? 'danger' : '') +

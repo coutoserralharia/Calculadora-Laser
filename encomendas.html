@@ -165,7 +165,7 @@
 (function(){
   "use strict";
   const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, searchKey, loadOrders, saveOrders, loadRemoteConfig,
-    remoteLoadOrders, remoteInsertOrder, remoteDeleteOrder, registerServiceWorker } = window.LC;
+    remoteLoadOrders, remoteInsertOrder, remoteDeleteOrder, registerServiceWorker, billedAt } = window.LC;
 
   const $ = id => document.getElementById(id);
   const state = { orders: [], remote: { configured:false, url:'', key:'' } };
@@ -444,9 +444,29 @@
     onFilterChange();
   });
 
-  $('exportOrdersBtn').addEventListener('click', ()=>{
+  $('exportOrdersBtn').addEventListener('click', async ()=>{
+    // A lista desta página vem sem os ficheiros DXF (modo "light") — para a cópia de segurança
+    // vai buscar tudo de novo ao servidor, com os DXF, senão a cópia não servia para repor.
+    let toExport = state.orders;
+    if(state.remote.configured){
+      const btn = $('exportOrdersBtn');
+      btn.disabled = true;
+      saveOrderHint.style.color = '';
+      saveOrderHint.textContent = 'A preparar a cópia completa (com os ficheiros DXF)…';
+      try{ toExport = await remoteLoadOrders(state.remote); }
+      catch(err){
+        btn.disabled = false;
+        saveOrderHint.textContent = '';
+        await window.LC.showAlert('Não foi possível ir buscar as encomendas completas ao servidor: ' + err.message + '\n\nA cópia não foi feita.');
+        return;
+      }
+      btn.disabled = false;
+      saveOrderHint.style.color = 'var(--readout)';
+      saveOrderHint.textContent = 'Cópia de segurança feita: ' + toExport.length + ' encomenda(s).';
+      setTimeout(()=>{ saveOrderHint.textContent=''; }, 5000);
+    }
     try{ localStorage.setItem('laser_last_backup', new Date().toISOString()); }catch(e){}
-    const blob = new Blob([JSON.stringify(state.orders, null, 2)], {type:'application/json'});
+    const blob = new Blob([JSON.stringify(toExport, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = 'laser-cost-encomendas.json';
@@ -464,20 +484,27 @@
         if(!Array.isArray(payload)) throw new Error('formato inesperado');
         const existingIds = new Set(state.orders.map(o=>o.id));
         const newOnes = payload.filter(o => o && o.id && !existingIds.has(o.id));
+        const skipped = payload.length - newOnes.length;
+        let imported = 0, failed = 0, lastErr = '';
         if(state.remote.configured){
           for(let i=0;i<newOnes.length;i++){
             saveOrderHint.style.color = '';
             saveOrderHint.textContent = 'A importar para o servidor… (' + (i+1) + '/' + newOnes.length + ')';
-            try{ await remoteInsertOrder(state.remote, newOnes[i]); state.orders.push(newOnes[i]); }catch(err){ /* skip records that fail (e.g. duplicate id on server) */ }
+            try{ await remoteInsertOrder(state.remote, newOnes[i]); state.orders.push(newOnes[i]); imported++; }
+            catch(err){ failed++; lastErr = err.message; /* ex.: número de encomenda já usado no servidor */ }
           }
         } else {
           newOnes.forEach(o => state.orders.push(o));
-          saveOrders(state.orders);
+          await saveOrders(state.orders);
+          imported = newOnes.length;
         }
+        populateFilterOptions();
         renderOrdersList();
-        saveOrderHint.style.color = 'var(--readout)';
-        saveOrderHint.textContent = newOnes.length + ' encomenda(s) importada(s).';
-        setTimeout(()=>{ saveOrderHint.textContent=''; }, 4000);
+        saveOrderHint.style.color = failed ? 'var(--danger)' : 'var(--readout)';
+        saveOrderHint.textContent = imported + ' encomenda(s) importada(s).' +
+          (skipped ? ' ' + skipped + (skipped===1 ? ' já existia e foi ignorada.' : ' já existiam e foram ignoradas.') : '') +
+          (failed ? ' ' + failed + (failed===1 ? ' falhou' : ' falharam') + ' (' + lastErr + ').' : '');
+        if(!failed) setTimeout(()=>{ saveOrderHint.textContent=''; }, 6000);
       }catch(err){
         await window.LC.showAlert('Não foi possível importar este ficheiro de encomendas.');
       }
@@ -561,6 +588,27 @@
     $('generateReportBtn').click();
   });
 
+  // Faturado = só encomendas concluídas (na data de conclusão). Em produção e orçamentos
+  // aparecem à parte; canceladas não entram em nenhum total.
+  function reportTotals(orders){
+    const val = o => (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0);
+    const st = o => o.orderState || 'production';
+    const invoiced = orders.filter(o=>st(o)==='done');
+    const inProd = orders.filter(o=>st(o)==='production');
+    const quotes = orders.filter(o=>st(o)==='quote');
+    const cancelled = orders.filter(o=>st(o)==='cancelled');
+    const totalRevenue = invoiced.reduce((s,o)=> s + val(o), 0);
+    const totalProd = inProd.reduce((s,o)=> s + val(o), 0);
+    const totalQuoted = quotes.reduce((s,o)=> s + val(o), 0);
+    const realCostSum = invoiced.reduce((s,o)=> s + (o.costSnapshot && isFinite(o.costSnapshot.realCost) ? o.costSnapshot.realCost : 0), 0);
+    const marginSum = totalRevenue - realCostSum;
+    const marginPctTotal = realCostSum > 0 ? (marginSum/realCostSum)*100 : null;
+    return { val, invoiced, inProd, quotes, cancelled, totalRevenue, totalProd, totalQuoted, realCostSum, marginSum, marginPctTotal };
+  }
+  // Data que conta para o relatório: concluídas pela data de conclusão, as restantes pela de criação.
+  const reportDate = o => billedAt(o) || o.createdAt || null;
+  const REPORT_RULE_NOTE = 'Faturado conta apenas encomendas concluídas, pela data de conclusão. Em produção e orçamentos entram pela data de criação e aparecem à parte, fora do faturado. Canceladas não entram em nenhum total.';
+
   function renderReport(orders){
     const resultsEl = $('reportResults');
     if(!orders.length){
@@ -569,20 +617,7 @@
       $('printReportBtn').hidden = true;
       return;
     }
-    // Faturado real exclui orçamentos ainda por confirmar — esses contam à parte.
-    const val = o => (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0);
-    const isQuote = o => o.orderState === 'quote';
-    const isCancelled = o => o.orderState === 'cancelled';
-    const live = orders.filter(o=>!isCancelled(o));   // canceladas não entram em nenhum total
-    const cancelled = orders.filter(isCancelled);
-    const invoiced = live.filter(o=>!isQuote(o));
-    const quotes = live.filter(isQuote);
-    const totalRevenue = invoiced.reduce((s,o)=> s + val(o), 0);
-    const totalQuoted = quotes.reduce((s,o)=> s + val(o), 0);
-    const realCostSum = invoiced.reduce((s,o)=> s + (o.costSnapshot && isFinite(o.costSnapshot.realCost) ? o.costSnapshot.realCost : 0), 0);
-    const marginSum = totalRevenue - realCostSum;
-    const marginPctTotal = realCostSum > 0 ? (marginSum/realCostSum)*100 : null;
-    const finalCount = live.filter(o=>o.costSnapshot && o.costSnapshot.isFinal).length;
+    const { val, invoiced, inProd, quotes, cancelled, totalRevenue, totalProd, totalQuoted, realCostSum, marginSum, marginPctTotal } = reportTotals(orders);
 
     const byClient = {};
     invoiced.forEach(o=>{
@@ -594,17 +629,17 @@
     const clientRows = Object.values(byClient).sort((a,b)=>b.total-a.total).map(r=>[r.name, r.total]);
 
     let html = '<div class="preview-meta" style="padding:14px 0 4px;">';
-    html += '<div class="meta-item"><div class="k">Encomendas</div><div class="v">'+invoiced.length+'</div></div>';
-    html += '<div class="meta-item"><div class="k">Final / Estimado</div><div class="v">'+finalCount+' / '+(live.length-finalCount)+'</div></div>';
+    html += '<div class="meta-item"><div class="k">Concluídas</div><div class="v">'+invoiced.length+'</div></div>';
     html += '<div class="meta-item"><div class="k">Faturado (sem IVA)</div><div class="v">'+fmtEUR(totalRevenue)+'</div></div>';
-    html += '<div class="meta-item"><div class="k">Em orçamento</div><div class="v">'+fmtEUR(totalQuoted)+'</div></div>';
-    html += '</div>';
     if(realCostSum > 0){
       html += '<div class="meta-item"><div class="k">Custo real</div><div class="v">'+fmtEUR(realCostSum)+'</div></div>';
       html += '<div class="meta-item"><div class="k">Margem</div><div class="v">'+fmtEUR(marginSum)+(marginPctTotal!=null ? ' · '+fmtNum(marginPctTotal,1)+'%' : '')+'</div></div>';
     }
+    html += '<div class="meta-item"><div class="k">Em produção ('+inProd.length+')</div><div class="v">'+fmtEUR(totalProd)+'</div></div>';
+    html += '<div class="meta-item"><div class="k">Em orçamento ('+quotes.length+')</div><div class="v">'+fmtEUR(totalQuoted)+'</div></div>';
     if(cancelled.length) html += '<div class="meta-item"><div class="k">Canceladas</div><div class="v">'+cancelled.length+'</div></div>';
-    html += '<p class="save-hint" style="margin-top:10px;">Faturado conta apenas ordens em produção ou concluídas. Canceladas não entram em nenhum total. Os '+quotes.length+' orçamento(s) por confirmar aparecem à parte e não entram no total.</p>';
+    html += '</div>';
+    html += '<p class="save-hint" style="margin-top:10px;">'+REPORT_RULE_NOTE+'</p>';
     if(invoiced.length) html += breakdownRowsHTML(costBreakdown(invoiced), totalRevenue);
     html += '<div class="mat-table-wrap" style="margin-top:14px;"><table class="mat-table"><thead><tr><th>Cliente</th><th>Faturado (sem IVA)</th></tr></thead><tbody>';
     clientRows.forEach(([c,total])=>{
@@ -621,8 +656,9 @@
     const fromDate = fromStr ? new Date(fromStr+'T00:00:00') : null;
     const toDate = toStr ? new Date(toStr+'T23:59:59') : null;
     reportOrders = state.orders.filter(o=>{
-      if(!o.createdAt) return false;
-      const d = new Date(o.createdAt);
+      const when = reportDate(o);
+      if(!when) return false;
+      const d = new Date(when);
       if(fromDate && d < fromDate) return false;
       if(toDate && d > toDate) return false;
       return true;
@@ -632,17 +668,7 @@
 
   $('printReportBtn').addEventListener('click', ()=>{
     if(!reportOrders.length) return;
-    const val = o => (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0);
-    const isQuote = o => o.orderState === 'quote';
-    const isCancelled = o => o.orderState === 'cancelled';
-    const live = reportOrders.filter(o=>!isCancelled(o));
-    const invoiced = live.filter(o=>!isQuote(o));
-    const quotes = live.filter(isQuote);
-    const totalRevenue = invoiced.reduce((s,o)=> s + val(o), 0);
-    const totalQuoted = quotes.reduce((s,o)=> s + val(o), 0);
-    const realCostSum = invoiced.reduce((s,o)=> s + (o.costSnapshot && isFinite(o.costSnapshot.realCost) ? o.costSnapshot.realCost : 0), 0);
-    const marginSum = totalRevenue - realCostSum;
-    const marginPctTotal = realCostSum > 0 ? (marginSum/realCostSum)*100 : null;
+    const { invoiced, inProd, quotes, totalRevenue, totalProd, totalQuoted, realCostSum, marginSum, marginPctTotal } = reportTotals(reportOrders);
 
     const STATE_LABEL = { quote:'Orçamentado', production:'Em produção', done:'Concluído', cancelled:'Cancelada' };
     const fromStr = $('reportFrom').value, toStr = $('reportTo').value;
@@ -654,13 +680,14 @@
     html += '<div class="p-meta">Período: ' + fmtD(fromStr) + ' a ' + fmtD(toStr) + ' · gerado em ' + now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) + '</div>';
 
     html += '<div class="p-section">';
-    html += '<div class="p-row"><span class="p-label">Encomendas faturadas</span><span class="p-value">' + invoiced.length + '</span></div>';
+    html += '<div class="p-row"><span class="p-label">Encomendas concluídas</span><span class="p-value">' + invoiced.length + '</span></div>';
     html += '<div class="p-row"><span class="p-label">Faturado (sem IVA)</span><span class="p-value">' + fmtEUR(totalRevenue) + '</span></div>';
     if(realCostSum > 0){
       html += '<div class="p-row"><span class="p-label">Custo real</span><span class="p-value">' + fmtEUR(realCostSum) + '</span></div>';
       html += '<div class="p-row"><span class="p-label">Margem</span><span class="p-value">' + fmtEUR(marginSum) + (marginPctTotal!=null ? ' · ' + fmtNum(marginPctTotal,1) + '%' : '') + '</span></div>';
     }
-    if(quotes.length) html += '<div class="p-row"><span class="p-label">Em orçamento (' + quotes.length + ')</span><span class="p-value">' + fmtEUR(totalQuoted) + '</span></div>';
+    if(inProd.length) html += '<div class="p-row"><span class="p-label">Em produção (' + inProd.length + ') — fora do faturado</span><span class="p-value">' + fmtEUR(totalProd) + '</span></div>';
+    if(quotes.length) html += '<div class="p-row"><span class="p-label">Em orçamento (' + quotes.length + ') — fora do faturado</span><span class="p-value">' + fmtEUR(totalQuoted) + '</span></div>';
     html += '</div>';
 
     if(invoiced.length){
@@ -686,7 +713,7 @@
       const mat = ms ? (escapeHtml(ms.name) + (o.pieceType==='tube' ? '' : ' ' + ms.thickness + 'mm')) : '—';
       html += '<tr>' +
         '<td>' + escapeHtml(o.orderNumber||'—') + '</td>' +
-        '<td>' + (o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—') + '</td>' +
+        '<td>' + (reportDate(o) ? new Date(reportDate(o)).toLocaleDateString('pt-PT') : '—') + '</td>' +
         '<td>' + escapeHtml(o.client||'—') + '</td>' +
         '<td>' + escapeHtml(o.orderName||'—') + '</td>' +
         '<td>' + mat + '</td>' +
@@ -696,7 +723,7 @@
       '</tr>';
     });
     html += '</tbody></table>';
-    html += '<div class="p-group-note">Faturado conta apenas ordens em produção ou concluídas. Canceladas aparecem na lista mas não entram nos totais.</div>';
+    html += '<div class="p-group-note">' + REPORT_RULE_NOTE + '</div>';
 
     $('printSheet').innerHTML = html;
     const originalTitle = document.title;
@@ -707,16 +734,18 @@
 
   $('exportReportBtn').addEventListener('click', ()=>{
     const STATE_LABEL = { quote:'Orçamentado', production:'Em produção', done:'Concluído', cancelled:'Cancelada' };
-    const rows = [['Nº Encomenda','Data','Cliente','Peça','Material','Espessura (mm)','Quantidade','Estado','Custo fechado','Subtotal (€)','Ajuste (€)','Motivo do ajuste','Total sem IVA (€)','Custo real (€)','Margem (€)','Margem (%)']];
-    reportOrders.slice().sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||'')).forEach(o=>{
+    const rows = [['Nº Encomenda','Data','Data de conclusão','Cliente','Peça','Material','Espessura (mm)','Quantidade','Estado','Custo fechado','Subtotal (€)','Ajuste (€)','Motivo do ajuste','Total sem IVA (€)','Custo real (€)','Margem (€)','Margem (%)']];
+    reportOrders.slice().sort((a,b)=>(reportDate(a)||'').localeCompare(reportDate(b)||'')).forEach(o=>{
       const cs = o.costSnapshot;
+      const done = billedAt(o);
       rows.push([
         o.orderNumber||'',
         o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '',
+        done ? new Date(done).toLocaleDateString('pt-PT') : '',
         o.client||'',
         o.orderName||'',
         o.materialSnapshot ? o.materialSnapshot.name : '',
-        o.materialSnapshot ? o.materialSnapshot.thickness : '',
+        (o.materialSnapshot && o.materialSnapshot.thickness != null) ? o.materialSnapshot.thickness : '',
         o.quantity||1,
         STATE_LABEL[o.orderState||'production'] || 'Em produção',
         cs && cs.isFinal ? 'Sim (tempo real)' : 'Não (estimado)',

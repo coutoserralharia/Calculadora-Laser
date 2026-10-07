@@ -780,11 +780,22 @@
   // Campos usados pelas páginas que só mostram tabelas/listagens — deliberadamente sem
   // dxf_text, que pode ser um ficheiro DXF inteiro em texto e não serve para nada numa lista.
   const ORDERS_LIST_FIELDS = 'id,client,order_name,order_number,created_at,mode,dxf_file_name,manual,material_id,material_snapshot,quantity,machine_snapshot,cost_snapshot,comments,client_ref,order_state,piece_type,was_quoted,tube_inputs';
+  // O Supabase devolve no máximo 1000 linhas por pedido — vai buscando páginas seguidas até
+  // vir uma incompleta, senão as encomendas mais antigas desapareciam das listas sem aviso.
+  const REMOTE_PAGE_SIZE = 1000;
+  async function remoteFetchAll(remoteCfg, query){
+    const all = [];
+    for(let offset = 0; ; offset += REMOTE_PAGE_SIZE){
+      const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?' + query + '&limit=' + REMOTE_PAGE_SIZE + '&offset=' + offset, { headers: await remoteHeaders(remoteCfg) });
+      if(!res.ok) throw await remoteRequestError(res);
+      const rows = await res.json();
+      all.push(...rows);
+      if(rows.length < REMOTE_PAGE_SIZE) return all;
+    }
+  }
   LC.remoteLoadOrders = async function(remoteCfg, opts){
     const fields = (opts && opts.light) ? ORDERS_LIST_FIELDS : '*';
-    const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?select=' + fields + '&order=created_at.desc', { headers: await remoteHeaders(remoteCfg) });
-    if(!res.ok) throw await remoteRequestError(res);
-    const rows = await res.json();
+    const rows = await remoteFetchAll(remoteCfg, 'select=' + fields + '&order=created_at.desc,id.desc');
     return rows.map(rowToOrder);
   };
   LC.remoteLoadOrderById = async function(remoteCfg, id){
@@ -839,8 +850,7 @@
     };
     if(remoteCfg && remoteCfg.configured){
       try{
-        const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?select=order_number&order_number=like.' + year + '_*', { headers: await remoteHeaders(remoteCfg) });
-        if(res.ok) scan(await res.json());
+        scan(await remoteFetchAll(remoteCfg, 'select=order_number&order_number=like.' + year + '_*&order=id.asc'));
       }catch(e){ /* fall back to whatever is already loaded locally */ }
     }
     scan(ordersList);
@@ -891,15 +901,13 @@
   };
 
   /* ---------------------------------------------------------------- */
-  /* FINAL COST — recompute from the real cutting time reported after  */
-  /* the piece was actually cut. Recalcula sempre material, taxas e margem com os valores ATUAIS   */
-  /* das Definições (só o tempo de corte fica fixo) — usa a geometria em bruto gravada com a       */
-  /* encomenda para o conseguir fazer do zero. Encomendas antigas sem essa geometria (gravadas      */
-  /* antes desta versão) caem no método anterior, que reaproveita os valores da cotação original.   */
+  /* FINAL COST — fecho da encomenda com o tempo de corte real.         */
+  /* Só o custo de corte muda: material, desenho, setup e ajuste ficam   */
+  /* exatamente como no orçamento aceite (mesmo que os preços tenham     */
+  /* mudado entretanto). O corte usa o custo/hora gravado na encomenda.  */
   /* ---------------------------------------------------------------- */
   LC.recomputeFinalCost = async function(rec, realCuttingTimeMin){
     const cs = rec.costSnapshot || {};
-    const geoSnap = cs.geoSnapshot;
     const qty = rec.quantity || 1;
 
     // Encomendas de tubo (novo método): o corte não se cobra, o tempo real é só registo — o preço
@@ -908,83 +916,33 @@
       return Object.assign({}, cs, { cuttingTimeMin: realCuttingTimeMin, isFinal: true });
     }
 
-    // O material não muda ao registar o tempo real — só o custo de corte muda. Por isso o custo
-    // real e a margem só precisam de um ajuste (delta), não de um recálculo do zero: evita ficarem
-    // presos no valor de quando a encomenda ainda era estimativa.
-    function withMarginFields(base, corteCost, totalCost){
-      if(cs.realCost != null && isFinite(cs.corteCost)){
-        const realCost = cs.realCost - cs.corteCost + corteCost;
-        const marginValue = totalCost - realCost;
-        const marginPct = realCost > 0 ? (marginValue/realCost)*100 : null;
-        return Object.assign(base, { realCost, marginValue, marginPct });
-      }
-      return base;
+    let hourlyRate = rec.machineSnapshot && rec.machineSnapshot.hourlyRate;
+    if(!isFinite(hourlyRate)){
+      try{ hourlyRate = (await LC.loadMachine()).hourlyRate; }catch(e){}
     }
-
-    if(geoSnap && geoSnap.perimeterMm){
-      try{
-        const materials = await LC.loadMaterials();
-        const machine = await LC.loadMachine();
-        const material = materials.find(m => m.id === rec.materialId);
-        if(material){
-          const hourlyRate = machine.hourlyRate || 0;
-          // O tempo real introduzido é sempre o TOTAL da encomenda (todas as peças, já inclui
-          // perfurações) — não se soma nem se multiplica mais nada a este tempo.
-          const corteCost = (realCuttingTimeMin/60) * hourlyRate;
-
-          const marginMm = machine.wasteMarginMm || 0;
-          let areaMm2;
-          if(machine.areaBasis==='net'){
-            areaMm2 = geoSnap.netAreaMm2 || 0;
-          } else if(geoSnap.widthMm!=null && geoSnap.heightMm!=null){
-            areaMm2 = (geoSnap.widthMm+marginMm) * (geoSnap.heightMm+marginMm);
-          } else {
-            areaMm2 = geoSnap.netAreaMm2 || 0;
-          }
-          const areaM2 = areaMm2/1e6;
-          const weightPerPiece = areaM2 * (material.thickness||0) * (material.density||0);
-          const weightTotal = weightPerPiece * qty;
-          const effectivePricePerKg = (material.pricePerKg||0) * (1 + (material.markupPct||0)/100);
-          const materialCost = weightPerPiece * effectivePricePerKg; // por peça
-
-          const si = cs.setupInputs || {};
-          const designTimeMin = si.designTimeMin || 0;
-          const setupTimeMin = si.setupTimeMin || 0;
-          const designCost = (designTimeMin/60) * (machine.designRate||0);
-          const setupCost = (setupTimeMin/60) * (machine.setupRate||0);
-          const preCorteCost = designCost + setupCost;
-
-          // corteCost já é total; materialCost é por peça, por isso só este é vezes qty aqui.
-          const adj = cs.adjustmentValue || 0;
-          const totalCost = corteCost + materialCost*qty + preCorteCost + adj;
-          const avgPerPiece = totalCost / qty;
-
-          return Object.assign({}, cs, withMarginFields({
-            cuttingTimeMin: realCuttingTimeMin,
-            corteCost, materialCost, weightPerPiece, weightTotal,
-            designCost, setupCost, preCorteCost,
-            totalCost, avgPerPiece,
-            isFinal: true,
-          }, corteCost, totalCost));
-        }
-        // material desta encomenda já não existe na tabela — cai para o método antigo abaixo
-      }catch(e){ /* falha a ir buscar materiais/máquina atuais — cai para o método antigo abaixo */ }
-    }
-
-    // Método antigo (encomendas sem geometria gravada — incluindo TODAS as de tubo, ou material
-    // entretanto removido): reaproveita os valores tal como estavam na cotação original.
-    const ms = rec.machineSnapshot || {};
-    const hourlyRate = ms.hourlyRate || 0;
-    const materialCost = cs.materialCost || 0; // por peça
-    const preCorteCost = cs.preCorteCost || 0;
+    hourlyRate = hourlyRate || 0;
+    // O tempo real introduzido é sempre o TOTAL da encomenda (todas as peças, já inclui
+    // perfurações) — não se soma nem se multiplica mais nada a este tempo.
     const corteCost = (realCuttingTimeMin/60) * hourlyRate;
-    const totalCost = corteCost + materialCost*qty + preCorteCost + (cs.adjustmentValue||0);
-    const avgPerPiece = totalCost / qty;
-    return Object.assign({}, cs, withMarginFields({
+    const delta = corteCost - (isFinite(cs.corteCost) ? cs.corteCost : 0);
+
+    // Tudo o resto acompanha só a diferença do corte (delta) — o material nunca é recalculado,
+    // por isso também não importa se o ficheiro era de 1 peça ou de todas as peças aninhadas.
+    const totalCost = isFinite(cs.totalCost)
+      ? cs.totalCost + delta
+      : corteCost + (cs.materialCost||0)*qty + (cs.preCorteCost||0) + (cs.adjustmentValue||0);
+    const out = {
       cuttingTimeMin: realCuttingTimeMin,
-      corteCost, totalCost, avgPerPiece,
+      corteCost, totalCost, avgPerPiece: totalCost / qty,
       isFinal: true,
-    }, corteCost, totalCost));
+    };
+    if(isFinite(cs.subtotal)) out.subtotal = cs.subtotal + delta;
+    if(isFinite(cs.realCost)){
+      out.realCost = cs.realCost + delta;
+      out.marginValue = totalCost - out.realCost;
+      out.marginPct = out.realCost > 0 ? (out.marginValue/out.realCost)*100 : null;
+    }
+    return Object.assign({}, cs, out);
   };
 
   /* ---------------------------------------------------------------- */
@@ -1036,7 +994,24 @@
     lines.push('Cliente: ' + (rec.client || '—'));
     lines.push('Data: ' + (rec.createdAt ? new Date(rec.createdAt).toLocaleString('pt-PT') : '—'));
     lines.push('');
-    lines.push('Material: ' + (rec.materialSnapshot ? (rec.materialSnapshot.name + ' — ' + rec.materialSnapshot.thickness + ' mm') : '—'));
+    const ms = rec.materialSnapshot;
+    if(rec.pieceType === 'tube'){
+      const t = rec.tubeInputs || {};
+      lines.push('Perfil: ' + (ms ? ms.name : '—'));
+      lines.push('Quantidade: ' + (rec.quantity || 1));
+      if(t.lengthMm) lines.push('Comprimento de corte: ' + fmtNum(t.lengthMm,0) + ' mm');
+      if(t.bars) lines.push('Barras: ' + t.bars + ' × ' + fmtNum(t.barLengthMm||0,0) + ' mm');
+      if(rec.comments) lines.push('Comentários: ' + rec.comments);
+      lines.push('');
+      if(rec.costSnapshot){
+        lines.push('Valores no momento de gravação:');
+        if(rec.costSnapshot.adjustmentValue) lines.push('  Ajuste comercial: ' + fmtEUR(rec.costSnapshot.adjustmentValue) + (rec.costSnapshot.adjustmentReason ? ' (' + rec.costSnapshot.adjustmentReason + ')' : ''));
+        lines.push('  TOTAL da encomenda (sem IVA): ' + fmtEUR(rec.costSnapshot.totalCost));
+        lines.push('  TOTAL ÷ nº peças (sem IVA): ' + fmtEUR(rec.costSnapshot.avgPerPiece));
+      }
+      return lines.join('\n');
+    }
+    lines.push('Material: ' + (ms ? (ms.name + (ms.thickness != null ? ' — ' + ms.thickness + ' mm' : '')) : '—'));
     lines.push('Quantidade: ' + (rec.quantity || 1));
     if(rec.costSnapshot && rec.costSnapshot.weightPerPiece > 0){
       lines.push('Peso unitário (1 peça): ' + fmtNum(rec.costSnapshot.weightPerPiece,2) + ' kg');
@@ -1158,7 +1133,7 @@
     inWeek.forEach(o=>{
       const cs = o.costSnapshot, ms = o.materialSnapshot;
       if(ms){
-        const k = ms.name + ' ' + ms.thickness + 'mm';
+        const k = (o.pieceType === 'tube' || ms.thickness == null) ? ms.name : (ms.name + ' ' + ms.thickness + 'mm');
         byMaterial[k] = (byMaterial[k]||0) + 1;
       }
       const c = (o.client||'').trim();
@@ -1219,7 +1194,7 @@
       alerts.push({
         kind:'danger', title:'Tempo real em falta',
         detail: missingTime.length + (missingTime.length===1?' peça em produção há +':' peças em produção há +') + realDays + ' dias',
-        action:'Registar', href:'encomendas.html',
+        action:'Registar', href:'producao.html',
       });
     }
 
@@ -1311,6 +1286,14 @@
   /* "Concluído" (dentro do cost_snapshot já existente — sem precisar   */
   /* de alterar a tabela do Supabase).                                  */
   /* ---------------------------------------------------------------- */
+  /* FATURADO — só contam encomendas concluídas, na data de conclusão   */
+  /* (completedAt). Encomendas antigas sem essa data usam a de criação. */
+  LC.isBilled = o => o.orderState === 'done';
+  LC.billedAt = function(o){
+    if(!LC.isBilled(o)) return null;
+    return (o.costSnapshot && o.costSnapshot.completedAt) || o.createdAt || null;
+  };
+
   LC.summarizeToday = function(orders){
     const now = new Date();
     const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -1344,6 +1327,15 @@
       try{ localStorage.setItem('laser_theme', next); }catch(e){}
       sync();
     });
+  })();
+
+  // Telemóvel: o menu de páginas passa a uma faixa com scroll horizontal — centra a página
+  // atual, senão ficava escondida no fim (ex.: Histórico, Definições).
+  (function scrollActiveNavIntoView(){
+    const nav = document.querySelector('nav.pagenav');
+    const a = nav && nav.querySelector('a.active');
+    if(!a || nav.scrollWidth <= nav.clientWidth) return;
+    nav.scrollLeft = a.offsetLeft - nav.offsetLeft - (nav.clientWidth - a.offsetWidth)/2;
   })();
 
   /* ---------------------------------------------------------------- */
@@ -1406,6 +1398,119 @@
       items: [ { label:'OK', result:undefined, cls:'accent', autofocus:true } ],
     });
   };
+
+  (function(){
+  /* Helpers de formatação usados pelo desenho IGES (partilhado entre tubo.html e producao-item.html). */
+  const fmtC = n => String(n).replace('.', ',');
+  const fmtThousands = n => Math.round(n).toLocaleString('pt-PT');
+  const escapeHtml = LC.escapeHtml;
+  /* ---------------------------------------------------------------- */
+  /* IGES — desenho em tira (tubo inteiro + ampliação) e resumo        */
+  /* ---------------------------------------------------------------- */
+  function igesMainView(iges){ return (iges.groups && iges.groups[0] && iges.groups[0].view) || 'A'; }
+  function igesPolys(iges, view){ return view === 'B' ? iges.B : iges.A; }
+  function igesExt(iges, view){ return view === 'B' ? iges.sectionH : iges.sectionW; }
+
+  // from/to em mm ao longo do tubo; W = largura máxima em px; maxTubeH = altura máxima do tubo em px
+  function igesStripSVG(iges, view, from, to, W, maxTubeH, opts){
+    opts = opts || {};
+    const pad = 10, ext = igesExt(iges, view) || 1;
+    const sc = Math.min((W - 2*pad) / (to - from), maxTubeH / ext);
+    const width = (to - from) * sc + 2*pad;
+    const tubeH = ext * sc;
+    const g = iges.groups && iges.groups[0];
+    const mainView = igesMainView(iges);
+    const showGroupDims = !!(g && view === mainView);
+    const top = 16, cy = top + tubeH/2, yb = top + tubeH;
+    const x = a => pad + (a - from) * sc;
+    const y = u => cy - u * sc;
+    const f = n => n.toFixed(1);
+    const dim = 'stroke="currentColor" stroke-opacity=".55" stroke-width="0.8"';
+    const txt = 'font-size="10" font-family="Inter,sans-serif" fill="currentColor" fill-opacity=".75" text-anchor="middle"';
+    let body = '';
+    igesPolys(iges, view).forEach(flat=>{
+      let d = '';
+      for(let i=0;i<flat.length;i+=2) d += (i ? 'L' : 'M') + f(x(flat[i])) + ' ' + f(y(flat[i+1]));
+      body += '<path d="'+d+'" fill="none" stroke="currentColor" stroke-width="'+(opts.zoom ? 1.4 : 1)+'" stroke-linejoin="round"/>';
+    });
+    const hDim = (a0, a1, yy, label) =>
+      '<line x1="'+f(x(a0))+'" y1="'+f(yy)+'" x2="'+f(x(a1))+'" y2="'+f(yy)+'" '+dim+'/>' +
+      '<line x1="'+f(x(a0))+'" y1="'+f(yy-4)+'" x2="'+f(x(a0))+'" y2="'+f(yy+4)+'" '+dim+'/>' +
+      '<line x1="'+f(x(a1))+'" y1="'+f(yy-4)+'" x2="'+f(x(a1))+'" y2="'+f(yy+4)+'" '+dim+'/>' +
+      '<text x="'+f((x(a0)+x(a1))/2)+'" y="'+f(yy+13)+'" '+txt+'>'+label+'</text>';
+    let rows = 0;
+    if(opts.zoom){
+      if(showGroupDims){
+        body += hDim(g.first, g.first + g.la, yb + 14, fmtC(g.la) + ' mm'); rows = 1;
+        if(g.regular && g.first + g.pitch <= to){ body += hDim(g.first, g.first + g.pitch, yb + 40, fmtC(g.pitch) + ' mm (passo)'); rows = 2; }
+        // largura do rasgo (cota vertical, à esquerda do 1.º rasgo)
+        const gx = x(g.first) - 14;
+        if(gx > pad){
+          body += '<line x1="'+f(gx)+'" y1="'+f(y(g.mid + g.cross/2))+'" x2="'+f(gx)+'" y2="'+f(y(g.mid - g.cross/2))+'" '+dim+'/>' +
+            '<line x1="'+f(gx-4)+'" y1="'+f(y(g.mid + g.cross/2))+'" x2="'+f(gx+4)+'" y2="'+f(y(g.mid + g.cross/2))+'" '+dim+'/>' +
+            '<line x1="'+f(gx-4)+'" y1="'+f(y(g.mid - g.cross/2))+'" x2="'+f(gx+4)+'" y2="'+f(y(g.mid - g.cross/2))+'" '+dim+'/>' +
+            '<text x="'+f(gx-6)+'" y="'+f(y(g.mid))+'" transform="rotate(-90 '+f(gx-6)+' '+f(y(g.mid))+')" '+txt+'>'+fmtC(g.cross)+' mm</text>';
+        }
+        body += '<text x="'+f(x(g.first))+'" y="'+f(top-4)+'" '+txt+'>'+fmtThousands(g.first)+'</text>';
+      }
+    } else {
+      if(showGroupDims){ body += hDim(0, g.first, yb + 14, fmtThousands(g.first) + ' mm'); rows = 1; }
+      body += hDim(0, iges.lengthMm, yb + 14 + rows*24 + (rows ? 8 : 0), fmtThousands(iges.lengthMm) + ' mm'); rows += 1;
+      if(opts.zoomFrom != null){
+        body += '<rect x="'+f(x(opts.zoomFrom))+'" y="'+f(top-6)+'" width="'+f((opts.zoomTo-opts.zoomFrom)*sc)+'" height="'+f(tubeH+12)+'" fill="none" stroke="#2563eb" stroke-width="0.9" stroke-dasharray="3 2"/>';
+      }
+    }
+    const H = yb + 14 + rows*28 + 14;
+    return '<svg width="'+f(width)+'" height="'+f(H)+'" viewBox="0 0 '+f(width)+' '+f(H)+'" style="display:block; max-width:100%;">' + body + '</svg>';
+  }
+
+  function igesZoomRange(iges){
+    const g = iges.groups && iges.groups[0];
+    if(!g) return null;
+    const ext = igesExt(iges, igesMainView(iges)) || 1;
+    const W = 690, pad = 10;
+    const sc = Math.min((W - 2*pad) / 200, 150 / ext);
+    const span = Math.min(iges.lengthMm, (W - 2*pad) / sc);
+    let from = Math.max(0, g.first - 50);
+    if(from + span > iges.lengthMm) from = Math.max(0, iges.lengthMm - span);
+    return { from, to: from + span };
+  }
+
+  function igesSummaryLines(iges){
+    return (iges.groups || []).slice(0,4).map(g=>{
+      let t = g.count + (g.count===1 ? ' rasgo' : ' rasgos') + ' de ' + fmtC(g.la) + ' × ' + fmtC(g.cross) + ' mm';
+      if(g.regular) t += ' · passo de ' + fmtC(g.pitch) + ' mm · do 1.º (aos ' + fmtThousands(g.first) + ' mm) ao último (aos ' + fmtThousands(g.last) + ' mm)';
+      else if(g.count > 1) t += ' · a partir dos ' + fmtThousands(g.first) + ' mm';
+      else t += ' · aos ' + fmtThousands(g.first) + ' mm';
+      return t;
+    });
+  }
+
+  function igesBlockHTML(iges, forPrint){
+    const mainView = igesMainView(iges), otherView = mainView === 'A' ? 'B' : 'A';
+    const z = igesZoomRange(iges);
+    const W = forPrint ? 690 : 560;
+    let h = '<div style="color:#111;">';
+    h += '<div class="p-costs-title" style="margin-bottom:6px;">Desenho do ficheiro IGES' + (iges.name ? ' <span style="font-weight:400; font-size:11px; color:#555;">(' + escapeHtml(iges.name) + ')</span>' : '') + '</div>';
+    h += igesStripSVG(iges, mainView, 0, iges.lengthMm, W, 120, z ? { zoomFrom:z.from, zoomTo:z.to } : {});
+    if(z){
+      h += '<div style="font-size:10.5px; color:#555; margin:6px 0 2px;">Ampliação, de ' + fmtThousands(z.from) + ' a ' + fmtThousands(z.to) + ' mm</div>';
+      h += igesStripSVG(iges, mainView, z.from, z.to, W, 150, { zoom:true });
+    }
+    h += '<div style="font-size:10.5px; color:#555; margin:6px 0 2px;">Vista rodada 90°</div>';
+    h += igesStripSVG(iges, otherView, 0, iges.lengthMm, W, 120, {});
+    const lines = igesSummaryLines(iges);
+    if(lines.length){
+      h += '<div style="margin-top:8px; font-size:13px; line-height:1.55;"><strong>Resumo dos cortes</strong>' + lines.map(l=>'<div>'+escapeHtml(l)+'</div>').join('') +
+        '<div style="font-size:10.5px; color:#555; margin-top:3px;">Lido do ficheiro IGES — posições medidas desde a ponta esquerda do desenho. Confirmar no computador.</div></div>';
+    } else {
+      h += '<div style="margin-top:8px; font-size:11px; color:#555;">Lido do ficheiro IGES. Confirmar no computador.</div>';
+    }
+    return h + '</div>';
+  }
+  Object.assign(LC, { igesMainView, igesStripSVG, igesZoomRange, igesSummaryLines, igesBlockHTML });
+
+  })();
 
   /* ---------------------------------------------------------------- */
   /* IGES — lê as arestas de um tubo/perfil para o desenho do operador  */

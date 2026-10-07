@@ -338,6 +338,8 @@
     loadedOrderNumber: null,
     loadedOrderCreatedAt: null,
     loadedCostSnapshot: null,
+    loadedClientRef: null,
+    localFolder: { ready:false, handle:null },
     orderState: 'quote',
     wasQuoted: false,
     dirty: false,
@@ -550,110 +552,8 @@
     return s + v;
   }
 
-  /* ---------------------------------------------------------------- */
-  /* IGES — desenho em tira (tubo inteiro + ampliação) e resumo        */
-  /* ---------------------------------------------------------------- */
-  function igesMainView(iges){ return (iges.groups && iges.groups[0] && iges.groups[0].view) || 'A'; }
-  function igesPolys(iges, view){ return view === 'B' ? iges.B : iges.A; }
-  function igesExt(iges, view){ return view === 'B' ? iges.sectionH : iges.sectionW; }
-
-  // from/to em mm ao longo do tubo; W = largura máxima em px; maxTubeH = altura máxima do tubo em px
-  function igesStripSVG(iges, view, from, to, W, maxTubeH, opts){
-    opts = opts || {};
-    const pad = 10, ext = igesExt(iges, view) || 1;
-    const sc = Math.min((W - 2*pad) / (to - from), maxTubeH / ext);
-    const width = (to - from) * sc + 2*pad;
-    const tubeH = ext * sc;
-    const g = iges.groups && iges.groups[0];
-    const mainView = igesMainView(iges);
-    const showGroupDims = !!(g && view === mainView);
-    const top = 16, cy = top + tubeH/2, yb = top + tubeH;
-    const x = a => pad + (a - from) * sc;
-    const y = u => cy - u * sc;
-    const f = n => n.toFixed(1);
-    const dim = 'stroke="currentColor" stroke-opacity=".55" stroke-width="0.8"';
-    const txt = 'font-size="10" font-family="Inter,sans-serif" fill="currentColor" fill-opacity=".75" text-anchor="middle"';
-    let body = '';
-    igesPolys(iges, view).forEach(flat=>{
-      let d = '';
-      for(let i=0;i<flat.length;i+=2) d += (i ? 'L' : 'M') + f(x(flat[i])) + ' ' + f(y(flat[i+1]));
-      body += '<path d="'+d+'" fill="none" stroke="currentColor" stroke-width="'+(opts.zoom ? 1.4 : 1)+'" stroke-linejoin="round"/>';
-    });
-    const hDim = (a0, a1, yy, label) =>
-      '<line x1="'+f(x(a0))+'" y1="'+f(yy)+'" x2="'+f(x(a1))+'" y2="'+f(yy)+'" '+dim+'/>' +
-      '<line x1="'+f(x(a0))+'" y1="'+f(yy-4)+'" x2="'+f(x(a0))+'" y2="'+f(yy+4)+'" '+dim+'/>' +
-      '<line x1="'+f(x(a1))+'" y1="'+f(yy-4)+'" x2="'+f(x(a1))+'" y2="'+f(yy+4)+'" '+dim+'/>' +
-      '<text x="'+f((x(a0)+x(a1))/2)+'" y="'+f(yy+13)+'" '+txt+'>'+label+'</text>';
-    let rows = 0;
-    if(opts.zoom){
-      if(showGroupDims){
-        body += hDim(g.first, g.first + g.la, yb + 14, fmtC(g.la) + ' mm'); rows = 1;
-        if(g.regular && g.first + g.pitch <= to){ body += hDim(g.first, g.first + g.pitch, yb + 40, fmtC(g.pitch) + ' mm (passo)'); rows = 2; }
-        // largura do rasgo (cota vertical, à esquerda do 1.º rasgo)
-        const gx = x(g.first) - 14;
-        if(gx > pad){
-          body += '<line x1="'+f(gx)+'" y1="'+f(y(g.mid + g.cross/2))+'" x2="'+f(gx)+'" y2="'+f(y(g.mid - g.cross/2))+'" '+dim+'/>' +
-            '<line x1="'+f(gx-4)+'" y1="'+f(y(g.mid + g.cross/2))+'" x2="'+f(gx+4)+'" y2="'+f(y(g.mid + g.cross/2))+'" '+dim+'/>' +
-            '<line x1="'+f(gx-4)+'" y1="'+f(y(g.mid - g.cross/2))+'" x2="'+f(gx+4)+'" y2="'+f(y(g.mid - g.cross/2))+'" '+dim+'/>' +
-            '<text x="'+f(gx-6)+'" y="'+f(y(g.mid))+'" transform="rotate(-90 '+f(gx-6)+' '+f(y(g.mid))+')" '+txt+'>'+fmtC(g.cross)+' mm</text>';
-        }
-        body += '<text x="'+f(x(g.first))+'" y="'+f(top-4)+'" '+txt+'>'+fmtThousands(g.first)+'</text>';
-      }
-    } else {
-      if(showGroupDims){ body += hDim(0, g.first, yb + 14, fmtThousands(g.first) + ' mm'); rows = 1; }
-      body += hDim(0, iges.lengthMm, yb + 14 + rows*24 + (rows ? 8 : 0), fmtThousands(iges.lengthMm) + ' mm'); rows += 1;
-      if(opts.zoomFrom != null){
-        body += '<rect x="'+f(x(opts.zoomFrom))+'" y="'+f(top-6)+'" width="'+f((opts.zoomTo-opts.zoomFrom)*sc)+'" height="'+f(tubeH+12)+'" fill="none" stroke="#2563eb" stroke-width="0.9" stroke-dasharray="3 2"/>';
-      }
-    }
-    const H = yb + 14 + rows*28 + 14;
-    return '<svg width="'+f(width)+'" height="'+f(H)+'" viewBox="0 0 '+f(width)+' '+f(H)+'" style="display:block; max-width:100%;">' + body + '</svg>';
-  }
-
-  function igesZoomRange(iges){
-    const g = iges.groups && iges.groups[0];
-    if(!g) return null;
-    const ext = igesExt(iges, igesMainView(iges)) || 1;
-    const W = 690, pad = 10;
-    const sc = Math.min((W - 2*pad) / 200, 150 / ext);
-    const span = Math.min(iges.lengthMm, (W - 2*pad) / sc);
-    let from = Math.max(0, g.first - 50);
-    if(from + span > iges.lengthMm) from = Math.max(0, iges.lengthMm - span);
-    return { from, to: from + span };
-  }
-
-  function igesSummaryLines(iges){
-    return (iges.groups || []).slice(0,4).map(g=>{
-      let t = g.count + (g.count===1 ? ' rasgo' : ' rasgos') + ' de ' + fmtC(g.la) + ' × ' + fmtC(g.cross) + ' mm';
-      if(g.regular) t += ' · passo de ' + fmtC(g.pitch) + ' mm · do 1.º (aos ' + fmtThousands(g.first) + ' mm) ao último (aos ' + fmtThousands(g.last) + ' mm)';
-      else if(g.count > 1) t += ' · a partir dos ' + fmtThousands(g.first) + ' mm';
-      else t += ' · aos ' + fmtThousands(g.first) + ' mm';
-      return t;
-    });
-  }
-
-  function igesBlockHTML(iges, forPrint){
-    const mainView = igesMainView(iges), otherView = mainView === 'A' ? 'B' : 'A';
-    const z = igesZoomRange(iges);
-    const W = forPrint ? 690 : 560;
-    let h = '<div style="color:#111;">';
-    h += '<div class="p-costs-title" style="margin-bottom:6px;">Desenho do ficheiro IGES' + (iges.name ? ' <span style="font-weight:400; font-size:11px; color:#555;">(' + escapeHtml(iges.name) + ')</span>' : '') + '</div>';
-    h += igesStripSVG(iges, mainView, 0, iges.lengthMm, W, 120, z ? { zoomFrom:z.from, zoomTo:z.to } : {});
-    if(z){
-      h += '<div style="font-size:10.5px; color:#555; margin:6px 0 2px;">Ampliação, de ' + fmtThousands(z.from) + ' a ' + fmtThousands(z.to) + ' mm</div>';
-      h += igesStripSVG(iges, mainView, z.from, z.to, W, 150, { zoom:true });
-    }
-    h += '<div style="font-size:10.5px; color:#555; margin:6px 0 2px;">Vista rodada 90°</div>';
-    h += igesStripSVG(iges, otherView, 0, iges.lengthMm, W, 120, {});
-    const lines = igesSummaryLines(iges);
-    if(lines.length){
-      h += '<div style="margin-top:8px; font-size:13px; line-height:1.55;"><strong>Resumo dos cortes</strong>' + lines.map(l=>'<div>'+escapeHtml(l)+'</div>').join('') +
-        '<div style="font-size:10.5px; color:#555; margin-top:3px;">Lido do ficheiro IGES — posições medidas desde a ponta esquerda do desenho. Confirmar no computador.</div></div>';
-    } else {
-      h += '<div style="margin-top:8px; font-size:11px; color:#555;">Lido do ficheiro IGES. Confirmar no computador.</div>';
-    }
-    return h + '</div>';
-  }
+  // Desenho do IGES (tira + ampliação + resumo) vive no shared.js — também é usado na Produção.
+  const { igesMainView, igesStripSVG, igesZoomRange, igesSummaryLines, igesBlockHTML } = window.LC;
 
   function renderIges(){
     const ig = state.iges;
@@ -1091,6 +991,7 @@
     $('priceChangeNote').hidden = true;
     state.loadedOrderId = null; state.loadedOrderNumber = null;
     state.loadedOrderCreatedAt = null; state.loadedCostSnapshot = null;
+    state.loadedClientRef = null;
     state.orderState = 'quote';
     state.wasQuoted = false;
     state.basis = 'cut';
@@ -1179,6 +1080,7 @@
     state.loadedOrderNumber = o.orderNumber;
     state.loadedOrderCreatedAt = o.createdAt;
     state.loadedCostSnapshot = o.costSnapshot || null;
+    state.loadedClientRef = o.clientRef || null; // campo antigo, já sem caixa no formulário — só se preserva
     const isV2 = await populateFromOrder(o);
     $('orderNumberPreview').value = o.orderNumber || '';
     $('orderDatePreview').value = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '';
@@ -1194,7 +1096,12 @@
   async function loadOrderAsDuplicate(o){
     state.loadedOrderId = null; state.loadedOrderNumber = null;
     state.loadedOrderCreatedAt = null; state.loadedCostSnapshot = null;
+    state.loadedClientRef = null;
     await populateFromOrder(o);
+    // A cópia é uma encomenda nova: começa sempre como orçamento, nunca herda "Concluído"/"Cancelada".
+    state.orderState = 'quote';
+    state.wasQuoted = false;
+    applyOrderStateUI();
     realCuttingTimeInput.value = '';
     await refreshOrderNumberPreview();
     recalcAndRender();
@@ -1253,6 +1160,7 @@
       const rec = {
         id, client: clientNameInp.value.trim(), orderName, orderNumber, createdAt,
         comments: orderCommentsInp.value.trim(),
+        clientRef: isUpdate ? (state.loadedClientRef || null) : null,
         orderState: state.orderState,
         wasQuoted: state.wasQuoted || state.orderState === 'quote',
         pieceType: 'tube',
@@ -1335,6 +1243,11 @@
       state.loadedOrderNumber = orderNumber;
       state.loadedOrderCreatedAt = createdAt;
       state.loadedCostSnapshot = rec.costSnapshot;
+      if(state.localFolder.ready){
+        const folderResult = await window.LC.writeOrderToLocalFolder(state.localFolder.handle, rec);
+        if(folderResult.ok) saveOrderHint.textContent += ' Também guardada na pasta local.';
+        else if(!folderResult.skipped) saveOrderHint.textContent += ' (falhou a gravação na pasta local: ' + folderResult.error + ')';
+      }
       $('orderNumberPreview').value = orderNumber;
       $('priceChangeNote').hidden = true;
       markClean();
@@ -1377,29 +1290,44 @@
     renderSelectors();
     applyOrderStateUI();
 
+    let ordersLoadError = null;
     try{
       state.orders = state.remote.configured ? await remoteLoadOrders(state.remote, {light:true}) : await loadOrders();
-    }catch(e){ state.orders = []; }
+    }catch(e){ state.orders = []; ordersLoadError = e; }
+
+    if('showDirectoryPicker' in window){
+      try{
+        const handle = await window.LC.idbGet('rootDir');
+        if(handle && (await handle.queryPermission({mode:'readwrite'})) === 'granted') state.localFolder = { ready:true, handle };
+      }catch(e){ /* sem pasta ligada, ou acesso já não é válido */ }
+    }
 
     await refreshOrderNumberPreview();
 
     const params = new URLSearchParams(location.search);
     const loadId = params.get('loadOrder'), dupId = params.get('duplicateOrder');
-    let autoPrintOperator = false;
-    if(loadId){
-      const o = state.orders.find(x=>x.id===loadId);
-      if(o) await loadOrderIntoForm(o);
-      if(o && params.get('print')==='operator') autoPrintOperator = true;
+    let autoPrintOperator = false, openFailMsg = null;
+    if(loadId || dupId){
+      const o = state.orders.find(x=>x.id===(loadId || dupId));
+      if(o && loadId){
+        await loadOrderIntoForm(o);
+        if(params.get('print')==='operator') autoPrintOperator = true;
+      } else if(o){
+        await loadOrderAsDuplicate(o);
+      }
       history.replaceState(null, '', 'tubo.html');
-    } else if(dupId){
-      const o = state.orders.find(x=>x.id===dupId);
-      if(o) await loadOrderAsDuplicate(o);
-      history.replaceState(null, '', 'tubo.html');
+      if(!o){
+        // Sem isto ficava um formulário vazio sem explicação — e gravar criava uma encomenda nova.
+        openFailMsg = ordersLoadError
+          ? 'Não foi possível abrir a encomenda pedida (sem ligação ao servidor: ' + ordersLoadError.message + ').\n\nEste formulário está vazio — se gravar, cria uma encomenda NOVA. Tente abrir de novo mais tarde.'
+          : 'A encomenda pedida não foi encontrada (pode ter sido eliminada).\n\nEste formulário está vazio — se gravar, cria uma encomenda nova.';
+      }
     }
 
     recalcAndRender();
     markClean();
     $('loadingVeil').classList.add('done');
+    if(openFailMsg) window.LC.showAlert(openFailMsg);
     // Vindo de "Aceitar" nos Orçamentos — abre logo a impressão da ordem de fabrico.
     if(autoPrintOperator) doPrint('operator');
   }
