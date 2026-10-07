@@ -264,7 +264,7 @@
     pageRows.forEach(o=>{
       const cs = o.costSnapshot;
       const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
-      const matStr = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + ' ' + o.materialSnapshot.thickness + 'mm') : '—';
+      const matStr = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + (o.pieceType==='tube' ? '' : ' ' + o.materialSnapshot.thickness + 'mm')) : '—';
       const isFinal = !!(cs && cs.isFinal);
       const finalTag = isFinal
         ? '<span class="hist-final" title="Custo fechado com tempo real de corte">✓</span>'

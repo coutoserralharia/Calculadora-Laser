@@ -105,22 +105,58 @@
         </div>
       </div>
       <p class="save-hint" style="margin:-6px 0 12px;">A margem de desperdício soma-se à largura e ao comprimento da peça (retângulo envolvente) antes de calcular a área usada no peso/custo do material — reflete o espaço à volta de cada peça na chapa real. Não afeta o desenho mostrado na pré-visualização nem na ficha do operador, só o cálculo numérico. Só se aplica no modo "Retângulo envolvente".</p>
-      <div class="field-row" style="margin-bottom:0;">
+      <div class="field-row3" style="margin-bottom:0;">
         <div class="field" style="margin-bottom:0;">
-          <label>Fator de corte em ângulo/esquadria (tubo)</label>
-          <div class="unit-suffix"><input type="number" id="angleCutFactor" step="0.1" min="1"><span>×</span></div>
+          <label>Margem de venda do tubo (× custo)</label>
+          <div class="unit-suffix"><input type="number" id="tubeMarkup" step="0.05" min="1"><span>×</span></div>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label>Comprimento da barra de tubo</label>
+          <div class="unit-suffix"><input type="number" id="tubeBarLengthMm" step="100" min="0"><span>mm</span></div>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label>Zona de fixação perdida por barra</label>
+          <div class="unit-suffix"><input type="number" id="tubeClampMm" step="10" min="0"><span>mm</span></div>
         </div>
       </div>
-      <p class="save-hint" style="margin:-6px 0 0;">Um corte em ângulo demora mais do que um corte reto — este fator multiplica o tempo estimado desse corte. 1,4× significa 40% mais lento que um corte reto equivalente.</p>
+      <p class="save-hint" style="margin:8px 0 0;">Tubo e perfis: o preço de venda ao metro é o custo de compra × a margem (1,5× = custo + 50%). Alterar a margem muda o preço de venda de todos os perfis ao mesmo tempo. A zona de fixação é a ponta da barra que a máquina não consegue cortar — conta para as barras necessárias.</p>
       </div>
     </details>
 
     <details class="card" id="tubeProfilesDetails">
       <summary class="summary-row"><span>Gerir perfis de tubo</span><span class="chev">▸</span></summary>
       <div class="details-body">
-      <div class="mat-table-wrap">
+      <div class="field-row" style="margin-bottom:10px;">
+        <div class="field" style="margin-bottom:0;">
+          <label for="tubeFilterMaterial">Material</label>
+          <select id="tubeFilterMaterial">
+            <option value="">Todos</option>
+            <option value="preto">Preto</option>
+            <option value="galvanizado">Galvanizado</option>
+            <option value="inox">Inox</option>
+            <option value="aluminio">Alumínio</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="tubeFilterShape">Tipo de perfil</label>
+          <select id="tubeFilterShape">
+            <option value="">Todos</option>
+            <option value="redondo">Redondo</option>
+            <option value="quadrado">Quadrado</option>
+            <option value="retangular">Retangular</option>
+            <option value="cantoneira">Cantoneira</option>
+            <option value="perfilu">Perfil em U</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="tubeFilterText">Pesquisar</label>
+          <input type="text" id="tubeFilterText" placeholder="Ex.: 40x40">
+        </div>
+      </div>
+      <p class="save-hint" id="tubeCount" style="margin:0 0 8px;"></p>
+      <div class="mat-table-wrap" style="max-height:480px; overflow:auto;">
         <table class="mat-table">
-          <thead><tr><th>Perfil</th><th>Perím. secção (mm)</th><th>Veloc. (mm/min)</th><th>€/m base</th><th>% extra</th><th>€/m final</th><th>% desperdício</th><th>Barra (mm)</th><th></th></tr></thead>
+          <thead><tr><th>Perfil</th><th>Material</th><th>Tipo</th><th>Larg. (mm)</th><th>Alt. (mm)</th><th>Esp. (mm)</th><th>Compra (€/m)</th><th>Venda (€/m)</th><th></th></tr></thead>
           <tbody id="tubeProfilesTbody"></tbody>
         </table>
       </div>
@@ -128,7 +164,7 @@
         <button class="ghost-btn" id="addTubeProfileBtn" type="button">+ Adicionar linha</button>
         <button class="ghost-btn" id="resetTubeProfilesBtn" type="button">Repor valores por defeito</button>
       </div>
-      <p class="save-hint" style="margin-top:8px;">O tubo é orçamentado ao metro: indique o preço por metro do seu fornecedor e a % extra a aplicar. O perímetro da secção é a soma dos lados (tubo quadrado/retangular) ou π×diâmetro (tubo redondo) — mede-se uma vez por perfil. A "% desperdício" aplica-se automaticamente quando escolheres esse modo na Orçamentação; "Barra (mm)" é só informativo, para referência do comprimento normal de compra.</p>
+      <p class="save-hint" style="margin-top:8px;">O tubo é orçamentado ao metro. O preço de venda é calculado: compra × a margem de venda do tubo definida em "Parâmetros da máquina". Perfis sem preço de compra (0) pedem o valor à mão em cada encomenda. Alumínio, cantoneiras e perfis em U ainda não têm tabela — adicione linhas à medida que precisar.</p>
       </div>
     </details>
 
@@ -308,7 +344,7 @@ create policy "só utilizadores autenticados"
   const setupRateInp = $('setupRate'), defaultSetupMinInp = $('defaultSetupMin'), wasteMarginMmInp = $('wasteMarginMm');
   const areaBasisSel = $('areaBasis');
   const alertQuoteDaysInp = $('alertQuoteDays'), alertRealTimeDaysInp = $('alertRealTimeDays'), alertBackupDaysInp = $('alertBackupDays');
-  const angleCutFactorInp = $('angleCutFactor');
+  const tubeMarkupInp = $('tubeMarkup'), tubeBarLengthMmInp = $('tubeBarLengthMm'), tubeClampMmInp = $('tubeClampMm');
 
   function applyMachineToInputs(){
     hourlyRateInp.value = state.machine.hourlyRate;
@@ -321,9 +357,11 @@ create policy "só utilizadores autenticados"
     alertQuoteDaysInp.value = state.machine.alertQuoteDays ?? 7;
     alertRealTimeDaysInp.value = state.machine.alertRealTimeDays ?? 2;
     alertBackupDaysInp.value = state.machine.alertBackupDays ?? 14;
-    angleCutFactorInp.value = state.machine.angleCutFactor ?? 1.4;
+    tubeMarkupInp.value = state.machine.tubeMarkup ?? 1.5;
+    tubeBarLengthMmInp.value = state.machine.tubeBarLengthMm ?? 6000;
+    tubeClampMmInp.value = state.machine.tubeClampMm ?? 400;
   }
-  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, setupRateInp, defaultSetupMinInp, wasteMarginMmInp, alertQuoteDaysInp, alertRealTimeDaysInp, alertBackupDaysInp, angleCutFactorInp].forEach(inp=>{
+  [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, setupRateInp, defaultSetupMinInp, wasteMarginMmInp, alertQuoteDaysInp, alertRealTimeDaysInp, alertBackupDaysInp, tubeMarkupInp, tubeBarLengthMmInp, tubeClampMmInp].forEach(inp=>{
     inp.addEventListener('input', ()=>{
       state.machine.hourlyRate = parseFloat(hourlyRateInp.value)||0;
       state.machine.designRate = parseFloat(designRateInp.value)||0;
@@ -335,7 +373,10 @@ create policy "só utilizadores autenticados"
       state.machine.alertQuoteDays = parseInt(alertQuoteDaysInp.value,10)||7;
       state.machine.alertRealTimeDays = parseInt(alertRealTimeDaysInp.value,10)||2;
       state.machine.alertBackupDays = parseInt(alertBackupDaysInp.value,10)||14;
-      state.machine.angleCutFactor = parseFloat(angleCutFactorInp.value)||1.4;
+      state.machine.tubeMarkup = parseFloat(tubeMarkupInp.value)||1.5;
+      state.machine.tubeBarLengthMm = parseFloat(tubeBarLengthMmInp.value)||6000;
+      state.machine.tubeClampMm = parseFloat(tubeClampMmInp.value)||0;
+      renderTubeProfilesTable();
       saveMachine(state.machine);
     });
   });
@@ -410,25 +451,37 @@ create policy "só utilizadores autenticados"
   /* PERFIS DE TUBO                                                    */
   /* ---------------------------------------------------------------- */
   const tubeProfilesTbody = $('tubeProfilesTbody');
+  const MAT_LABEL = { preto:'Preto', galvanizado:'Galvanizado', inox:'Inox', aluminio:'Alumínio' };
+  const SHAPE_LABEL = { redondo:'Redondo', quadrado:'Quadrado', retangular:'Retangular', cantoneira:'Cantoneira', perfilu:'Perfil em U' };
+  const eur2 = n => n.toFixed(2).replace('.',',');
+  const tubeMarkupNow = () => state.machine.tubeMarkup || 1.5;
+  const optionsHTML = (map, sel) => Object.keys(map).map(k=>'<option value="'+k+'"'+(k===sel?' selected':'')+'>'+map[k]+'</option>').join('');
 
   function renderTubeProfilesTable(){
+    const fm = $('tubeFilterMaterial').value, fs = $('tubeFilterShape').value;
+    const ft = window.LC.searchKey($('tubeFilterText').value.trim());
     tubeProfilesTbody.innerHTML = '';
+    let shown = 0;
     state.tubeProfiles.forEach((p,i)=>{
+      if(fm && p.material!==fm) return;
+      if(fs && p.shape!==fs) return;
+      if(ft && !window.LC.searchKey(p.name).includes(ft)) return;
+      shown++;
       const tr = document.createElement('tr');
-      const finalPrice = (p.pricePerM||0) * (1 + (p.markupPct||0)/100);
       tr.innerHTML =
-        '<td><input type="text" data-i="'+i+'" data-f="name" value="'+p.name.replace(/"/g,'&quot;')+'"></td>' +
-        '<td><input type="number" step="1" min="0" data-i="'+i+'" data-f="perimeterMm" value="'+(p.perimeterMm||0)+'"></td>' +
-        '<td><input type="number" step="10" min="1" data-i="'+i+'" data-f="speed" value="'+(p.speed||0)+'"></td>' +
-        '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="pricePerM" value="'+(p.pricePerM||0)+'"></td>' +
-        '<td><input type="number" step="1" min="0" data-i="'+i+'" data-f="markupPct" value="'+(p.markupPct||0)+'"></td>' +
-        '<td class="mat-final-price">'+finalPrice.toFixed(2).replace('.',',')+' €</td>' +
-        '<td><input type="number" step="1" min="0" data-i="'+i+'" data-f="defaultWastePct" value="'+(p.defaultWastePct??10)+'"></td>' +
-        '<td><input type="number" step="100" min="0" data-i="'+i+'" data-f="barLengthMm" value="'+(p.barLengthMm||6000)+'"></td>' +
+        '<td><input type="text" data-i="'+i+'" data-f="name" value="'+escapeHtml(p.name)+'"></td>' +
+        '<td><select data-i="'+i+'" data-f="material">'+optionsHTML(MAT_LABEL, p.material)+'</select></td>' +
+        '<td><select data-i="'+i+'" data-f="shape">'+optionsHTML(SHAPE_LABEL, p.shape)+'</select></td>' +
+        '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="w" value="'+(p.w||0)+'" style="width:64px;"></td>' +
+        '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="h" value="'+(p.h||0)+'" style="width:64px;"></td>' +
+        '<td><input type="number" step="0.05" min="0" data-i="'+i+'" data-f="t" value="'+(p.t==null?'':p.t)+'" style="width:64px;"></td>' +
+        '<td><input type="number" step="0.05" min="0" data-i="'+i+'" data-f="costPerM" value="'+(p.costPerM||0)+'"></td>' +
+        '<td class="mat-final-price">'+((p.costPerM||0)>0 ? eur2(p.costPerM*tubeMarkupNow())+' €' : '—')+'</td>' +
         '<td><button class="rm-btn" data-i="'+i+'" title="Remover" aria-label="Remover">✕</button></td>';
       tubeProfilesTbody.appendChild(tr);
     });
-    tubeProfilesTbody.querySelectorAll('input').forEach(inp=>{
+    $('tubeCount').textContent = shown + ' de ' + state.tubeProfiles.length + ' perfis' + ((fm||fs||ft) ? ' (com filtros)' : '');
+    tubeProfilesTbody.querySelectorAll('input, select').forEach(inp=>{
       inp.addEventListener('change', onTubeProfileFieldChange);
       inp.addEventListener('input', onTubeProfileFieldLivePreview);
     });
@@ -441,34 +494,35 @@ create policy "só utilizadores autenticados"
       });
     });
   }
+  ['tubeFilterMaterial','tubeFilterShape'].forEach(id=> $(id).addEventListener('change', renderTubeProfilesTable));
+  $('tubeFilterText').addEventListener('input', renderTubeProfilesTable);
   function onTubeProfileFieldLivePreview(e){
-    const f = e.target.getAttribute('data-f');
-    if(f!=='pricePerM' && f!=='markupPct') return;
-    const row = e.target.closest('tr');
-    const price = parseFloat(row.querySelector('[data-f="pricePerM"]').value)||0;
-    const markup = parseFloat(row.querySelector('[data-f="markupPct"]').value)||0;
-    row.querySelector('.mat-final-price').textContent = (price*(1+markup/100)).toFixed(2).replace('.',',') + ' €';
+    if(e.target.getAttribute('data-f')!=='costPerM') return;
+    const price = parseFloat(e.target.value)||0;
+    e.target.closest('tr').querySelector('.mat-final-price').textContent = price>0 ? eur2(price*tubeMarkupNow())+' €' : '—';
   }
   function onTubeProfileFieldChange(e){
     const i = parseInt(e.target.getAttribute('data-i'),10);
     const f = e.target.getAttribute('data-f');
     let v = e.target.value;
-    if(f!=='name') v = parseFloat(v)||0;
+    if(f==='t') v = (v==='' ? null : (parseFloat(v)||0));
+    else if(f!=='name' && f!=='material' && f!=='shape') v = parseFloat(v)||0;
     state.tubeProfiles[i][f] = v;
     saveTubeProfiles(state.tubeProfiles);
   }
   $('addTubeProfileBtn').addEventListener('click', ()=>{
-    state.tubeProfiles.push({id:'t'+Date.now(), name:'Novo perfil', perimeterMm:100, speed:3000, pricePerM:3, markupPct:0, defaultWastePct:10, barLengthMm:6000});
+    state.tubeProfiles.unshift({id:'t'+Date.now(), material:$('tubeFilterMaterial').value||'preto', shape:$('tubeFilterShape').value||'quadrado', name:'Novo perfil', w:0, h:0, t:null, inch:false, costPerM:0});
+    $('tubeFilterText').value = '';
     renderTubeProfilesTable();
     saveTubeProfiles(state.tubeProfiles);
+    const first = tubeProfilesTbody.querySelector('input'); if(first){ first.focus(); first.select(); }
   });
   $('resetTubeProfilesBtn').addEventListener('click', async ()=>{
-    if(!(await window.LC.showConfirm('Repor a tabela de perfis de tubo para os valores por defeito? Isto substitui todos os perfis atuais.', {danger:true}))) return;
+    if(!(await window.LC.showConfirm('Repor a tabela de perfis de tubo para os valores por defeito (a lista do Excel)? Isto substitui todos os perfis atuais, incluindo os que adicionou ou alterou.', {danger:true}))) return;
     state.tubeProfiles = JSON.parse(JSON.stringify(DEFAULT_TUBE_PROFILES));
     renderTubeProfilesTable();
     saveTubeProfiles(state.tubeProfiles);
   });
-
   $('exportSettingsBtn').addEventListener('click', ()=>{
     const payload = { materials: state.materials, tubeProfiles: state.tubeProfiles, machine: state.machine };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
@@ -487,7 +541,7 @@ create policy "só utilizadores autenticados"
       try{
         const payload = JSON.parse(ev.target.result);
         if(Array.isArray(payload.materials) && payload.materials.length) state.materials = payload.materials;
-        if(Array.isArray(payload.tubeProfiles) && payload.tubeProfiles.length) state.tubeProfiles = payload.tubeProfiles;
+        if(Array.isArray(payload.tubeProfiles) && payload.tubeProfiles.length && payload.tubeProfiles[0].shape) state.tubeProfiles = payload.tubeProfiles;
         if(payload.machine && typeof payload.machine==='object') state.machine = Object.assign({}, DEFAULT_MACHINE, payload.machine);
         renderMaterialsTable();
         renderTubeProfilesTable();

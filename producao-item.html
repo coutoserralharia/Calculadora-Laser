@@ -249,11 +249,19 @@
     if(isTube){
       const t = rec.tubeInputs || {};
       $('drawingBox').innerHTML = '<span class="pi-noprev">Peça em tubo — ' + escapeHtml((ms&&ms.name)||'') + '</span>';
-      $('specsGrid').innerHTML =
-        '<div><p class="k">Perfil</p><p class="v">' + escapeHtml((ms&&ms.name)||'—') + '</p></div>' +
-        '<div><p class="k">Quantidade</p><p class="v">' + (rec.quantity||1) + ' peças</p></div>' +
-        '<div><p class="k">Comprimento de barra</p><p class="v">' + (t.barLengthMm!=null ? fmtNum(t.barLengthMm,0)+' mm' : '—') + '</p></div>' +
-        '<div><p class="k">Cortes</p><p class="v">' + (t.straightCuts||0) + ' reto(s) + ' + (t.angleCuts||0) + ' ângulo</p></div>';
+      if(t.v === 2){
+        $('specsGrid').innerHTML =
+          '<div><p class="k">Material</p><p class="v">' + escapeHtml((ms&&ms.name)||'—') + '</p></div>' +
+          '<div><p class="k">Quantidade</p><p class="v">' + (rec.quantity||1) + ' peças</p></div>' +
+          '<div><p class="k">Comprimento de corte</p><p class="v">' + (t.lengthMm!=null ? fmtNum(t.lengthMm,0)+' mm' : '—') + '</p></div>' +
+          '<div><p class="k">Barras</p><p class="v">' + (t.bars!=null ? t.bars + ' × ' + fmtNum(t.barLengthMm||0,0) + ' mm' : '—') + '</p></div>';
+      } else {
+        $('specsGrid').innerHTML =
+          '<div><p class="k">Perfil</p><p class="v">' + escapeHtml((ms&&ms.name)||'—') + '</p></div>' +
+          '<div><p class="k">Quantidade</p><p class="v">' + (rec.quantity||1) + ' peças</p></div>' +
+          '<div><p class="k">Comprimento de barra</p><p class="v">' + (t.barLengthMm!=null ? fmtNum(t.barLengthMm,0)+' mm' : '—') + '</p></div>' +
+          '<div><p class="k">Cortes</p><p class="v">' + (t.straightCuts||0) + ' reto(s) + ' + (t.angleCuts||0) + ' ângulo</p></div>';
+      }
     } else {
       drawDXF(rec.dxfText);
       $('specsGrid').innerHTML =

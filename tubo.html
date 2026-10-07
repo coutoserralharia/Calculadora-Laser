@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Produção Tubo — Custo de Corte Laser</title>
+<title>Encomenda Tubo e perfis — Custo de Corte Laser</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#111417">
 <meta name="mobile-web-app-capable" content="yes">
@@ -16,6 +16,27 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared.css">
 <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('laser_theme')||'dark');</script>
+<style>
+  [hidden]{display:none !important;}
+  .pill-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
+  .pill{
+    border:1px solid var(--border); background:var(--panel-2); color:var(--text-muted);
+    padding:8px 14px; border-radius:8px; font:600 13px 'Inter',sans-serif; cursor:pointer;
+  }
+  .pill:hover{color:var(--text);}
+  .pill.on{background:var(--accent); border-color:var(--accent); color:var(--on-accent);}
+  .price-strip{display:flex; gap:28px; flex-wrap:wrap; background:var(--panel-2); border-radius:8px; padding:12px 14px;}
+  .price-strip .k{font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em;}
+  .price-strip .v{font:600 15px 'JetBrains Mono',monospace; margin-top:3px;}
+  .note-warn{background:rgba(240,180,41,0.1); border:1px solid rgba(240,180,41,0.45); color:#f0b429; border-radius:8px; padding:10px 14px; font-size:12.5px; line-height:1.5;}
+  :root[data-theme="light"] .note-warn{color:#8a5a00;}
+  .stat-strip{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; background:var(--panel-2); border-radius:8px; padding:12px 14px;}
+  .stat-strip .k{font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em;}
+  .stat-strip .v{font:600 14px 'JetBrains Mono',monospace; margin-top:3px;}
+  .draw-wrap{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:10px; padding:10px; display:flex; align-items:center; gap:6px; overflow:hidden; color:var(--text);}
+  .draw-wrap svg{flex:none; max-width:100%;}
+  .field-row3b{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px;}
+</style>
 </head>
 <body>
 <a href="#main" class="skip-link">Saltar para o conteúdo</a>
@@ -27,7 +48,7 @@
       <div class="nav-brand"><img src="logo-mark.svg" alt="" class="nav-logo"><span class="nav-name">JGPVC<em>LASER</em></span></div>
       <a href="dashboard.html">Dashboard</a>
       <a href="index.html">Encomenda Chapa</a>
-      <a href="tubo.html" class="active">Encomenda Tubo</a>
+      <a href="tubo.html" class="active">Encomenda Tubo e perfis</a>
       <a href="orcamentos.html">Orçamentos</a>
       <a href="producao.html">Produção</a>
       <a href="encomendas.html">Histórico</a>
@@ -49,17 +70,17 @@
           <path d="M4 24L30 24" stroke="#3a4149" stroke-width="1" stroke-dasharray="1 3"/>
         </svg>
         <div class="brand-text">
-          <p class="eyebrow">Corte Laser // Produção Tubo</p>
-          <h1>Calculadora de Custo — Tubo</h1>
+          <p class="eyebrow">Corte Laser // Tubo e perfis</p>
+          <h1>Encomenda de Tubo e Perfis</h1>
         </div>
       </div>
-      <p class="top-note">Escolha o perfil, indique os cortes e o tempo de rotação para obter o custo de fabrico.</p>
+      <p class="top-note">Identifique o material, indique o comprimento e veja as barras necessárias. Sem velocidades de corte — o tempo real é só registo.</p>
     </div>
   </header>
 
   <main class="layout" id="main">
 
-    <!-- LEFT: CONTROLS -->
+    <!-- ESQUERDA: DADOS -->
     <section class="col">
 
       <div class="card">
@@ -67,103 +88,77 @@
           <span class="title-left"><span class="dot"></span>Dados da encomenda</span>
           <button class="ghost-btn sm" id="newOrderBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M13 8A5 5 0 113 8" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M13 3v3.5H9.5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Nova encomenda</button>
         </h2>
-        <div class="field-row">
-          <div class="field"><label for="orderName">Nome da encomenda / peça</label><input type="text" id="orderName" placeholder="Ex: Estrutura de guarda-corpo"></div>
-          <div class="field">
+        <div class="field-row3b" style="margin-bottom:12px;">
+          <div class="field" style="margin-bottom:0;"><label for="orderName">Nome / peça</label><input type="text" id="orderName" placeholder="Ex: Pé de mesa"></div>
+          <div class="field" style="margin-bottom:0;">
             <label for="clientName">Cliente</label>
             <div class="autocomplete-wrap">
               <input type="text" id="clientName" placeholder="Ex: Metalúrgica Silva, Lda." autocomplete="off">
               <div class="autocomplete-list" id="clientSuggestions" hidden></div>
             </div>
           </div>
+          <div class="field" style="margin-bottom:0;"><label for="orderNumberPreview">Nº da encomenda (auto)</label><input type="text" id="orderNumberPreview" readonly></div>
         </div>
-        <div class="field-row" style="margin-bottom:0;">
-          <div class="field" style="margin-bottom:0;">
-            <label for="orderNumberPreview">Nº da encomenda (automático)</label>
-            <input type="text" id="orderNumberPreview" readonly>
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label for="qtyInput">Quantidade de peças a produzir</label>
-            <input type="number" id="qtyInput" value="1" min="1" step="1">
-          </div>
+        <div class="field-row3b" style="margin-bottom:12px;">
+          <div class="field" style="margin-bottom:0;"><label for="orderDatePreview">Data</label><input type="text" id="orderDatePreview" readonly class="mono"></div>
+          <div class="field" style="margin-bottom:0;"><label for="qtyInput">Quantidade de peças</label><input type="number" id="qtyInput" value="1" min="1" step="1"></div>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="orderComments">Notas de corte e observações (aparecem na ordem de fabrico)</label>
+          <textarea id="orderComments" rows="3" placeholder="Ex.: esquadria a 45° nas duas pontas — ver ficheiro IGES da encomenda" style="width:100%; resize:vertical; background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:9px 10px; border-radius:7px; font-family:'Inter',sans-serif; font-size:13.5px; outline:none;"></textarea>
         </div>
       </div>
 
       <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Perfil de tubo</h2>
-        <div class="field" style="margin-bottom:14px;">
-          <label for="tubeProfileSelect">Perfil</label>
+        <h2 class="card-title"><span class="dot"></span>Identificação do material</h2>
+
+        <label class="lbl-block" style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:6px;">Material</label>
+        <div class="pill-row" id="matPills"></div>
+
+        <label class="lbl-block" style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:6px;">Tipo de perfil</label>
+        <div class="pill-row" id="shapePills"></div>
+
+        <div class="field" style="margin-bottom:12px;">
+          <label for="tubeProfileSelect" id="tubeProfileLabel">Perfil</label>
           <select id="tubeProfileSelect"></select>
-          <p class="save-hint" style="margin-top:8px;">Perfis, velocidades e preços definem-se em <a href="definicoes.html" style="color:var(--readout);">Definições avançadas</a>.</p>
         </div>
-        <div class="field-row" style="margin-bottom:0;">
-          <div class="field" style="margin-bottom:0;">
-            <label for="barLengthInput">Comprimento de barra usado</label>
-            <div class="unit-suffix"><input type="number" id="barLengthInput" min="0" step="10" value="1000"><span>mm</span></div>
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label for="wasteModeSelect">Desperdício</label>
-            <select id="wasteModeSelect">
-              <option value="pct">% padrão do perfil</option>
-              <option value="manual">Já incluído no comprimento acima</option>
-            </select>
-          </div>
+        <div class="field-row3b" id="customDims" hidden style="margin-bottom:12px;">
+          <div class="field" style="margin-bottom:0;"><label for="customW">Largura / Ø (mm)</label><input type="number" id="customW" min="0" step="0.1"></div>
+          <div class="field" style="margin-bottom:0;"><label for="customH">Altura (mm)</label><input type="number" id="customH" min="0" step="0.1"></div>
+          <div class="field" style="margin-bottom:0;"><label for="customT">Espessura (mm)</label><input type="number" id="customT" min="0" step="0.05"></div>
         </div>
+
+        <div class="price-strip" id="priceStrip" hidden>
+          <div><div class="k">Custo (compra)</div><div class="v" id="stripCost">—</div></div>
+          <div><div class="k">Venda ao público</div><div class="v" id="stripSale" style="color:var(--readout);">—</div></div>
+          <div style="margin-left:auto; align-self:center; font-size:11.5px; color:var(--text-dim); max-width:220px; text-align:right;" id="stripNote"></div>
+        </div>
+        <div class="note-warn" id="noPriceNote" hidden></div>
+        <p class="save-hint" style="margin-top:10px;">Perfis, preços de compra e a margem de venda definem-se em <a href="definicoes.html" style="color:var(--readout);">Definições avançadas</a>.</p>
       </div>
 
       <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Cortes</h2>
-        <div class="field-row">
-          <div class="field">
-            <label for="straightCutsInput">Nº de cortes retos</label>
-            <input type="number" id="straightCutsInput" min="0" step="1" value="0">
-          </div>
-          <div class="field">
-            <label for="angleCutsInput">Nº de cortes em esquadria/ângulo</label>
-            <input type="number" id="angleCutsInput" min="0" step="1" value="0">
-          </div>
+        <h2 class="card-title"><span class="dot"></span>Barras e desperdício</h2>
+        <div class="field-row3b" style="margin-bottom:14px;">
+          <div class="field" style="margin-bottom:0;"><label for="barLengthInput">Comprimento da barra (mm)</label><input type="number" id="barLengthInput" min="0" step="100"></div>
+          <div class="field" style="margin-bottom:0;"><label for="clampInput">Zona de fixação perdida (mm)</label><input type="number" id="clampInput" min="0" step="10"></div>
+          <div class="field" style="margin-bottom:0;"><label for="barsInput">Barras a usar</label><input type="number" id="barsInput" min="0" step="1"></div>
         </div>
-        <div class="field-row" style="margin-bottom:0;">
-          <div class="field" style="margin-bottom:0;">
-            <label for="extraCutMmInput">Furos e bocas de ligação — comprimento total de corte</label>
-            <div class="unit-suffix"><input type="number" id="extraCutMmInput" min="0" step="10" value="0"><span>mm</span></div>
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label for="rotationMinInput">Tempo de rotação</label>
-            <div class="unit-suffix"><input type="number" id="rotationMinInput" min="0" step="0.5" value="0"><span>min</span></div>
-          </div>
+        <div class="stat-strip">
+          <div><div class="k">Útil por barra</div><div class="v" id="statUsable">—</div></div>
+          <div><div class="k">Peças por barra</div><div class="v" id="statPpb">—</div></div>
+          <div><div class="k">Sugestão</div><div class="v" id="statSuggest" style="color:var(--readout);">—</div></div>
+        </div>
+        <div class="note-warn" id="barsWarn" hidden style="margin-top:12px;"></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; font-size:12.5px; color:var(--text-muted); gap:10px;">
+          <span id="wasteLine">—</span>
+          <button class="ghost-btn sm" id="resetBarsBtn" type="button">Repor sugestão</button>
         </div>
       </div>
-
-      <details class="card" id="setupDetails" open>
-        <summary class="summary-row"><span>Preparação (setup) <span class="conn-badge conn-local" id="setupBadge"></span></span><span class="chev">▸</span></summary>
-        <div class="details-body">
-          <div class="field">
-            <label for="drawingType">Origem do desenho</label>
-            <select id="drawingType">
-              <option value="client_direct">Desenho do cliente, pronto a usar</option>
-              <option value="client_convert">Converter desenho do cliente</option>
-              <option value="from_scratch">Desenho de raiz</option>
-            </select>
-          </div>
-          <div class="field" id="designTimeField" hidden>
-            <label for="designTimeInput">Tempo de desenho</label>
-            <div class="unit-suffix"><input type="number" id="designTimeInput" min="0" step="1" value="0"><span>min</span></div>
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label for="setupTimeInput">Tempo de setup</label>
-            <div class="unit-suffix"><input type="number" id="setupTimeInput" min="0" step="1" value="5"><span>min</span></div>
-          </div>
-        </div>
-      </details>
 
       <div class="card">
         <h2 class="card-title"><span class="dot"></span>Guardar encomenda <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
         <p class="save-hint" id="editingNote" hidden style="color:var(--accent); margin-bottom:10px;"></p>
-        <div class="field">
-          <label for="orderComments">Comentários (internos — aparecem na ficha interna)</label>
-          <textarea id="orderComments" rows="2" placeholder="Notas para esta encomenda…" style="width:100%; resize:vertical; background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:9px 10px; border-radius:7px; font-family:'Inter',sans-serif; font-size:13.5px; outline:none;"></textarea>
-        </div>
         <div class="mat-actions">
           <button class="ghost-btn" id="saveOrderBtn" type="button" hidden><span id="saveOrderBtnLabel">Guardar encomenda atual</span></button>
           <a class="ghost-btn sm" href="encomendas.html" style="text-decoration:none;">Ver encomendas guardadas →</a>
@@ -172,7 +167,7 @@
         <div class="next-steps" id="nextSteps" hidden>
           <div class="ns-head"><span id="nextStepsMsg"></span><button type="button" class="ns-close" id="nsClose" title="Fechar" aria-label="Fechar">✕</button></div>
           <div class="ns-actions">
-            <button class="ghost-btn sm" id="nsPrintOperator" type="button">Ficha do operador</button>
+            <button class="ghost-btn sm" id="nsPrintOperator" type="button">Ordem de fabrico</button>
             <button class="ghost-btn sm" id="nsPrintQuote" type="button">Orçamento</button>
             <button class="ghost-btn sm" id="nsNew" type="button">Nova encomenda</button>
           </div>
@@ -181,33 +176,38 @@
 
     </section>
 
-    <!-- RIGHT: RESULTS -->
+    <!-- DIREITA: DESENHO E PREÇO -->
     <section class="col">
 
       <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Resumo do corte</h2>
-        <div class="preview-meta" id="previewMeta">
-          <div class="meta-item"><div class="k">Perfil</div><div class="v" id="metaProfile">—</div></div>
-          <div class="meta-item"><div class="k">Comprimento total de corte</div><div class="v" id="metaCutLength">—</div></div>
-          <div class="meta-item"><div class="k">Comprimento de barra</div><div class="v" id="metaBarLength">—</div></div>
+        <h2 class="card-title"><span class="dot"></span>Representação para o operador</h2>
+        <p class="save-hint" id="tubeTitle" style="margin:-4px 0 10px; font-size:13px;">—</p>
+        <div class="draw-wrap" id="profileDrawing"><span class="save-hint" style="margin:6px;">Escolha o perfil e indique o comprimento.</span></div>
+        <div class="field" style="margin:14px 0 0;">
+          <label for="lengthInput">Comprimento de corte (mm)</label>
+          <input type="number" id="lengthInput" min="0" step="1" placeholder="Ex.: 1500">
         </div>
+        <p class="save-hint" style="margin-top:10px;">Só o perfil e o comprimento. Esquadrias e outros cortes ficam nas notas acima.</p>
       </div>
 
       <div class="card">
-        <h2 class="card-title"><span class="dot"></span>Custo da encomenda <small id="costFinalBadge" style="margin-left:auto;"></small></h2>
-        <div class="field" style="margin-bottom:14px;">
-          <label for="realCuttingTimeInput">Tempo de corte real — total da encomenda, todas as peças (opcional)</label>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <div class="unit-suffix" style="flex:1;"><input type="number" id="realCuttingTimeInput" min="0" step="0.1" placeholder="deixe vazio para usar a estimativa"><span>min</span></div>
-            <button class="ghost-btn sm" id="clearRealTimeBtn" type="button">Repor estimativa</button>
-          </div>
+        <h2 class="card-title"><span class="dot"></span>Preço <small id="costFinalBadge" style="margin-left:auto;"></small></h2>
+
+        <div id="basisBox" hidden style="margin-bottom:10px;">
+          <label class="lbl-block" style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:6px;">Cobrar ao cliente (decidir em cada encomenda)</label>
+          <div class="pill-row" id="basisPills" style="margin-bottom:6px;"></div>
         </div>
-        <div class="breakdown-row"><span class="lbl">Comprimento por peça</span><span class="val" id="valLenUnit">—</span></div>
-        <div class="breakdown-row"><span class="lbl">Comprimento total<small id="lenTotalSub">—</small></span><span class="val" id="valLenTotal">—</span></div>
-        <div class="breakdown-row"><span class="lbl">Custo total do material<small id="matInfoSub">—</small></span><span class="val" id="costMaterial">€0,00</span></div>
-        <div class="breakdown-row"><span class="lbl">Custo pré-corte<small id="preCorteSub">—</small></span><span class="val" id="costPreCorte">€0,00</span></div>
-        <div class="breakdown-row"><span class="lbl">Custo total do corte<small id="cutTimeSub">—</small></span><span class="val" id="costCorte">€0,00</span></div>
-        <div class="breakdown-row"><span class="lbl">Subtotal <small>(antes de ajuste)</small></span><span class="val" id="subtotalValue">€0,00</span></div>
+
+        <div class="field-row" id="manualBox" hidden>
+          <div class="field"><label for="manualCostInput">Custo de compra (total, €)</label><input type="number" id="manualCostInput" min="0" step="0.5" placeholder="0,00"></div>
+          <div class="field"><label for="manualSaleInput">Valor de venda (total, €)</label><input type="number" id="manualSaleInput" min="0" step="0.5" placeholder="0,00"></div>
+        </div>
+
+        <div class="breakdown-row"><span class="lbl">Metros cortados<small id="cutMetresSub">—</small></span><span class="val" id="valCutMetres">—</span></div>
+        <div class="breakdown-row"><span class="lbl">Barras usadas<small id="barsSub">—</small></span><span class="val" id="valBarMetres">—</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo de material (compra, barras usadas)<small id="costSub">—</small></span><span class="val" id="costMaterial">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Margem</span><span class="val" id="marginValueShown">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Valor de venda <small>(antes de ajuste)</small></span><span class="val" id="subtotalValue">€0,00</span></div>
 
         <button class="ghost-btn sm" id="showAdjustmentBtn" type="button" style="margin:10px 0 4px;">+ Ajuste comercial</button>
         <div class="field" id="adjustmentFields" hidden style="margin:12px 0 4px;">
@@ -233,9 +233,20 @@
         </div>
         <div class="breakdown-row" id="adjustmentRow" hidden><span class="lbl">Ajuste comercial<small id="adjustmentSub">—</small></span><span class="val" id="adjustmentValueShown">€0,00</span></div>
 
-        <div class="breakdown-row" style="border-top:1.5px solid var(--border); margin-top:4px; padding-top:12px;"><span class="lbl" style="font-weight:600; color:var(--text);">Custo total da encomenda <small>(sem IVA)<span id="totalQtyTag"></span></small></span><span class="val" id="totalValue" style="font-size:16px; color:var(--readout);">€0,00</span></div>
-        <div class="breakdown-row"><span class="lbl">Custo total ÷ nº peças <small>(sem IVA)</small></span><span class="val" id="avgPerPieceValue">€0,00</span></div>
-        <div class="total-sub" id="totalTimeSub" hidden style="margin-top:10px; padding-top:10px;"></div>
+        <div class="breakdown-row" style="border-top:1.5px solid var(--border); margin-top:4px; padding-top:12px;"><span class="lbl" style="font-weight:600; color:var(--text);">Valor total da encomenda <small>(sem IVA)<span id="totalQtyTag"></span></small></span><span class="val" id="totalValue" style="font-size:16px; color:var(--readout);">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Valor ÷ nº peças <small>(sem IVA)</small></span><span class="val" id="avgPerPieceValue">€0,00</span></div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Depois de cortado</h2>
+        <div class="field" style="margin-bottom:0;">
+          <label for="realCuttingTimeInput">Tempo de corte real — total da encomenda, todas as peças (min)</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <div class="unit-suffix" style="flex:1;"><input type="number" id="realCuttingTimeInput" min="0" step="0.1" placeholder="vem da ordem de fabrico devolvida"><span>min</span></div>
+            <button class="ghost-btn sm" id="clearRealTimeBtn" type="button">Limpar</button>
+          </div>
+        </div>
+        <p class="save-hint" style="margin-top:10px;">Por agora é só registo — não entra no preço. Também pode ser registado em Produção, como na chapa.</p>
       </div>
 
       <div class="card">
@@ -244,7 +255,7 @@
           <button class="ghost-btn print-btn" id="printInternalBtn" type="button">Ficha interna (com custos)</button>
           <button class="ghost-btn print-btn" id="printQuoteBtn" type="button">Orçamento p/ cliente</button>
         </div>
-        <p class="save-hint">A ficha do operador está sempre disponível na barra inferior; não mostra preços. A ficha interna inclui a decomposição de custos.</p>
+        <p class="save-hint">A ordem de fabrico (para o operador, sem preços) está sempre disponível na barra inferior.</p>
         <p class="save-hint" id="printHint"></p>
       </div>
 
@@ -252,7 +263,7 @@
   </main>
 
   <footer class="disclaimer">
-    Ferramenta de cálculo interno. Perímetros de secção, velocidades e preços por perfil são valores de referência editáveis em <a href="definicoes.html" style="color:var(--text-dim);">Definições avançadas</a>. O tempo de corte em ângulo é estimado com um fator sobre o corte reto — ajuste-o em Definições consoante a realidade da máquina.
+    Ferramenta de cálculo interno. Preços de compra e margem de venda do tubo são editáveis em <a href="definicoes.html" style="color:var(--text-dim);">Definições avançadas</a>.
   </footer>
 
 </div>
@@ -272,7 +283,7 @@
     </div>
     <div class="ab-buttons">
       <button class="ghost-btn sm" id="barNewBtn" type="button">Nova</button>
-      <button class="ghost-btn sm" id="barPrintOperatorBtn" type="button">Ficha do operador</button>
+      <button class="ghost-btn sm" id="barPrintOperatorBtn" type="button">Ordem de fabrico</button>
       <button class="ghost-btn sm accent" id="barSaveBtn" type="button"><span id="barSaveLabel">Guardar encomenda atual</span></button>
     </div>
   </div>
@@ -290,6 +301,13 @@
 
   const $ = id => document.getElementById(id);
 
+  const MATS = [['preto','Preto'], ['galvanizado','Galvanizado'], ['inox','Inox'], ['aluminio','Alumínio']];
+  const SHAPES = [['redondo','Redondo'], ['quadrado','Quadrado'], ['retangular','Retangular'], ['cantoneira','Cantoneira'], ['perfilu','Perfil em U']];
+  const SHAPE_TITLE = { redondo:'Tubo redondo', quadrado:'Tubo quadrado', retangular:'Tubo retangular', cantoneira:'Cantoneira', perfilu:'Perfil em U' };
+  const MAT_LABEL = { preto:'Preto', galvanizado:'Galvanizado', inox:'Inox', aluminio:'Alumínio' };
+  const BASES = [['cut','Só o que se corta'], ['bars','Barras inteiras (inclui sobra)']];
+  const CUSTOM_ID = '__custom';
+
   const state = {
     profiles: [],
     machine: Object.assign({}, window.LC.DEFAULT_MACHINE),
@@ -302,16 +320,18 @@
     orderState: 'quote',
     wasQuoted: false,
     dirty: false,
+    material: 'galvanizado',
+    shape: 'quadrado',
+    profileId: null,
+    basis: 'cut',
   };
 
   const orderNameInp = $('orderName'), clientNameInp = $('clientName');
-  const orderCommentsInp = $('orderComments'), qtyInput = $('qtyInput');
-  const tubeProfileSelect = $('tubeProfileSelect'), barLengthInput = $('barLengthInput');
-  const wasteModeSelect = $('wasteModeSelect');
-  const straightCutsInput = $('straightCutsInput'), angleCutsInput = $('angleCutsInput');
-  const extraCutMmInput = $('extraCutMmInput'), rotationMinInput = $('rotationMinInput');
-  const drawingTypeSel = $('drawingType'), designTimeField = $('designTimeField');
-  const designTimeInput = $('designTimeInput'), setupTimeInput = $('setupTimeInput');
+  const orderCommentsInp = $('orderComments'), qtyInput = $('qtyInput'), lengthInput = $('lengthInput');
+  const tubeProfileSelect = $('tubeProfileSelect');
+  const customW = $('customW'), customH = $('customH'), customT = $('customT');
+  const barLengthInput = $('barLengthInput'), clampInput = $('clampInput'), barsInput = $('barsInput');
+  const manualCostInput = $('manualCostInput'), manualSaleInput = $('manualSaleInput');
   const realCuttingTimeInput = $('realCuttingTimeInput'), clearRealTimeBtn = $('clearRealTimeBtn');
   const adjustmentValueInput = $('adjustmentValueInput'), adjustmentReasonSelect = $('adjustmentReasonSelect');
   const showAdjustmentBtn = $('showAdjustmentBtn'), adjustmentFields = $('adjustmentFields');
@@ -326,19 +346,73 @@
   const statePicker = $('statePicker'), clientSuggestionsEl = $('clientSuggestions');
   const printHint = $('printHint'), printSheetEl = $('printSheet');
 
+  const fmtC = n => String(n).replace('.', ',');
+  const fmtThousands = n => Math.round(n).toLocaleString('pt-PT');
+
+  /* ---------------------------------------------------------------- */
+  /* PERFIL ESCOLHIDO                                                  */
+  /* ---------------------------------------------------------------- */
+  function profilesFor(material, shape){
+    return state.profiles.filter(p=>p.material===material && p.shape===shape);
+  }
   function getSelectedProfile(){
-    return state.profiles.find(p=>p.id===tubeProfileSelect.value) || state.profiles[0] || null;
+    if(state.profileId === CUSTOM_ID){
+      const w = parseFloat(customW.value)||0, h = parseFloat(customH.value)||0;
+      const t = parseFloat(customT.value)||null;
+      const round = state.shape === 'redondo';
+      if(w<=0) return null;
+      const hh = round ? w : (h>0 ? h : w);
+      const name = (round ? 'Ø' + fmtC(w) : fmtC(w) + 'x' + fmtC(hh)) + (t ? 'x' + fmtC(t) : '') + ' (à medida)';
+      return { id:CUSTOM_ID, custom:true, material:state.material, shape:state.shape, name, w, h:hh, t, inch:false, costPerM:0 };
+    }
+    return profilesFor(state.material, state.shape).find(p=>p.id===state.profileId) || null;
+  }
+  function profileTitle(p){
+    return p ? (SHAPE_TITLE[p.shape] + ' ' + p.name + ' · ' + MAT_LABEL[p.material]) : '—';
   }
 
-  function populateProfileSelect(){
-    tubeProfileSelect.innerHTML = '';
-    state.profiles.forEach(p=>{
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = p.name;
-      tubeProfileSelect.appendChild(opt);
+  function renderPills(containerId, list, current, onPick){
+    const box = $(containerId);
+    box.innerHTML = '';
+    list.forEach(([val,label])=>{
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pill' + (val===current ? ' on' : '');
+      b.textContent = label;
+      b.addEventListener('click', ()=>{ onPick(val); markDirty(); });
+      box.appendChild(b);
     });
   }
+
+  function populateProfileSelect(keepId){
+    const list = profilesFor(state.material, state.shape);
+    tubeProfileSelect.innerHTML = '';
+    list.forEach(p=>{
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name + (p.inch && p.w ? '  (' + fmtC(p.w) + ' mm)' : '') + (p.costPerM>0 ? '' : '  — sem preço');
+      tubeProfileSelect.appendChild(opt);
+    });
+    const custom = document.createElement('option');
+    custom.value = CUSTOM_ID; custom.textContent = 'À medida (indicar medidas)…';
+    tubeProfileSelect.appendChild(custom);
+    $('tubeProfileLabel').textContent = 'Perfil (' + list.length + ' disponíveis)';
+    if(keepId && (keepId===CUSTOM_ID || list.some(p=>p.id===keepId))) state.profileId = keepId;
+    else state.profileId = list.length ? list[0].id : CUSTOM_ID;
+    tubeProfileSelect.value = state.profileId;
+    $('customDims').hidden = state.profileId !== CUSTOM_ID;
+  }
+
+  function renderSelectors(keepId){
+    renderPills('matPills', MATS, state.material, v=>{ state.material = v; renderSelectors(); recalcAndRender(); });
+    renderPills('shapePills', SHAPES, state.shape, v=>{ state.shape = v; renderSelectors(); recalcAndRender(); });
+    populateProfileSelect(keepId);
+  }
+  tubeProfileSelect.addEventListener('change', ()=>{
+    state.profileId = tubeProfileSelect.value;
+    $('customDims').hidden = state.profileId !== CUSTOM_ID;
+    recalcAndRender();
+  });
 
   /* ---------------------------------------------------------------- */
   /* CÁLCULO                                                           */
@@ -346,116 +420,205 @@
   function computeCost(){
     const profile = getSelectedProfile();
     const qty = Math.max(1, parseInt(qtyInput.value,10)||1);
+    const lenMm = parseFloat(lengthInput.value)||0;
+    if(!profile || lenMm <= 0) return { valid:false, profile, qty, lenMm };
+
     const barLenMm = parseFloat(barLengthInput.value)||0;
-    if(!profile || barLenMm <= 0){
-      return { valid:false, profile, qty };
+    const clampMm = parseFloat(clampInput.value)||0;
+    const usableMm = Math.max(0, barLenMm - clampMm);
+    const ppb = lenMm > 0 ? Math.floor(usableMm / lenMm) : 0;
+    const suggestedBars = ppb > 0 ? Math.ceil(qty / ppb) : 0;
+    const override = parseInt(barsInput.value,10);
+    const bars = override > 0 ? override : suggestedBars;
+    const cutMm = lenMm * qty;
+    const barMm = bars * barLenMm;
+    const capacity = bars * ppb;
+
+    const priced = profile.costPerM > 0;
+    const markup = state.machine.tubeMarkup || 1.5;
+    let costVal, saleVal, salePerM = 0;
+    if(priced){
+      salePerM = profile.costPerM * markup;
+      // o custo real é o das barras usadas; se a peça não couber na barra, usa o que se corta
+      const costMm = barMm > 0 ? barMm : cutMm;
+      costVal = profile.costPerM * costMm / 1000;
+      const saleMm = (state.basis === 'bars' && barMm > 0) ? barMm : cutMm;
+      saleVal = salePerM * saleMm / 1000;
+    } else {
+      costVal = parseFloat(manualCostInput.value) || 0;
+      saleVal = parseFloat(manualSaleInput.value) || 0;
     }
-
-    const straightCuts = Math.max(0, parseInt(straightCutsInput.value,10)||0);
-    const angleCuts = Math.max(0, parseInt(angleCutsInput.value,10)||0);
-    const extraCutMm = Math.max(0, parseFloat(extraCutMmInput.value)||0);
-    const rotationMin = Math.max(0, parseFloat(rotationMinInput.value)||0);
-
-    // Comprimento de corte: cada corte (reto ou em ângulo) percorre o perímetro da secção.
-    // O corte em ângulo é mais lento, por isso conta com um fator sobre o tempo, não sobre o comprimento.
-    const perim = profile.perimeterMm || 0;
-    const angleFactor = state.machine.angleCutFactor ?? 1.4;
-    const cutLengthMm = (straightCuts + angleCuts) * perim + extraCutMm;
-    const effectiveCutMm = straightCuts*perim + angleCuts*perim*angleFactor + extraCutMm;
-
-    const speed = Math.max(profile.speed||1, 1);
-    const cutMinPerPiece = effectiveCutMm / speed + rotationMin;
-    const estimatedTotalTimeMin = cutMinPerPiece * qty;
 
     const realTimeRaw = realCuttingTimeInput.value.trim();
     const realTimeVal = parseFloat(realTimeRaw);
     const isFinalTime = realTimeRaw !== '' && Number.isFinite(realTimeVal) && realTimeVal >= 0;
-    const cuttingTimeMin = isFinalTime ? realTimeVal : estimatedTotalTimeMin;
-    const corteCost = cuttingTimeMin * (state.machine.hourlyRate/60);
 
-    // Material: o tubo é orçamentado ao metro — comprimento × €/m (com a % extra do perfil).
-    const wastePct = wasteModeSelect.value === 'pct' ? (profile.defaultWastePct||0) : 0;
-    const billedLenMm = barLenMm * (1 + wastePct/100);
-    const billedLenM = billedLenMm / 1000;
-    const totalLenM = billedLenM * qty;
-    const basePricePerM = profile.pricePerM||0;
-    const effectivePricePerM = basePricePerM * (1 + (profile.markupPct||0)/100);
-    const materialCostPerPiece = billedLenM * effectivePricePerM;
-    const materialCostTotal = materialCostPerPiece * qty;
-    const materialCostBaseTotal = billedLenM * basePricePerM * qty;   // sem margem
-
-    const drawingType = drawingTypeSel.value;
-    const designTimeMin = drawingType==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
-    const setupTimeMin = parseFloat(setupTimeInput.value)||0;
-    const designCost = (designTimeMin/60) * (state.machine.designRate||0);
-    const setupCost = (setupTimeMin/60) * (state.machine.setupRate||0);
-    const preCorteCost = designCost + setupCost;
-
-    const subtotal = corteCost + materialCostTotal + preCorteCost;
+    const subtotal = saleVal;
     const adjustmentValue = parseFloat(adjustmentValueInput.value) || 0;
     const totalCost = subtotal + adjustmentValue;
-    // Custo real para a empresa: material ao preço de compra, sem a margem do perfil.
-    const realCost = corteCost + materialCostBaseTotal + preCorteCost;
+    const realCost = costVal;
     const marginValue = totalCost - realCost;
     const marginPct = realCost > 0 ? (marginValue/realCost)*100 : null;
     const avgPerPiece = totalCost / qty;
-    const totalTimeMin = cuttingTimeMin + designTimeMin + setupTimeMin;
 
     return {
-      valid:true, profile, qty,
-      straightCuts, angleCuts, extraCutMm, rotationMin,
-      cutLengthMm, billedLenMm, billedLenM, totalLenM, barLenMm, wastePct, effectivePricePerM,
-      cuttingTimeMin, estimatedCuttingTimeMin: estimatedTotalTimeMin, corteCost,
-      materialCostTotal, materialCostPerPiece, materialCostBaseTotal,
-      realCost, marginValue, marginPct,
-      drawingType, designTimeMin, setupTimeMin, designCost, setupCost, preCorteCost,
+      valid:true, profile, qty, lenMm, priced, markup, salePerM,
+      barLenMm, clampMm, usableMm, ppb, suggestedBars, bars, cutMm, barMm, capacity,
+      cuttingTimeMin: isFinalTime ? realTimeVal : 0,
+      materialCostPerPiece: saleVal / qty,
       subtotal, adjustmentValue, adjustmentReason: adjustmentReasonSelect.value,
-      totalCost, avgPerPiece, totalTimeMin,
+      totalCost, realCost, marginValue, marginPct, avgPerPiece, saleVal, costVal,
       isFinalDisplay: isFinalTime,
     };
   }
 
   /* ---------------------------------------------------------------- */
+  /* DESENHO (secção + vista lateral)                                  */
+  /* ---------------------------------------------------------------- */
+  function drawingHTML(p, lenMm, qty){
+    if(!p || !(p.w>0)) return '';
+    const round = p.shape === 'redondo';
+    const isPath = p.shape === 'cantoneira' || p.shape === 'perfilu';
+    const w = p.w, h = round ? p.w : (p.h || p.w);
+    const k = 110 / Math.max(w, h);
+    const ow = w*k, oh = h*k;
+    const wallMm = p.t || Math.max(1.5, w*0.06);
+    const wall = Math.max(5, wallMm*k);
+    const cx = 90, cy = 84, ox = cx - ow/2, oy = cy - oh/2, oxr = ox + ow, oyb = oy + oh;
+    const f = n => n.toFixed(1);
+    const ink = 'stroke="currentColor" stroke-width="1.6" fill="none"';
+    const dim = 'stroke="currentColor" stroke-opacity=".55" stroke-width="0.8"';
+    const txt = 'font-size="10" font-family="Inter,sans-serif" fill="currentColor" fill-opacity=".65"';
+    let s = '<svg width="190" height="190" viewBox="0 0 190 190">';
+    if(round){
+      s += '<circle cx="'+cx+'" cy="'+cy+'" r="'+f(ow/2)+'" '+ink+'/><circle cx="'+cx+'" cy="'+cy+'" r="'+f(Math.max(2, ow/2 - wall))+'" '+ink+'/>';
+    } else if(p.shape === 'cantoneira'){
+      s += '<path d="M '+f(ox)+' '+f(oy)+' L '+f(ox+wall)+' '+f(oy)+' L '+f(ox+wall)+' '+f(oyb-wall)+' L '+f(oxr)+' '+f(oyb-wall)+' L '+f(oxr)+' '+f(oyb)+' L '+f(ox)+' '+f(oyb)+' Z" '+ink+' stroke-linejoin="round"/>';
+    } else if(p.shape === 'perfilu'){
+      s += '<path d="M '+f(ox)+' '+f(oy)+' L '+f(ox+wall)+' '+f(oy)+' L '+f(ox+wall)+' '+f(oyb-wall)+' L '+f(oxr-wall)+' '+f(oyb-wall)+' L '+f(oxr-wall)+' '+f(oy)+' L '+f(oxr)+' '+f(oy)+' L '+f(oxr)+' '+f(oyb)+' L '+f(ox)+' '+f(oyb)+' Z" '+ink+' stroke-linejoin="round"/>';
+    } else {
+      s += '<rect x="'+f(ox)+'" y="'+f(oy)+'" width="'+f(ow)+'" height="'+f(oh)+'" rx="5" '+ink+'/>';
+      s += '<rect x="'+f(ox+wall)+'" y="'+f(oy+wall)+'" width="'+f(Math.max(2,ow-2*wall))+'" height="'+f(Math.max(2,oh-2*wall))+'" rx="2" '+ink+'/>';
+    }
+    // cota inferior (largura)
+    s += '<line x1="'+f(ox)+'" y1="'+f(oyb+16)+'" x2="'+f(oxr)+'" y2="'+f(oyb+16)+'" '+dim+'/>';
+    s += '<line x1="'+f(ox)+'" y1="'+f(oyb+12)+'" x2="'+f(ox)+'" y2="'+f(oyb+20)+'" '+dim+'/><line x1="'+f(oxr)+'" y1="'+f(oyb+12)+'" x2="'+f(oxr)+'" y2="'+f(oyb+20)+'" '+dim+'/>';
+    s += '<text x="'+cx+'" y="'+f(oyb+32)+'" text-anchor="middle" '+txt+'>'+(round ? 'Ø ' : '')+fmtC(w)+' mm</text>';
+    if(!round){
+      const rx = oxr + 16;
+      s += '<line x1="'+f(rx)+'" y1="'+f(oy)+'" x2="'+f(rx)+'" y2="'+f(oyb)+'" '+dim+'/>';
+      s += '<line x1="'+f(rx-4)+'" y1="'+f(oy)+'" x2="'+f(rx+4)+'" y2="'+f(oy)+'" '+dim+'/><line x1="'+f(rx-4)+'" y1="'+f(oyb)+'" x2="'+f(rx+4)+'" y2="'+f(oyb)+'" '+dim+'/>';
+      s += '<text x="'+f(rx+12)+'" y="'+cy+'" transform="rotate(-90 '+f(rx+12)+' '+cy+')" text-anchor="middle" '+txt+'>'+fmtC(h)+' mm</text>';
+    }
+    if(p.t){ s += '<text x="'+cx+'" y="184" text-anchor="middle" '+txt+'>espessura '+fmtC(p.t)+' mm</text>'; }
+    s += '</svg>';
+
+    // vista lateral com o comprimento de corte
+    const sideH = Math.max(22, Math.min(60, oh*0.55));
+    const sy = 78 - sideH/2, dimY = 78 + sideH/2 + 26;
+    let v = '<svg width="400" height="190" viewBox="0 0 400 190" style="flex:1; min-width:0;">';
+    v += '<rect x="14" y="'+f(sy)+'" width="372" height="'+f(sideH)+'" rx="4" '+ink+'/>';
+    v += '<line x1="14" y1="78" x2="386" y2="78" stroke="currentColor" stroke-opacity=".4" stroke-width="0.8" stroke-dasharray="6 4"/>';
+    v += '<line x1="14" y1="'+f(dimY)+'" x2="386" y2="'+f(dimY)+'" '+dim+'/>';
+    v += '<line x1="14" y1="'+f(dimY-6)+'" x2="14" y2="'+f(dimY+6)+'" '+dim+'/><line x1="386" y1="'+f(dimY-6)+'" x2="386" y2="'+f(dimY+6)+'" '+dim+'/>';
+    v += '<text x="200" y="'+f(dimY+18)+'" text-anchor="middle" font-size="12" font-weight="600" font-family="Inter,sans-serif" fill="currentColor">'+fmtThousands(lenMm)+' mm</text>';
+    v += '<text x="200" y="182" text-anchor="middle" '+txt+'>'+qty+(qty===1?' peça':' peças')+' · desenho fora de escala no comprimento</text>';
+    v += '</svg>';
+    return s + v;
+  }
+
+  /* ---------------------------------------------------------------- */
   /* RENDER                                                            */
   /* ---------------------------------------------------------------- */
+  function distributionText(qty, ppb, bars){
+    if(ppb <= 0) return '';
+    const needed = Math.ceil(qty / ppb);
+    if(bars !== needed) return '';
+    const full = Math.floor(qty / ppb), rem = qty - full*ppb;
+    const parts = [];
+    if(needed <= 4){
+      for(let i=0;i<needed;i++){
+        const n = (i < full) ? ppb : rem;
+        parts.push((i+1) + '.ª barra: ' + n + (n===1?' peça':' peças'));
+      }
+      return parts.join(' · ');
+    }
+    return full + (full===1?' barra':' barras') + ' com ' + ppb + ' peças' + (rem ? ' + 1 barra com ' + rem + (rem===1?' peça':' peças') : '');
+  }
+
   function recalcAndRender(){
+    const profile = getSelectedProfile();
     const r = computeCost();
+    const qty = Math.max(1, parseInt(qtyInput.value,10)||1);
+    const lenMm = parseFloat(lengthInput.value)||0;
+
+    // faixa de preços do perfil e avisos
+    const strip = $('priceStrip'), noPrice = $('noPriceNote');
+    const markup = state.machine.tubeMarkup || 1.5;
+    const priced = !!(profile && profile.costPerM > 0);
+    strip.hidden = !priced;
+    noPrice.hidden = !profile || priced;
+    if(priced){
+      $('stripCost').textContent = fmtEUR(profile.costPerM) + ' /m';
+      $('stripSale').textContent = fmtEUR(profile.costPerM * markup) + ' /m';
+      $('stripNote').textContent = 'Venda = compra × ' + fmtC(markup) + ' (margem em Definições)';
+    } else if(profile){
+      noPrice.textContent = profile.custom
+        ? 'Perfil à medida — indique o custo de compra e o valor de venda no cartão "Preço".'
+        : 'Este perfil não tem preço de compra na tabela. Indique o custo de compra e o valor de venda no cartão "Preço" (ou preencha o preço em Definições).';
+    }
+    $('manualBox').hidden = !profile || priced;
+    $('basisBox').hidden = !priced;
+    renderPills('basisPills', BASES, state.basis, v=>{ state.basis = v; recalcAndRender(); });
+
+    $('tubeTitle').textContent = profileTitle(profile) + (profile && profile.t && !profile.inch ? '' : '');
+    $('profileDrawing').innerHTML = (profile && profile.w>0) ? drawingHTML(profile, lenMm || 1000, qty) : '<span class="save-hint" style="margin:6px;">Escolha o perfil e indique o comprimento.</span>';
+
+    // barras
+    const barLenMm = parseFloat(barLengthInput.value)||0, clampMm = parseFloat(clampInput.value)||0;
+    const usable = Math.max(0, barLenMm - clampMm);
+    const ppb = lenMm > 0 ? Math.floor(usable / lenMm) : 0;
+    const suggested = ppb > 0 ? Math.ceil(qty / ppb) : 0;
+    barsInput.placeholder = suggested > 0 ? String(suggested) : '—';
+    $('statUsable').textContent = fmtThousands(usable) + ' mm';
+    $('statPpb').textContent = ppb > 0 ? ppb + (ppb===1?' peça':' peças') : '—';
+    $('statSuggest').textContent = suggested > 0 ? suggested + (suggested===1?' barra':' barras') : '—';
+    const warn = $('barsWarn');
+    const ov = parseInt(barsInput.value,10);
+    const bars = ov > 0 ? ov : suggested;
+    if(lenMm > 0 && ppb === 0){
+      warn.hidden = false;
+      warn.textContent = 'O comprimento de corte (' + fmtThousands(lenMm) + ' mm) é maior que o útil da barra (' + fmtThousands(usable) + ' mm). Não cabe nenhuma peça por barra.';
+    } else if(ppb > 0 && bars*ppb < qty){
+      warn.hidden = false;
+      warn.textContent = 'Com ' + bars + (bars===1?' barra':' barras') + ' só dá para ' + (bars*ppb) + ' das ' + qty + ' peças.';
+    } else { warn.hidden = true; }
+    const wasteMm = Math.max(0, bars*barLenMm - lenMm*qty);
+    $('wasteLine').textContent = (bars > 0 && lenMm > 0)
+      ? 'Sobra/desperdício: ' + fmtThousands(wasteMm) + ' mm (' + Math.round(wasteMm/(bars*barLenMm)*100) + '% das barras usadas)'
+      : 'Sobra/desperdício: —';
 
     if(!r.valid){
-      ['costMaterial','costPreCorte','costCorte','totalValue','avgPerPieceValue','subtotalValue'].forEach(id=>$(id).textContent = fmtEUR(0));
-      ['valLenUnit','valLenTotal'].forEach(id=>$(id).textContent = '—');
-      ['metaProfile','metaCutLength','metaBarLength'].forEach(id=>$(id).textContent = '—');
+      ['costMaterial','marginValueShown','subtotalValue','totalValue','avgPerPieceValue'].forEach(id=>$(id).textContent = fmtEUR(0));
+      ['valCutMetres','valBarMetres'].forEach(id=>$(id).textContent = '—');
+      ['cutMetresSub','barsSub','costSub'].forEach(id=>$(id).textContent = '—');
       $('adjustmentRow').hidden = true;
-      $('matInfoSub').textContent = '—'; $('preCorteSub').textContent = '—';
-      $('cutTimeSub').textContent = '—'; $('lenTotalSub').textContent = '—';
       $('totalQtyTag').textContent = '';
-      $('totalTimeSub').hidden = true;
       $('costFinalBadge').textContent = '';
       $('abTotal').textContent = fmtEUR(0);
+      $('abOrderNum').textContent = ($('orderNumberPreview').value || '—') + (orderNameInp.value.trim() ? ' · ' + orderNameInp.value.trim() : '');
       return;
     }
 
-    $('metaProfile').textContent = r.profile.name;
-    $('metaCutLength').textContent = fmtNum(r.cutLengthMm/10,1) + ' cm/peça';
-    $('metaBarLength').textContent = fmtNum(r.billedLenMm,0) + ' mm' + (r.wastePct ? ' (inclui ' + r.wastePct + '% desperdício)' : '');
-
-    $('valLenUnit').textContent = fmtNum(r.billedLenM,3) + ' m';
-    $('valLenTotal').textContent = fmtNum(r.totalLenM,3) + ' m';
-    $('lenTotalSub').textContent = r.qty>1 ? (r.qty + ' × ' + fmtNum(r.billedLenM,3) + ' m') : 'igual ao unitário (1 peça)';
-
-    $('matInfoSub').textContent = fmtEUR(r.effectivePricePerM) + '/m' + (r.qty>1 ? ' · ' + fmtEUR(r.materialCostPerPiece) + '/peça' : '');
-    $('costMaterial').textContent = fmtEUR(r.materialCostTotal);
-
-    $('preCorteSub').textContent = 'Desenho ' + fmtNum(r.designTimeMin,0) + 'min (' + fmtEUR(r.designCost) + ') + Setup ' + fmtNum(r.setupTimeMin,0) + 'min (' + fmtEUR(r.setupCost) + ')';
-    $('costPreCorte').textContent = fmtEUR(r.preCorteCost);
-
-    const cutsLabel = r.straightCuts + ' reto(s) + ' + r.angleCuts + ' em ângulo' + (r.extraCutMm ? ' + furos/bocas' : '') + (r.rotationMin ? ' · rotação ' + fmtNum(r.rotationMin,1) + 'min/peça' : '');
-    $('cutTimeSub').textContent = r.isFinalDisplay
-      ? (fmtNum(r.cuttingTimeMin,1) + ' min no total (tempo real) · ' + cutsLabel)
-      : (fmtNum(r.cuttingTimeMin,1) + ' min no total (estimado) · ' + cutsLabel);
-    $('costCorte').textContent = fmtEUR(r.corteCost);
-
+    $('valCutMetres').textContent = fmtNum(r.cutMm/1000,2) + ' m';
+    $('cutMetresSub').textContent = fmtThousands(r.lenMm) + ' mm × ' + r.qty + (r.qty===1?' peça':' peças');
+    $('valBarMetres').textContent = fmtNum(r.barMm/1000,2) + ' m';
+    $('barsSub').textContent = r.bars + (r.bars===1?' barra':' barras') + ' × ' + fmtThousands(r.barLenMm) + ' mm';
+    $('costMaterial').textContent = fmtEUR(r.costVal);
+    $('costSub').textContent = r.priced ? (fmtEUR(r.profile.costPerM) + '/m') : 'indicado à mão';
+    $('marginValueShown').textContent = fmtEUR(r.marginValue) + (r.marginPct!=null ? ' · ' + fmtNum(r.marginPct,0) + '%' : '');
     $('subtotalValue').textContent = fmtEUR(r.subtotal);
+
     if(r.adjustmentValue){
       $('adjustmentRow').hidden = false;
       $('adjustmentValueShown').textContent = (r.adjustmentValue>0?'+':'') + fmtEUR(r.adjustmentValue);
@@ -472,15 +635,11 @@
     $('avgPerPieceValue').textContent = fmtEUR(r.avgPerPiece);
 
     if(r.isFinalDisplay){
-      $('costFinalBadge').textContent = '(FINAL — tempo de corte real registado)';
+      $('costFinalBadge').textContent = '(tempo de corte real registado)';
       $('costFinalBadge').style.color = 'var(--readout)';
     } else {
-      $('costFinalBadge').textContent = '(estimado — velocidade da tabela)';
-      $('costFinalBadge').style.color = '';
+      $('costFinalBadge').textContent = '';
     }
-
-    $('totalTimeSub').hidden = false;
-    $('totalTimeSub').textContent = 'Tempo total estimado da encomenda: ' + fmtNum(r.totalTimeMin,1) + ' min (corte ' + fmtNum(r.cuttingTimeMin,1) + ' + preparação ' + fmtNum(r.designTimeMin+r.setupTimeMin,0) + ')';
   }
 
   /* ---------------------------------------------------------------- */
@@ -587,35 +746,13 @@
   });
 
   /* ---------------------------------------------------------------- */
-  /* PREPARAÇÃO                                                        */
-  /* ---------------------------------------------------------------- */
-  const DRAWING_LABELS = { client_direct:'Cliente', client_convert:'Conversão', from_scratch:'De raiz' };
-  function updateSetupBadge(){
-    const designMin = drawingTypeSel.value==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
-    const totalMin = designMin + (parseFloat(setupTimeInput.value)||0);
-    $('setupBadge').textContent = '● ' + (DRAWING_LABELS[drawingTypeSel.value]||'') + ' · ' + fmtNum(totalMin,0) + ' min';
-  }
-  function applyDrawingTypeUI(){
-    designTimeField.hidden = drawingTypeSel.value==='client_direct';
-    if(drawingTypeSel.value==='client_direct') designTimeInput.value = 0;
-    updateSetupBadge();
-  }
-  drawingTypeSel.addEventListener('change', ()=>{
-    applyDrawingTypeUI();
-    if(!designTimeField.hidden) designTimeInput.focus();
-    recalcAndRender();
-  });
-  [designTimeInput, setupTimeInput].forEach(inp=>{
-    inp.addEventListener('input', ()=>{ updateSetupBadge(); recalcAndRender(); });
-  });
-
-  /* ---------------------------------------------------------------- */
   /* LISTENERS DE RECÁLCULO                                            */
   /* ---------------------------------------------------------------- */
-  [tubeProfileSelect, wasteModeSelect, adjustmentReasonSelect].forEach(el=> el.addEventListener('change', recalcAndRender));
-  [qtyInput, barLengthInput, straightCutsInput, angleCutsInput, extraCutMmInput,
-   rotationMinInput, realCuttingTimeInput, adjustmentValueInput, orderNameInp].forEach(el=> el.addEventListener('input', recalcAndRender));
-  clearRealTimeBtn.addEventListener('click', ()=>{ realCuttingTimeInput.value=''; recalcAndRender(); });
+  [adjustmentReasonSelect].forEach(el=> el.addEventListener('change', recalcAndRender));
+  [qtyInput, lengthInput, customW, customH, customT, barLengthInput, clampInput, barsInput,
+   manualCostInput, manualSaleInput, realCuttingTimeInput, adjustmentValueInput, orderNameInp].forEach(el=> el.addEventListener('input', recalcAndRender));
+  clearRealTimeBtn.addEventListener('click', ()=>{ realCuttingTimeInput.value=''; recalcAndRender(); markDirty(); });
+  $('resetBarsBtn').addEventListener('click', ()=>{ barsInput.value=''; recalcAndRender(); markDirty(); });
 
   /* ---------------------------------------------------------------- */
   /* IMPRESSÃO                                                         */
@@ -633,7 +770,8 @@
     const qty = Math.max(1, parseInt(qtyInput.value,10)||1);
     const now = new Date();
     const dateStr = now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});
-    const titles = { internal:'Ficha Interna — Custos de Fabrico (Tubo)', quote:'Orçamento', operator:'Ordem de Corte — Operador (Tubo)' };
+    const titles = { internal:'Ficha Interna — Custos (Tubo e perfis)', quote:'Orçamento', operator:'Ordem de Fabrico — Corte de Tubo' };
+    const title = r.valid ? profileTitle(r.profile) : '—';
 
     let html = '<div class="p-logo"><img src="logo.svg" alt="Serralharia José Gabriel P. V. do Couto"></div>';
     html += '<div class="p-title">' + (titles[mode]||titles.operator) + '</div>';
@@ -645,7 +783,8 @@
       html += pRow('Nº da encomenda', $('orderNumberPreview').value || '—');
       html += pRow('Data', now.toLocaleDateString('pt-PT'));
       html += pRow('Peça', orderName);
-      html += pRow('Perfil', r.valid ? r.profile.name : '—');
+      html += pRow('Material', escapeHtml(title));
+      html += pRow('Comprimento por peça', r.valid ? fmtThousands(r.lenMm) + ' mm' : '—');
       html += pRow('Quantidade', qty);
       html += '</div>';
       html += '<div class="p-totals">';
@@ -660,57 +799,64 @@
     html += pRow('Nº da encomenda', $('orderNumberPreview').value || '—');
     html += pRow('Encomenda / peça', orderName);
     html += pRow('Cliente', client);
-    html += pRow('Perfil de tubo', r.valid ? r.profile.name : '—');
-    html += pRow('Quantidade a produzir', qty);
+    html += pRow('Data da encomenda', ($('orderDatePreview').value || now.toLocaleDateString('pt-PT')));
     html += '</div>';
 
-    html += '<div class="p-section">';
-    html += pRow('Comprimento de barra por peça', r.valid ? (fmtNum(r.barLenMm,0) + ' mm') : '—');
-    html += pRow('Cortes retos', r.valid ? r.straightCuts : '—');
-    html += pRow('Cortes em esquadria/ângulo', r.valid ? r.angleCuts : '—');
-    if(r.valid && r.extraCutMm) html += pRow('Furos e bocas de ligação', fmtNum(r.extraCutMm,0) + ' mm de corte');
-    if(r.valid && r.rotationMin) html += pRow('Tempo de rotação', fmtNum(r.rotationMin,1) + ' min/peça');
-    if(r.valid) html += pRow('Comprimento faturado por peça', fmtNum(r.billedLenM,3) + ' m' + (r.wastePct ? ' (inclui '+r.wastePct+'% desperdício)' : ''));
-    html += '</div>';
-
-    html += '<div class="p-realtime-box">Tempo de corte real (TOTAL da encomenda, todas as peças): __________________ min</div>';
-
-    if(mode==='internal'){
-      html += '<div class="p-section">';
-      html += '<div class="p-costs-title">Custo da encomenda</div>';
-      html += pRow('Comprimento por peça', r.valid ? (fmtNum(r.billedLenM,3)+' m' + (r.wastePct ? ' (inclui '+r.wastePct+'% desperdício)' : '')) : '—');
-      html += pRow('Comprimento total', r.valid ? (fmtNum(r.totalLenM,3)+' m') : '—');
-      html += pRow('Preço do tubo', r.valid ? (fmtEUR(r.effectivePricePerM)+'/m') : '—');
-      html += pRow('Custo total do material', r.valid ? fmtEUR(r.materialCostTotal) : '—');
-      html += pRow('Custo pré-corte', r.valid ? fmtEUR(r.preCorteCost) : '—');
+    if(mode==='operator'){
+      html += '<div class="p-section" style="border:1.5px solid #111; border-radius:6px; padding:10px 14px;">';
+      html += '<div class="p-costs-title">Tubo a cortar</div>';
+      html += '<div style="font-size:18px; font-weight:700; margin:2px 0 8px;">' + escapeHtml(title) + '</div>';
+      html += pRow('Comprimento de corte', r.valid ? fmtThousands(r.lenMm) + ' mm' : '—');
+      html += pRow('Quantidade', qty + (qty===1?' peça':' peças'));
       if(r.valid){
-        const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[r.drawingType] || r.drawingType;
-        html += pRow('　· Desenho', drawLabel + (r.designTimeMin ? ' — '+r.designTimeMin+' min ('+fmtEUR(r.designCost)+')' : ' — sem custo'));
-        html += pRow('　· Setup', r.setupTimeMin+' min ('+fmtEUR(r.setupCost)+')');
-      }
-      html += pRow('Custo total do corte', r.valid ? (fmtEUR(r.corteCost)+' ('+fmtNum(r.cuttingTimeMin,1)+' min no total'+(r.isFinalDisplay?', real':', estimado')+')') : '—');
-      if(r.valid && r.adjustmentValue){
-        html += pRow('Subtotal', fmtEUR(r.subtotal));
-        html += pRow('Ajuste comercial' + (r.adjustmentReason ? ' ('+escapeHtml(r.adjustmentReason)+')' : ''), (r.adjustmentValue>0?'+':'') + fmtEUR(r.adjustmentValue));
+        html += pRow('Total a cortar', fmtNum(r.cutMm/1000,2) + ' m');
+        html += pRow('Barras a usar', r.bars + ' × ' + fmtThousands(r.barLenMm) + ' mm');
+        const dist = distributionText(qty, r.ppb, r.bars);
+        html += '<div style="font-size:12px; margin-top:6px;">' + (dist ? dist + ' · ' : '') + (r.clampMm ? 'não cortar os últimos ' + fmtThousands(r.clampMm) + ' mm de cada barra (zona de fixação).' : '') + '</div>';
       }
       html += '</div>';
-      html += '<div class="p-totals">';
-      html += '<div class="p-total-item p-total-main"><span>Total da encomenda (' + qty + (qty===1?' peça':' peças') + ') — sem IVA</span><strong>' + (r.valid?fmtEUR(r.totalCost):'—') + '</strong></div>';
-      html += '<div class="p-total-item"><span>Total ÷ nº peças — sem IVA</span><strong>' + (r.valid?fmtEUR(r.avgPerPiece):'—') + '</strong></div>';
-      html += '</div>';
-      if(r.valid){
-        html += '<div class="p-section p-margin-box">';
-        html += '<div class="p-costs-title">Margem (uso interno)</div>';
-        html += pRow('Custo real para a empresa', fmtEUR(r.realCost));
-        html += pRow('Margem', fmtEUR(r.marginValue) + (r.marginPct!=null ? ' · ' + fmtNum(r.marginPct,1) + '%' : ''));
-        html += '</div>';
-      }
-      const commentsText = orderCommentsInp.value.trim();
-      html += '<div class="p-notes-box"><div class="p-notes-title">Comentários</div>' +
-        (commentsText ? '<div class="p-notes-text">' + escapeHtml(commentsText).replace(/\n/g,'<br>') + '</div>'
-                      : '<div class="p-notes-lines"><span></span><span></span></div>') + '</div>';
+      html += '<div style="color:#111; border:1px solid #ccc; border-radius:6px; padding:10px; margin:10px 0;">' + (r.valid ? drawingHTML(r.profile, r.lenMm, qty) : '') + '</div>';
+      const notes = orderCommentsInp.value.trim();
+      html += '<div class="p-notes-box"><div class="p-notes-title">Notas de corte</div>' +
+        (notes ? '<div class="p-notes-text">' + escapeHtml(notes).replace(/\n/g,'<br>') + '</div>'
+               : '<div class="p-notes-lines"><span></span><span></span></div>') + '</div>';
+      html += '<div class="p-realtime-box">Tempo real de corte (total, todas as peças): __________________ min</div>';
+      html += '<div class="p-sign"><div>Operador: ______________________</div><div>Data: ______________</div></div>';
+      return html;
     }
 
+    // ficha interna
+    html += '<div class="p-section">';
+    html += pRow('Material', escapeHtml(title));
+    html += pRow('Comprimento de corte', r.valid ? fmtThousands(r.lenMm) + ' mm' : '—');
+    html += pRow('Quantidade', qty);
+    if(r.valid) html += pRow('Barras', r.bars + ' × ' + fmtThousands(r.barLenMm) + ' mm (' + fmtNum(r.barMm/1000,2) + ' m)');
+    html += '</div>';
+    html += '<div class="p-section">';
+    html += '<div class="p-costs-title">Custo da encomenda</div>';
+    html += pRow('Metros cortados', r.valid ? fmtNum(r.cutMm/1000,2) + ' m' : '—');
+    html += pRow('Custo de material (compra, barras usadas)', r.valid ? fmtEUR(r.costVal) : '—');
+    if(r.valid && r.priced) html += pRow('Venda calculada sobre', state.basis==='bars' ? 'barras inteiras (inclui sobra)' : 'só o que se corta');
+    html += pRow('Valor de venda (antes de ajuste)', r.valid ? fmtEUR(r.subtotal) : '—');
+    if(r.valid && r.adjustmentValue){
+      html += pRow('Ajuste comercial' + (r.adjustmentReason ? ' ('+escapeHtml(r.adjustmentReason)+')' : ''), (r.adjustmentValue>0?'+':'') + fmtEUR(r.adjustmentValue));
+    }
+    html += '</div>';
+    html += '<div class="p-totals">';
+    html += '<div class="p-total-item p-total-main"><span>Total da encomenda (' + qty + (qty===1?' peça':' peças') + ') — sem IVA</span><strong>' + (r.valid?fmtEUR(r.totalCost):'—') + '</strong></div>';
+    html += '<div class="p-total-item"><span>Total ÷ nº peças — sem IVA</span><strong>' + (r.valid?fmtEUR(r.avgPerPiece):'—') + '</strong></div>';
+    html += '</div>';
+    if(r.valid){
+      html += '<div class="p-section p-margin-box">';
+      html += '<div class="p-costs-title">Margem (uso interno)</div>';
+      html += pRow('Custo real para a empresa', fmtEUR(r.realCost));
+      html += pRow('Margem', fmtEUR(r.marginValue) + (r.marginPct!=null ? ' · ' + fmtNum(r.marginPct,1) + '%' : ''));
+      html += '</div>';
+    }
+    const commentsText = orderCommentsInp.value.trim();
+    html += '<div class="p-notes-box"><div class="p-notes-title">Notas</div>' +
+      (commentsText ? '<div class="p-notes-text">' + escapeHtml(commentsText).replace(/\n/g,'<br>') + '</div>'
+                    : '<div class="p-notes-lines"><span></span><span></span></div>') + '</div>';
     html += '<div class="p-sign"><div>Operador: ______________________</div><div>Data: ______________</div></div>';
     return html;
   }
@@ -718,7 +864,7 @@
   function doPrint(mode){
     const r = computeCost();
     if(!r.valid){
-      printHint.textContent = 'Escolha o perfil e indique o comprimento de barra antes de imprimir.';
+      printHint.textContent = 'Escolha o perfil e indique o comprimento de corte antes de imprimir.';
       printHint.style.color = 'var(--danger)';
       return;
     }
@@ -749,6 +895,12 @@
   async function refreshOrderNumberPreview(){
     try{ $('orderNumberPreview').value = await computeNextOrderNumber(state.remote, state.orders); }
     catch(e){ $('orderNumberPreview').value = ''; }
+    $('orderDatePreview').value = new Date().toLocaleDateString('pt-PT');
+  }
+
+  function applyMachineDefaultsToBarInputs(){
+    barLengthInput.value = state.machine.tubeBarLengthMm ?? 6000;
+    clampInput.value = state.machine.tubeClampMm ?? 400;
   }
 
   function resetOrderForm(){
@@ -756,18 +908,17 @@
     state.loadedOrderCreatedAt = null; state.loadedCostSnapshot = null;
     state.orderState = 'quote';
     state.wasQuoted = false;
+    state.basis = 'cut';
     orderNameInp.value = ''; clientNameInp.value = ''; orderCommentsInp.value = '';
-    qtyInput.value = 1;
-    barLengthInput.value = 1000;
-    wasteModeSelect.value = 'pct';
-    straightCutsInput.value = 0; angleCutsInput.value = 0;
-    extraCutMmInput.value = 0; rotationMinInput.value = 0;
+    qtyInput.value = 1; lengthInput.value = '';
+    barsInput.value = '';
+    customW.value = ''; customH.value = ''; customT.value = '';
+    manualCostInput.value = ''; manualSaleInput.value = '';
     realCuttingTimeInput.value = '';
     adjustmentValueInput.value = ''; adjustmentReasonSelect.value = '';
     adjustmentFields.hidden = true; showAdjustmentBtn.hidden = false;
-    drawingTypeSel.value = 'client_direct';
-    setupTimeInput.value = state.machine.defaultSetupMin ?? 5;
-    applyDrawingTypeUI();
+    applyMachineDefaultsToBarInputs();
+    renderSelectors();
     applyOrderStateUI();
     refreshOrderNumberPreview();
     recalcAndRender();
@@ -777,6 +928,7 @@
     if((orderNameInp.value.trim() || clientNameInp.value.trim()) &&
        !(await window.LC.showConfirm('Isto limpa o formulário atual. Continuar?'))) return;
     resetOrderForm();
+    window.scrollTo({top:0, behavior:'smooth'});
   });
 
   async function populateFromOrder(o){
@@ -788,29 +940,37 @@
     state.wasQuoted = !!o.wasQuoted || state.orderState === 'quote';
 
     const t = o.tubeInputs || {};
-    if(t.profileId && state.profiles.some(p=>p.id===t.profileId)) tubeProfileSelect.value = t.profileId;
-    barLengthInput.value = t.barLengthMm ?? 1000;
-    wasteModeSelect.value = t.wasteMode || 'pct';
-    straightCutsInput.value = t.straightCuts ?? 0;
-    angleCutsInput.value = t.angleCuts ?? 0;
-    extraCutMmInput.value = t.extraCutMm ?? 0;
-    rotationMinInput.value = t.rotationMin ?? 0;
+    const isV2 = t.v === 2;
+    applyMachineDefaultsToBarInputs();
+    barsInput.value = ''; customW.value = ''; customH.value = ''; customT.value = '';
+    manualCostInput.value = ''; manualSaleInput.value = '';
+    state.basis = 'cut';
+    if(isV2){
+      state.material = t.material || 'galvanizado';
+      state.shape = t.shape || 'quadrado';
+      lengthInput.value = t.lengthMm || '';
+      barLengthInput.value = t.barLengthMm ?? barLengthInput.value;
+      clampInput.value = t.clampMm ?? clampInput.value;
+      barsInput.value = t.barsOverride || '';
+      state.basis = t.basis || 'cut';
+      manualCostInput.value = t.manualCost ?? '';
+      manualSaleInput.value = t.manualSale ?? '';
+      if(t.custom){ customW.value = t.custom.w || ''; customH.value = t.custom.h || ''; customT.value = t.custom.t || ''; }
+      renderSelectors(t.custom ? CUSTOM_ID : t.profileId);
+    } else {
+      // encomenda do método antigo (perfil com velocidade e cortes): só traz os dados gerais
+      lengthInput.value = t.barLengthMm || '';
+      renderSelectors();
+    }
 
     const cs = o.costSnapshot;
     realCuttingTimeInput.value = (cs && cs.isFinal && isFinite(cs.cuttingTimeMin)) ? cs.cuttingTimeMin : '';
     adjustmentValueInput.value = (cs && cs.adjustmentValue) ? cs.adjustmentValue : '';
     if(adjustmentValueInput.value) revealAdjustment(); else hideAdjustmentIfEmpty();
     adjustmentReasonSelect.value = (cs && cs.adjustmentReason) || '';
-
-    const si = cs && cs.setupInputs;
-    if(si){
-      drawingTypeSel.value = si.drawingType || 'client_direct';
-      designTimeInput.value = si.designTimeMin || 0;
-      setupTimeInput.value = si.setupTimeMin ?? 5;
-    }
-    applyDrawingTypeUI();
     applyOrderStateUI();
     recalcAndRender();
+    return isV2;
   }
 
   async function loadOrderIntoForm(o){
@@ -818,12 +978,15 @@
     state.loadedOrderNumber = o.orderNumber;
     state.loadedOrderCreatedAt = o.createdAt;
     state.loadedCostSnapshot = o.costSnapshot || null;
-    await populateFromOrder(o);
+    const isV2 = await populateFromOrder(o);
     $('orderNumberPreview').value = o.orderNumber || '';
+    $('orderDatePreview').value = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '';
     markClean();
     saveOrderHint.style.color = 'var(--readout)';
-    saveOrderHint.textContent = 'Encomenda ' + (o.orderNumber||'') + ' reposta — gravar atualiza esta mesma encomenda.';
-    setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
+    saveOrderHint.textContent = isV2
+      ? 'Encomenda ' + (o.orderNumber||'') + ' reposta — gravar atualiza esta mesma encomenda.'
+      : 'Encomenda ' + (o.orderNumber||'') + ' criada com o método antigo — escolha o perfil e o comprimento; ao gravar passa a usar o novo método (o preço pode mudar).';
+    setTimeout(()=>{ saveOrderHint.textContent=''; }, 12000);
   }
 
   async function loadOrderAsDuplicate(o){
@@ -867,11 +1030,11 @@
     const r = computeCost();
     if(!r.valid){
       saveOrderHint.style.color = 'var(--danger)';
-      saveOrderHint.textContent = 'Escolha o perfil e indique o comprimento de barra antes de guardar.';
+      saveOrderHint.textContent = 'Escolha o perfil e indique o comprimento de corte antes de guardar.';
       return;
     }
     if(state.loadedOrderId && state.loadedCostSnapshot && state.loadedCostSnapshot.isFinal){
-      if(!(await window.LC.showConfirm('Esta encomenda (' + (state.loadedOrderNumber||'') + ') já está marcada como Final, com preço fechado. Tens a certeza que queres substituir os dados gravados?', {danger:true}))) return;
+      if(!(await window.LC.showConfirm('Esta encomenda (' + (state.loadedOrderNumber||'') + ') já tem o tempo de corte real registado. Tens a certeza que queres substituir os dados gravados?', {danger:true}))) return;
     }
 
     const saveLabelEl = $('saveOrderBtnLabel');
@@ -883,6 +1046,7 @@
       const id = isUpdate ? state.loadedOrderId : ('o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8));
       let orderNumber = isUpdate ? state.loadedOrderNumber : await computeNextOrderNumber(state.remote, state.orders);
       const createdAt = isUpdate ? state.loadedOrderCreatedAt : new Date().toISOString();
+      const p = r.profile;
 
       const rec = {
         id, client: clientNameInp.value.trim(), orderName, orderNumber, createdAt,
@@ -892,31 +1056,30 @@
         pieceType: 'tube',
         mode: 'tube',
         quantity: r.qty,
-        materialId: r.profile.id,
-        materialSnapshot: { name: r.profile.name, thickness: 0, speed: r.profile.speed,
-          pricePerM: r.profile.pricePerM, markupPct: r.profile.markupPct,
-          perimeterMm: r.profile.perimeterMm },
+        materialId: p.id,
+        materialSnapshot: { name: profileTitle(p), thickness: null, costPerM: p.costPerM, markup: r.markup,
+          shape: p.shape, material: p.material, profileName: p.name },
         machineSnapshot: Object.assign({}, state.machine),
         tubeInputs: {
-          profileId: r.profile.id, barLengthMm: r.barLenMm, wasteMode: wasteModeSelect.value,
-          straightCuts: r.straightCuts, angleCuts: r.angleCuts,
-          extraCutMm: r.extraCutMm, rotationMin: r.rotationMin,
+          v: 2, profileId: p.id, material: state.material, shape: state.shape,
+          custom: p.custom ? { w:p.w, h:p.h, t:p.t } : null,
+          lengthMm: r.lenMm, barLengthMm: r.barLenMm, clampMm: r.clampMm,
+          barsOverride: parseInt(barsInput.value,10) > 0 ? parseInt(barsInput.value,10) : null,
+          bars: r.bars, basis: state.basis,
+          manualCost: r.priced ? null : r.costVal, manualSale: r.priced ? null : r.saleVal,
         },
         costSnapshot: {
           totalCost: r.totalCost, avgPerPiece: r.avgPerPiece,
-          cuttingTimeMin: r.cuttingTimeMin, corteCost: r.corteCost,
-          materialCost: r.materialCostPerPiece, lengthPerPieceM: r.billedLenM, lengthTotalM: r.totalLenM,
-          designCost: r.designCost, setupCost: r.setupCost, preCorteCost: r.preCorteCost,
+          cuttingTimeMin: r.cuttingTimeMin, corteCost: 0,
+          materialCost: r.materialCostPerPiece, lengthPerPieceM: r.lenMm/1000, lengthTotalM: r.cutMm/1000,
+          barsUsed: r.bars, barMetres: r.barMm/1000,
+          designCost: 0, setupCost: 0, preCorteCost: 0,
           subtotal: r.subtotal, adjustmentValue: r.adjustmentValue, adjustmentReason: r.adjustmentReason,
           realCost: r.realCost, marginValue: r.marginValue, marginPct: r.marginPct,
           isFinal: r.isFinalDisplay,
-          estimadoCuttingTimeMin: (state.loadedCostSnapshot && state.loadedCostSnapshot.estimadoCuttingTimeMin != null)
-            ? state.loadedCostSnapshot.estimadoCuttingTimeMin : r.estimatedCuttingTimeMin,
-          setupInputs: {
-            drawingType: drawingTypeSel.value,
-            designTimeMin: parseFloat(designTimeInput.value)||0,
-            setupTimeMin: parseFloat(setupTimeInput.value)||0,
-          },
+          noCuttingCharge: true,
+          estimadoCuttingTimeMin: null,
+          setupInputs: { drawingType: 'client_direct', designTimeMin: 0, setupTimeMin: 0 },
           // Data de conclusão — só a 1ª vez que fica "Concluído"; alimenta o "Resumo do dia".
           completedAt: state.orderState === 'done'
             ? ((state.loadedCostSnapshot && state.loadedCostSnapshot.completedAt) || new Date().toISOString())
@@ -1006,9 +1169,8 @@
     if(state.remote.configured){ badge.textContent = '● servidor central'; badge.className = 'conn-badge conn-online'; }
     else { badge.textContent = '● só este aparelho'; badge.className = 'conn-badge conn-local'; }
 
-    populateProfileSelect();
-    setupTimeInput.value = state.machine.defaultSetupMin ?? 5;
-    applyDrawingTypeUI();
+    applyMachineDefaultsToBarInputs();
+    renderSelectors();
     applyOrderStateUI();
 
     try{
@@ -1034,7 +1196,7 @@
     recalcAndRender();
     markClean();
     $('loadingVeil').classList.add('done');
-    // Vindo de "Aceitar" nos Orçamentos — abre logo a impressão da ordem de corte.
+    // Vindo de "Aceitar" nos Orçamentos — abre logo a impressão da ordem de fabrico.
     if(autoPrintOperator) doPrint('operator');
   }
   init();
