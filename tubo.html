@@ -157,6 +157,26 @@
       </div>
 
       <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Ficheiro IGES (opcional)</h2>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <button class="ghost-btn" id="igesPickBtn" type="button">Anexar ficheiro IGES</button>
+          <button class="ghost-btn sm" id="igesRemoveBtn" type="button" hidden>Remover</button>
+          <span id="igesName" style="font-size:12.5px; color:var(--text-muted);">Nenhum ficheiro anexado</span>
+          <input type="file" id="igesFileInput" accept=".igs,.iges,.IGS,.IGES" style="display:none;">
+        </div>
+        <div id="igesInfo" hidden style="margin-top:12px;">
+          <div class="stat-strip" style="grid-template-columns:repeat(2, minmax(0,1fr));">
+            <div><div class="k">Comprimento no ficheiro</div><div class="v" id="igesLen">—</div></div>
+            <div><div class="k">Secção no ficheiro</div><div class="v" id="igesSection">—</div></div>
+          </div>
+          <div class="note-warn" id="igesWarn" hidden style="margin-top:10px;"></div>
+          <div id="igesSummary" style="margin-top:10px; font-size:13px; line-height:1.55;"></div>
+          <div class="draw-wrap" id="igesPreview" style="margin-top:10px; display:block;"></div>
+        </div>
+        <p class="save-hint" id="igesHint" style="margin-top:10px;">Com um IGES anexado, a ordem de fabrico mostra o tubo com os cortes e um resumo (ex.: rasgos). Lê as arestas do ficheiro; confirme sempre no computador.</p>
+      </div>
+
+      <div class="card">
         <h2 class="card-title"><span class="dot"></span>Guardar encomenda <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span></h2>
         <p class="save-hint" id="editingNote" hidden style="color:var(--accent); margin-bottom:10px;"></p>
         <div class="mat-actions">
@@ -324,6 +344,7 @@
     shape: 'quadrado',
     profileId: null,
     basis: 'cut',
+    iges: null,
   };
 
   const orderNameInp = $('orderName'), clientNameInp = $('clientName');
@@ -475,7 +496,7 @@
   /* ---------------------------------------------------------------- */
   /* DESENHO (secção + vista lateral)                                  */
   /* ---------------------------------------------------------------- */
-  function drawingHTML(p, lenMm, qty){
+  function drawingHTML(p, lenMm, qty, sectionOnly){
     if(!p || !(p.w>0)) return '';
     const round = p.shape === 'redondo';
     const isPath = p.shape === 'cantoneira' || p.shape === 'perfilu';
@@ -512,6 +533,7 @@
     }
     if(p.t){ s += '<text x="'+cx+'" y="184" text-anchor="middle" '+txt+'>espessura '+fmtC(p.t)+' mm</text>'; }
     s += '</svg>';
+    if(sectionOnly) return s;
 
     // vista lateral com o comprimento de corte
     const sideH = Math.max(22, Math.min(60, oh*0.55));
@@ -526,6 +548,165 @@
     v += '</svg>';
     return s + v;
   }
+
+  /* ---------------------------------------------------------------- */
+  /* IGES — desenho em tira (tubo inteiro + ampliação) e resumo        */
+  /* ---------------------------------------------------------------- */
+  function igesMainView(iges){ return (iges.groups && iges.groups[0] && iges.groups[0].view) || 'A'; }
+  function igesPolys(iges, view){ return view === 'B' ? iges.B : iges.A; }
+  function igesExt(iges, view){ return view === 'B' ? iges.sectionH : iges.sectionW; }
+
+  // from/to em mm ao longo do tubo; W = largura máxima em px; maxTubeH = altura máxima do tubo em px
+  function igesStripSVG(iges, view, from, to, W, maxTubeH, opts){
+    opts = opts || {};
+    const pad = 10, ext = igesExt(iges, view) || 1;
+    const sc = Math.min((W - 2*pad) / (to - from), maxTubeH / ext);
+    const width = (to - from) * sc + 2*pad;
+    const tubeH = ext * sc;
+    const g = iges.groups && iges.groups[0];
+    const mainView = igesMainView(iges);
+    const showGroupDims = !!(g && view === mainView);
+    const top = 16, cy = top + tubeH/2, yb = top + tubeH;
+    const x = a => pad + (a - from) * sc;
+    const y = u => cy - u * sc;
+    const f = n => n.toFixed(1);
+    const dim = 'stroke="currentColor" stroke-opacity=".55" stroke-width="0.8"';
+    const txt = 'font-size="10" font-family="Inter,sans-serif" fill="currentColor" fill-opacity=".75" text-anchor="middle"';
+    let body = '';
+    igesPolys(iges, view).forEach(flat=>{
+      let d = '';
+      for(let i=0;i<flat.length;i+=2) d += (i ? 'L' : 'M') + f(x(flat[i])) + ' ' + f(y(flat[i+1]));
+      body += '<path d="'+d+'" fill="none" stroke="currentColor" stroke-width="'+(opts.zoom ? 1.4 : 1)+'" stroke-linejoin="round"/>';
+    });
+    const hDim = (a0, a1, yy, label) =>
+      '<line x1="'+f(x(a0))+'" y1="'+f(yy)+'" x2="'+f(x(a1))+'" y2="'+f(yy)+'" '+dim+'/>' +
+      '<line x1="'+f(x(a0))+'" y1="'+f(yy-4)+'" x2="'+f(x(a0))+'" y2="'+f(yy+4)+'" '+dim+'/>' +
+      '<line x1="'+f(x(a1))+'" y1="'+f(yy-4)+'" x2="'+f(x(a1))+'" y2="'+f(yy+4)+'" '+dim+'/>' +
+      '<text x="'+f((x(a0)+x(a1))/2)+'" y="'+f(yy+13)+'" '+txt+'>'+label+'</text>';
+    let rows = 0;
+    if(opts.zoom){
+      if(showGroupDims){
+        body += hDim(g.first, g.first + g.la, yb + 14, fmtC(g.la) + ' mm'); rows = 1;
+        if(g.regular && g.first + g.pitch <= to){ body += hDim(g.first, g.first + g.pitch, yb + 40, fmtC(g.pitch) + ' mm (passo)'); rows = 2; }
+        // largura do rasgo (cota vertical, à esquerda do 1.º rasgo)
+        const gx = x(g.first) - 14;
+        if(gx > pad){
+          body += '<line x1="'+f(gx)+'" y1="'+f(y(g.mid + g.cross/2))+'" x2="'+f(gx)+'" y2="'+f(y(g.mid - g.cross/2))+'" '+dim+'/>' +
+            '<line x1="'+f(gx-4)+'" y1="'+f(y(g.mid + g.cross/2))+'" x2="'+f(gx+4)+'" y2="'+f(y(g.mid + g.cross/2))+'" '+dim+'/>' +
+            '<line x1="'+f(gx-4)+'" y1="'+f(y(g.mid - g.cross/2))+'" x2="'+f(gx+4)+'" y2="'+f(y(g.mid - g.cross/2))+'" '+dim+'/>' +
+            '<text x="'+f(gx-6)+'" y="'+f(y(g.mid))+'" transform="rotate(-90 '+f(gx-6)+' '+f(y(g.mid))+')" '+txt+'>'+fmtC(g.cross)+' mm</text>';
+        }
+        body += '<text x="'+f(x(g.first))+'" y="'+f(top-4)+'" '+txt+'>'+fmtThousands(g.first)+'</text>';
+      }
+    } else {
+      if(showGroupDims){ body += hDim(0, g.first, yb + 14, fmtThousands(g.first) + ' mm'); rows = 1; }
+      body += hDim(0, iges.lengthMm, yb + 14 + rows*24 + (rows ? 8 : 0), fmtThousands(iges.lengthMm) + ' mm'); rows += 1;
+      if(opts.zoomFrom != null){
+        body += '<rect x="'+f(x(opts.zoomFrom))+'" y="'+f(top-6)+'" width="'+f((opts.zoomTo-opts.zoomFrom)*sc)+'" height="'+f(tubeH+12)+'" fill="none" stroke="#2563eb" stroke-width="0.9" stroke-dasharray="3 2"/>';
+      }
+    }
+    const H = yb + 14 + rows*28 + 14;
+    return '<svg width="'+f(width)+'" height="'+f(H)+'" viewBox="0 0 '+f(width)+' '+f(H)+'" style="display:block; max-width:100%;">' + body + '</svg>';
+  }
+
+  function igesZoomRange(iges){
+    const g = iges.groups && iges.groups[0];
+    if(!g) return null;
+    const ext = igesExt(iges, igesMainView(iges)) || 1;
+    const W = 690, pad = 10;
+    const sc = Math.min((W - 2*pad) / 200, 150 / ext);
+    const span = Math.min(iges.lengthMm, (W - 2*pad) / sc);
+    let from = Math.max(0, g.first - 50);
+    if(from + span > iges.lengthMm) from = Math.max(0, iges.lengthMm - span);
+    return { from, to: from + span };
+  }
+
+  function igesSummaryLines(iges){
+    return (iges.groups || []).slice(0,4).map(g=>{
+      let t = g.count + (g.count===1 ? ' rasgo' : ' rasgos') + ' de ' + fmtC(g.la) + ' × ' + fmtC(g.cross) + ' mm';
+      if(g.regular) t += ' · passo de ' + fmtC(g.pitch) + ' mm · do 1.º (aos ' + fmtThousands(g.first) + ' mm) ao último (aos ' + fmtThousands(g.last) + ' mm)';
+      else if(g.count > 1) t += ' · a partir dos ' + fmtThousands(g.first) + ' mm';
+      else t += ' · aos ' + fmtThousands(g.first) + ' mm';
+      return t;
+    });
+  }
+
+  function igesBlockHTML(iges, forPrint){
+    const mainView = igesMainView(iges), otherView = mainView === 'A' ? 'B' : 'A';
+    const z = igesZoomRange(iges);
+    const W = forPrint ? 690 : 560;
+    let h = '<div style="color:#111;">';
+    h += '<div class="p-costs-title" style="margin-bottom:6px;">Desenho do ficheiro IGES' + (iges.name ? ' <span style="font-weight:400; font-size:11px; color:#555;">(' + escapeHtml(iges.name) + ')</span>' : '') + '</div>';
+    h += igesStripSVG(iges, mainView, 0, iges.lengthMm, W, 120, z ? { zoomFrom:z.from, zoomTo:z.to } : {});
+    if(z){
+      h += '<div style="font-size:10.5px; color:#555; margin:6px 0 2px;">Ampliação, de ' + fmtThousands(z.from) + ' a ' + fmtThousands(z.to) + ' mm</div>';
+      h += igesStripSVG(iges, mainView, z.from, z.to, W, 150, { zoom:true });
+    }
+    h += '<div style="font-size:10.5px; color:#555; margin:6px 0 2px;">Vista rodada 90°</div>';
+    h += igesStripSVG(iges, otherView, 0, iges.lengthMm, W, 120, {});
+    const lines = igesSummaryLines(iges);
+    if(lines.length){
+      h += '<div style="margin-top:8px; font-size:13px; line-height:1.55;"><strong>Resumo dos cortes</strong>' + lines.map(l=>'<div>'+escapeHtml(l)+'</div>').join('') +
+        '<div style="font-size:10.5px; color:#555; margin-top:3px;">Lido do ficheiro IGES — posições medidas desde a ponta esquerda do desenho. Confirmar no computador.</div></div>';
+    } else {
+      h += '<div style="margin-top:8px; font-size:11px; color:#555;">Lido do ficheiro IGES. Confirmar no computador.</div>';
+    }
+    return h + '</div>';
+  }
+
+  function renderIges(){
+    const ig = state.iges;
+    $('igesInfo').hidden = !ig;
+    $('igesRemoveBtn').hidden = !ig;
+    $('igesPickBtn').textContent = ig ? 'Trocar ficheiro IGES' : 'Anexar ficheiro IGES';
+    $('igesName').textContent = ig ? (ig.name || 'IGES anexado') : 'Nenhum ficheiro anexado';
+    if(!ig) return;
+    $('igesLen').textContent = fmtThousands(ig.lengthMm) + ' mm';
+    $('igesSection').textContent = fmtC(ig.sectionW) + ' × ' + fmtC(ig.sectionH) + ' mm';
+    const warns = [];
+    const lenVal = parseFloat(lengthInput.value) || 0;
+    if(lenVal > 0 && Math.abs(lenVal - ig.lengthMm) > 1){
+      warns.push('O IGES tem ' + fmtC(ig.lengthMm) + ' mm de comprimento, mas a encomenda indica ' + fmtC(lenVal) + ' mm.');
+    }
+    const p = getSelectedProfile();
+    if(p && p.w > 0){
+      const a = [p.w, p.shape==='redondo' ? p.w : (p.h || p.w)].sort((m,n)=>m-n);
+      const b = [ig.sectionW, ig.sectionH].sort((m,n)=>m-n);
+      if(Math.abs(a[0]-b[0]) > 1.5 || Math.abs(a[1]-b[1]) > 1.5){
+        warns.push('A secção do IGES (' + fmtC(ig.sectionW) + ' × ' + fmtC(ig.sectionH) + ' mm) não corresponde ao perfil escolhido (' + fmtC(a[0]) + ' × ' + fmtC(a[1]) + ' mm).');
+      }
+    }
+    const warnEl = $('igesWarn');
+    warnEl.hidden = !warns.length;
+    warnEl.innerHTML = warns.map(escapeHtml).join('<br>');
+    $('igesSummary').innerHTML = igesSummaryLines(ig).map(l=>'<div>• ' + escapeHtml(l) + '</div>').join('') ||
+      '<div style="color:var(--text-muted);">Sem rasgos detetados — o desenho mostra as arestas do ficheiro.</div>';
+    const z = igesZoomRange(ig), mainView = igesMainView(ig);
+    $('igesPreview').innerHTML = igesStripSVG(ig, mainView, 0, ig.lengthMm, 520, 90, z ? { zoomFrom:z.from, zoomTo:z.to } : {});
+  }
+
+  $('igesPickBtn').addEventListener('click', ()=> $('igesFileInput').click());
+  $('igesRemoveBtn').addEventListener('click', ()=>{ state.iges = null; $('igesFileInput').value = ''; renderIges(); markDirty(); });
+  $('igesFileInput').addEventListener('change', e=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const hint = $('igesHint');
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try{
+        const r = window.LC.parseIGES(String(ev.target.result));
+        state.iges = Object.assign({ name: file.name }, r);
+        hint.style.color = '';
+        if(!(parseFloat(lengthInput.value) > 0)) lengthInput.value = state.iges.lengthMm;
+        renderIges(); recalcAndRender(); markDirty();
+      }catch(err){
+        hint.style.color = 'var(--danger)';
+        hint.textContent = 'Não foi possível ler este IGES: ' + err.message;
+      }
+    };
+    reader.onerror = ()=>{ hint.style.color = 'var(--danger)'; hint.textContent = 'Não foi possível abrir o ficheiro.'; };
+    reader.readAsText(file);
+  });
 
   /* ---------------------------------------------------------------- */
   /* RENDER                                                            */
@@ -549,6 +730,7 @@
   function recalcAndRender(){
     const profile = getSelectedProfile();
     const r = computeCost();
+    renderIges();
     const qty = Math.max(1, parseInt(qtyInput.value,10)||1);
     const lenMm = parseFloat(lengthInput.value)||0;
 
@@ -815,7 +997,8 @@
         html += '<div style="font-size:12px; margin-top:6px;">' + (dist ? dist + ' · ' : '') + (r.clampMm ? 'não cortar os últimos ' + fmtThousands(r.clampMm) + ' mm de cada barra (zona de fixação).' : '') + '</div>';
       }
       html += '</div>';
-      html += '<div style="color:#111; border:1px solid #ccc; border-radius:6px; padding:10px; margin:10px 0;">' + (r.valid ? drawingHTML(r.profile, r.lenMm, qty) : '') + '</div>';
+      html += '<div style="color:#111; border:1px solid #ccc; border-radius:6px; padding:10px; margin:10px 0;">' + (r.valid ? drawingHTML(r.profile, r.lenMm, qty, !!state.iges) : '') + '</div>';
+      if(state.iges) html += '<div style="border:1px solid #ccc; border-radius:6px; padding:10px; margin:10px 0;">' + igesBlockHTML(state.iges, true) + '</div>';
       const notes = orderCommentsInp.value.trim();
       html += '<div class="p-notes-box"><div class="p-notes-title">Notas de corte</div>' +
         (notes ? '<div class="p-notes-text">' + escapeHtml(notes).replace(/\n/g,'<br>') + '</div>'
@@ -915,6 +1098,7 @@
     customW.value = ''; customH.value = ''; customT.value = '';
     manualCostInput.value = ''; manualSaleInput.value = '';
     realCuttingTimeInput.value = '';
+    state.iges = null; $('igesFileInput').value = '';
     adjustmentValueInput.value = ''; adjustmentReasonSelect.value = '';
     adjustmentFields.hidden = true; showAdjustmentBtn.hidden = false;
     applyMachineDefaultsToBarInputs();
@@ -941,6 +1125,8 @@
 
     const t = o.tubeInputs || {};
     const isV2 = t.v === 2;
+    state.iges = (isV2 && t.iges) ? t.iges : null;
+    $('igesFileInput').value = '';
     applyMachineDefaultsToBarInputs();
     barsInput.value = ''; customW.value = ''; customH.value = ''; customT.value = '';
     manualCostInput.value = ''; manualSaleInput.value = '';
@@ -1067,6 +1253,7 @@
           barsOverride: parseInt(barsInput.value,10) > 0 ? parseInt(barsInput.value,10) : null,
           bars: r.bars, basis: state.basis,
           manualCost: r.priced ? null : r.costVal, manualSale: r.priced ? null : r.saleVal,
+          iges: state.iges || null,
         },
         costSnapshot: {
           totalCost: r.totalCost, avgPerPiece: r.avgPerPiece,

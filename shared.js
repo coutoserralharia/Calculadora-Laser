@@ -1407,5 +1407,155 @@
     });
   };
 
+  /* ---------------------------------------------------------------- */
+  /* IGES — lê as arestas de um tubo/perfil para o desenho do operador  */
+  /* (curvas 3D das fronteiras das superfícies; não lê sólidos nem      */
+  /* superfícies "cheias" — só o contorno, que é o que se desenha).     */
+  /* ---------------------------------------------------------------- */
+  LC.parseIGES = function(text){
+    const lines = text.split(/\r?\n/);
+    const S = { D:[], P:[], G:[] };
+    lines.forEach(l=>{ if(l.length<73) return; const c=l[72]; if(S[c]) S[c].push(l); });
+    if(S.D.length<2) throw new Error('Ficheiro IGES inválido (sem secção de entidades).');
+    const G = S.G.map(l=>l.slice(0,72)).join('');
+    const pd = (G[0]==='1' && G[1]==='H') ? G[2] : ',';
+
+    const ents = {};
+    for(let i=0;i+1<S.D.length;i+=2){
+      const l1=S.D[i], l2=S.D[i+1];
+      ents[i+1] = { type:parseInt(l1.slice(0,8),10), pStart:parseInt(l1.slice(8,16),10),
+        matrix:parseInt(l1.slice(48,56),10)||0, pCount:parseInt(l2.slice(24,32),10) };
+    }
+    Object.values(ents).forEach(e=>{
+      let s=''; for(let k=0;k<e.pCount;k++){ const l=S.P[e.pStart-1+k]; if(l) s+=l.slice(0,64); }
+      s=s.trim(); const end=s.lastIndexOf(';'); if(end>=0) s=s.slice(0,end);
+      e.p = s.split(pd).map(t=>t.trim().replace(/D/g,'E'));
+    });
+
+    const num = t => parseFloat(t);
+    const matOf = seq => { const m=ents[seq]; return (seq && m && m.type===124) ? m.p.slice(1,13).map(num) : null; };
+    const applyM = (m,p) => m ? [ m[0]*p[0]+m[1]*p[1]+m[2]*p[2]+m[3], m[4]*p[0]+m[5]*p[1]+m[6]*p[2]+m[7], m[8]*p[0]+m[9]*p[1]+m[10]*p[2]+m[11] ] : p;
+
+    function bspline(e){
+      const p=e.p, K=parseInt(p[1],10), M=parseInt(p[2],10), nk=K+M+2; let idx=7;
+      const T=[]; for(let i=0;i<nk;i++) T.push(num(p[idx++]));
+      const W=[]; for(let i=0;i<=K;i++) W.push(num(p[idx++]));
+      const P=[]; for(let i=0;i<=K;i++){ P.push([num(p[idx++]),num(p[idx++]),num(p[idx++])]); }
+      const v0=num(p[idx++]), v1=num(p[idx++]);
+      const N=Math.max(12,(K+1)*6), pts=[];
+      for(let n=0;n<=N;n++){
+        const u=v0+(v1-v0)*n/N;
+        let s=M; for(let i=M;i<=K;i++){ if(u>=T[i]) s=i; } s=Math.min(s,K);
+        const Nb=new Array(M+1).fill(0); Nb[0]=1; const left=[], right=[];
+        for(let j=1;j<=M;j++){
+          left[j]=u-T[s+1-j]; right[j]=T[s+j]-u; let saved=0;
+          for(let r=0;r<j;r++){ const d=right[r+1]+left[j-r]; const tmp=d===0?0:Nb[r]/d; Nb[r]=saved+right[r+1]*tmp; saved=left[j-r]*tmp; }
+          Nb[j]=saved;
+        }
+        let x=0,y=0,z=0,w=0;
+        for(let j=0;j<=M;j++){ const i=s-M+j; const b=Nb[j]*W[i]; x+=b*P[i][0]; y+=b*P[i][1]; z+=b*P[i][2]; w+=b; }
+        pts.push([x/w,y/w,z/w]);
+      }
+      return pts;
+    }
+    function curvePoints(seq, depth){
+      const e=ents[seq]; if(!e || (depth||0)>6) return [];
+      const m=matOf(e.matrix), p=e.p; let pts=[];
+      if(e.type===110){ pts=[[num(p[1]),num(p[2]),num(p[3])],[num(p[4]),num(p[5]),num(p[6])]]; }
+      else if(e.type===100){
+        const zt=num(p[1]), cx=num(p[2]), cy=num(p[3]), sx=num(p[4]), sy=num(p[5]), ex=num(p[6]), ey=num(p[7]);
+        const r=Math.hypot(sx-cx,sy-cy), a0=Math.atan2(sy-cy,sx-cx); let a1=Math.atan2(ey-cy,ex-cx);
+        if(a1<=a0+1e-9) a1+=2*Math.PI;
+        const n=Math.max(8,Math.ceil((a1-a0)/(Math.PI/36)));
+        for(let i=0;i<=n;i++){ const a=a0+(a1-a0)*i/n; pts.push([cx+r*Math.cos(a),cy+r*Math.sin(a),zt]); }
+      }
+      else if(e.type===126){ pts=bspline(e); }
+      else if(e.type===102){
+        const n=parseInt(p[1],10); let all=[];
+        for(let i=0;i<n;i++){ const sub=curvePoints(parseInt(p[2+i],10),(depth||0)+1); if(sub.length) all=all.concat(sub); }
+        return all.map(q=>applyM(m,q));
+      } else return [];
+      return pts.map(q=>applyM(m,q));
+    }
+
+    // curvas de fronteira (142 -> curva 3D) e contornos interiores de cada superfície recortada (144)
+    const curves=[], seenCurve=new Set(), loops=[];
+    Object.values(ents).forEach(e=>{
+      if(e.type===142){
+        const c=parseInt(e.p[4],10);
+        if(c && !seenCurve.has(c)){ seenCurve.add(c); const pts=curvePoints(c); if(pts.length>1) curves.push(pts); }
+      } else if(e.type===144){
+        const n2=parseInt(e.p[3],10)||0;
+        for(let i=0;i<n2;i++){
+          const b=ents[parseInt(e.p[5+i],10)]; if(!b || b.type!==142) continue;
+          const pts=curvePoints(parseInt(b.p[4],10)); if(pts.length>=3) loops.push(pts);
+        }
+      }
+    });
+    if(!curves.length) throw new Error('Não foram encontradas arestas neste IGES (precisa de superfícies recortadas ou curvas).');
+
+    const mn=[1e9,1e9,1e9], mx=[-1e9,-1e9,-1e9];
+    curves.forEach(c=>c.forEach(p=>{ for(let i=0;i<3;i++){ if(p[i]<mn[i]) mn[i]=p[i]; if(p[i]>mx[i]) mx[i]=p[i]; } }));
+    const ext=[mx[0]-mn[0],mx[1]-mn[1],mx[2]-mn[2]];
+    const ax = ext[0]>=ext[1] && ext[0]>=ext[2] ? 0 : (ext[1]>=ext[2] ? 1 : 2);
+    const ui = ax===0 ? 1 : 0, vi = ax===2 ? 1 : 2;
+    const uc=(mn[ui]+mx[ui])/2, vc=(mn[vi]+mx[vi])/2;
+    const L=ext[ax], secW=ext[ui], secH=ext[vi];
+    const r1 = n => Math.round(n*10)/10;
+    const toA = p => [p[ax]-mn[ax], p[ui]-uc];
+    const toB = p => [p[ax]-mn[ax], p[vi]-vc];
+
+    function simplify(pts){
+      const out=[pts[0]];
+      for(let i=1;i<pts.length-1;i++){
+        const p0=out[out.length-1], p1=pts[i], p2=pts[i+1];
+        const cross=(p1[0]-p0[0])*(p2[1]-p0[1])-(p1[1]-p0[1])*(p2[0]-p0[0]);
+        const len=Math.hypot(p2[0]-p0[0],p2[1]-p0[1])||1;
+        if(Math.abs(cross)/len>0.04) out.push(p1);
+      }
+      out.push(pts[pts.length-1]); return out;
+    }
+    function project(fn){
+      const out=[], seen=new Set();
+      curves.forEach(c=>{
+        const pts=simplify(c.map(fn));
+        let len=0; for(let i=1;i<pts.length;i++) len+=Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]);
+        if(len<0.3) return;
+        const flat=[]; pts.forEach(q=>{ flat.push(r1(q[0]), r1(q[1])); });
+        const key=flat.join(','), keyRev=(function(){ const f=[]; for(let i=flat.length-2;i>=0;i-=2) f.push(flat[i],flat[i+1]); return f.join(','); })();
+        if(seen.has(key) || seen.has(keyRev)) return;
+        seen.add(key); out.push(flat);
+      });
+      return out;
+    }
+
+    // rasgos: contornos interiores fechados, agrupados por tamanho
+    const slotMap={};
+    loops.forEach(pts=>{
+      const lmn=[1e9,1e9,1e9], lmx=[-1e9,-1e9,-1e9];
+      pts.forEach(p=>{ for(let i=0;i<3;i++){ if(p[i]<lmn[i]) lmn[i]=p[i]; if(p[i]>lmx[i]) lmx[i]=p[i]; } });
+      const la=lmx[ax]-lmn[ax], lu=lmx[ui]-lmn[ui], lv=lmx[vi]-lmn[vi];
+      const cross=Math.max(lu,lv);
+      if(la<0.5 || cross<0.5 || la>L*0.9) return;   // ignora contornos enormes (ex.: contorno do próprio tubo)
+      const normalIsU = lu < lv;
+      const side = (normalIsU ? 'u' : 'v') + ((normalIsU ? (lmn[ui]+lmx[ui])/2-uc : (lmn[vi]+lmx[vi])/2-vc) >= 0 ? '+' : '-');
+      const key=[r1(la), r1(cross), r1(lmn[ax]-mn[ax]), side].join('|');
+      const mid = normalIsU ? (lmn[vi]+lmx[vi])/2-vc : (lmn[ui]+lmx[ui])/2-uc;   // centro do rasgo na direção transversal
+      if(!slotMap[key]) slotMap[key]={ la:r1(la), cross:r1(cross), start:r1(lmn[ax]-mn[ax]), side, mid:r1(mid), view: normalIsU ? 'B' : 'A' };
+    });
+    const bySize={};
+    Object.values(slotMap).forEach(s=>{ const k=s.la+'x'+s.cross; (bySize[k]=bySize[k]||[]).push(s); });
+    const groups = Object.values(bySize).map(list=>{
+      list.sort((a,b)=>a.start-b.start);
+      const pitches=[]; for(let i=1;i<list.length;i++) pitches.push(r1(list[i].start-list[i-1].start));
+      const regular = list.length>2 && pitches.every(p=>Math.abs(p-pitches[0])<=0.2);
+      return { count:list.length, la:list[0].la, cross:list[0].cross, first:list[0].start, last:list[list.length-1].start,
+        pitch: regular ? pitches[0] : null, regular, sides:Array.from(new Set(list.map(s=>s.side))),
+        mid:list[0].mid, view:list[0].view };
+    }).sort((a,b)=>b.count-a.count);
+
+    return { lengthMm:r1(L), sectionW:r1(secW), sectionH:r1(secH), A:project(toA), B:project(toB), groups };
+  };
+
   window.LC = LC;
 })();
