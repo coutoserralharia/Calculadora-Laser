@@ -167,7 +167,7 @@
 <script>
 (function(){
   "use strict";
-  const { escapeHtml, searchKey, fmtNum, fmtEUR, showAlert, showConfirm, registerServiceWorker, parseDXF,
+  const { escapeHtml, fmtNum, fmtEUR, showAlert, showConfirm, registerServiceWorker, parseDXF,
     sheetGeometryFromDXF, computeSheetCost, loadMaterials, loadMachine, loadOrders, saveOrders,
     loadRemoteConfig, remoteLoadOrders, remoteInsertOrder, computeNextOrderNumber,
     idbGet, writeOrderToLocalFolder } = window.LC;
@@ -1290,25 +1290,9 @@
   /* ---------------------------------------------------------------- */
   /* ARRANQUE                                                          */
   /* ---------------------------------------------------------------- */
-  // Clientes já usados, sem repetir os que só diferem em maiúsculas/minúsculas ou acentos
-  // (fica a primeira forma escrita) — igual à Encomenda Chapa.
-  function knownClients(){
-    const seen = new Map();
-    app.orders.forEach(o=>{
-      const n = (o.client||'').trim();
-      if(!n) return;
-      const k = searchKey(n);
-      if(!seen.has(k)) seen.set(k, n);
-    });
-    return Array.from(seen.values()).sort((a,b)=>a.localeCompare(b,'pt'));
-  }
-  // O cliente escrito; se já existir com outras maiúsculas/minúsculas, usa-se o nome existente
-  // para as encomendas ficarem todas no mesmo cliente.
-  function clientName(){
-    const typed = $('clientInput').value.trim();
-    const k = searchKey(typed);
-    return knownClients().find(n=>searchKey(n)===k) || typed;
-  }
+  // Clientes sem distinguir maiúsculas/minúsculas nem acentos (regras em shared.js).
+  function knownClients(){ return window.LC.knownClients(app.orders); }
+  function clientName(){ return window.LC.canonicalClient($('clientInput').value, app.orders); }
 
   function updateConnBadge(){
     const badge = $('connBadge');

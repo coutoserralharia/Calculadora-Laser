@@ -755,16 +755,7 @@
   /* SUGESTÕES DE CLIENTE                                              */
   /* ---------------------------------------------------------------- */
   let suggestIndex = -1;
-  function knownClients(){
-    const seen = new Map();
-    state.orders.forEach(o=>{
-      const n = (o.client||'').trim();
-      if(!n) return;
-      const k = searchKey(n);
-      if(!seen.has(k)) seen.set(k, n);
-    });
-    return Array.from(seen.values()).sort((a,b)=>a.localeCompare(b,'pt'));
-  }
+  function knownClients(){ return window.LC.knownClients(state.orders); }
   function hideClientSuggestions(){ clientSuggestionsEl.hidden = true; clientSuggestionsEl.innerHTML = ''; suggestIndex = -1; }
   function renderClientSuggestions(){
     const q = searchKey(clientNameInp.value.trim());
@@ -1166,7 +1157,7 @@
       const p = r.profile;
 
       const rec = {
-        id, client: clientNameInp.value.trim(), orderName, orderNumber, createdAt,
+        id, client: window.LC.canonicalClient(clientNameInp.value, state.orders, id), orderName, orderNumber, createdAt,
         comments: orderCommentsInp.value.trim(),
         clientRef: isUpdate ? (state.loadedClientRef || null) : null,
         orderState: state.orderState,
@@ -1206,6 +1197,7 @@
         },
       };
 
+      clientNameInp.value = rec.client; // mostra o nome com que ficou gravado (cliente já existente)
       const verb = isUpdate ? 'atualizada' : 'guardada';
       if(state.remote.configured){
         saveOrderHint.style.color = '';

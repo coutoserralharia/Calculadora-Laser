@@ -21,6 +21,29 @@
     .filter(ch => { const c = ch.codePointAt(0); return c < 0x0300 || c > 0x036f; }) // remove marcas de acentuação (combining diacritics)
     .join('').toLowerCase();
 
+  // Clientes: o mesmo cliente escrito com outras maiúsculas/minúsculas ou acentos conta como um
+  // só. knownClients devolve um nome por cliente (a 1ª forma gravada); canonicalClient devolve o
+  // nome já existente para o que foi escrito (ou o escrito, se for um cliente novo) — usado ao
+  // gravar, para as encomendas não ficarem espalhadas por "clientes" diferentes.
+  // skipId: a encomenda que está a ser gravada não conta como "já existente".
+  LC.knownClients = function(orders, skipId){
+    const seen = new Map();
+    (orders||[]).forEach(o=>{
+      if(!o || (skipId && o.id === skipId)) return;
+      const n = (o.client||'').trim();
+      if(!n) return;
+      const k = LC.searchKey(n);
+      if(!seen.has(k)) seen.set(k, n);
+    });
+    return Array.from(seen.values()).sort((a,b)=>a.localeCompare(b,'pt'));
+  };
+  LC.canonicalClient = function(name, orders, skipId){
+    const typed = String(name||'').trim().replace(/\s+/g,' ');
+    if(!typed) return '';
+    const k = LC.searchKey(typed);
+    return LC.knownClients(orders, skipId).find(n=>LC.searchKey(n)===k) || typed;
+  };
+
   /* ---------------------------------------------------------------- */
   /* DXF PARSER                                                        */
   /* ---------------------------------------------------------------- */

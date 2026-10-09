@@ -1293,16 +1293,7 @@
   /* ---------------------------------------------------------------- */
   let suggestIndex = -1;
 
-  function knownClients(){
-    const seen = new Map(); // chave normalizada -> nome como foi escrito
-    state.orders.forEach(o=>{
-      const n = (o.client||'').trim();
-      if(!n) return;
-      const key = searchKey(n);
-      if(!seen.has(key)) seen.set(key, n);
-    });
-    return Array.from(seen.values()).sort((a,b)=>a.localeCompare(b,'pt'));
-  }
+  function knownClients(){ return window.LC.knownClients(state.orders); }
 
   function hideClientSuggestions(){
     clientSuggestionsEl.hidden = true;
@@ -1711,7 +1702,7 @@
       const createdAt = isUpdate ? state.loadedOrderCreatedAt : new Date().toISOString();
       const rec = {
         id,
-        client: clientNameInp.value.trim(),
+        client: window.LC.canonicalClient(clientNameInp.value, state.orders, id),
         comments: orderCommentsInp.value.trim(),
         clientRef: isUpdate ? (state.loadedClientRef || null) : null,
         orderState: state.orderState,
@@ -1763,6 +1754,7 @@
             : null,
         } : null,
       };
+      clientNameInp.value = rec.client; // mostra o nome com que ficou gravado (cliente já existente)
       const verb = isUpdate ? 'atualizada' : 'guardada';
       if(state.remote.configured){
         saveOrderHint.style.color = '';

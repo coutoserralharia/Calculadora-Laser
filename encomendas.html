@@ -382,7 +382,7 @@
     if(!chosen.length) return;
 
     const STATE_LABEL = { quote:'Orçamentado', production:'Em produção', done:'Concluído', cancelled:'Cancelada' };
-    const clientNames = Array.from(new Set(chosen.map(o=>(o.client||'').trim()).filter(Boolean)));
+    const clientNames = window.LC.knownClients(chosen); // "Silva" e "SILVA" contam como um só cliente
     const clientLabel = clientNames.length === 1 ? clientNames[0] : (clientNames.join(' / ') || '—');
     const now = new Date();
     const total = chosen.filter(o=>o.orderState!=='cancelled').reduce((s,o)=> s + (o.costSnapshot ? (o.costSnapshot.totalCost||0) : 0), 0);
