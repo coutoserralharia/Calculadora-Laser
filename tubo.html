@@ -980,6 +980,8 @@
     try{ $('orderNumberPreview').value = await computeNextOrderNumber(state.remote, state.orders); }
     catch(e){ $('orderNumberPreview').value = ''; }
     $('orderDatePreview').value = new Date().toLocaleDateString('pt-PT');
+    // o nº chega depois do recálculo — atualiza também a barra de baixo
+    $('abOrderNum').textContent = ($('orderNumberPreview').value || '—') + (orderNameInp.value.trim() ? ' · ' + orderNameInp.value.trim() : '');
   }
 
   function applyMachineDefaultsToBarInputs(){
@@ -995,6 +997,11 @@
     state.orderState = 'quote';
     state.wasQuoted = false;
     state.basis = 'cut';
+    // Material, forma e perfil voltam aos iniciais (os mesmos de quando a página abre).
+    state.material = 'galvanizado'; state.shape = 'quadrado'; state.profileId = null;
+    // Mensagens da encomenda anterior ("Encomenda … guardada") também saem.
+    $('nextSteps').hidden = true;
+    saveOrderHint.textContent = ''; saveOrderHint.style.color = '';
     orderNameInp.value = ''; clientNameInp.value = ''; orderCommentsInp.value = '';
     qtyInput.value = 1; lengthInput.value = '';
     barsInput.value = '';

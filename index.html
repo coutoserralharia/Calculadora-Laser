@@ -407,8 +407,8 @@
   const saveOrderHint = $('saveOrderHint');
 
   function updateOrderHeader(){
-    // Nome/cliente já não são mostrados no cartão de custos (mantido só para clareza dos dados
-    // preenchidos noutros sítios da página, como a ficha de impressão).
+    // Nome/cliente já não são mostrados no cartão de custos — só o nº e o nome na barra fixa de baixo.
+    $('abOrderNum').textContent = ($('orderNumberPreview').value || '—') + (orderNameInp.value.trim() ? ' · ' + orderNameInp.value.trim() : '');
   }
   orderNameInp.addEventListener('input', updateOrderHeader);
   clientNameInp.addEventListener('input', updateOrderHeader);
@@ -1491,7 +1491,7 @@
     updateOrderHeader();
 
     if(!result.valid){
-      ['costMaterial','costPreCorte','costCorte','totalValue','avgPerPieceValue','subtotalValue'].forEach(id=>$(id).textContent = fmtEUR(0));
+      ['costMaterial','costPreCorte','costCorte','totalValue','avgPerPieceValue','subtotalValue','abTotal'].forEach(id=>$(id).textContent = fmtEUR(0));
       $('adjustmentRow').hidden = true;
       ['valWeightUnit','valWeightTotal'].forEach(id=>$(id).textContent = '—');
       $('matInfoSub').textContent = '—'; $('preCorteSub').textContent = '—'; $('cutTimeSub').textContent = '—'; $('weightTotalSub').textContent = '—';
@@ -1556,6 +1556,7 @@
     try{ $('orderNumberPreview').value = await computeNextOrderNumber(state.remote, state.orders); }
     catch(e){ $('orderNumberPreview').value = ''; }
     $('orderDatePreview').value = new Date().toLocaleDateString('pt-PT');
+    updateOrderHeader(); // o nº chega depois do recálculo — atualiza também a barra de baixo
   }
 
   function updateEditingUI(){
@@ -1609,6 +1610,12 @@
     drawingTypeSel.value = 'client_direct';
     setupTimeInput.value = state.machine.defaultSetupMin ?? 5;
     applyDrawingTypeUI();
+    // Material volta ao inicial (o mesmo de quando a página abre), como o resto do formulário.
+    if(state.materials.length) materialSelect.value = state.materials[0].id;
+    rebuildVisibleMaterialSelectors();
+    // Mensagens da encomenda anterior ("Encomenda … guardada") também saem.
+    $('nextSteps').hidden = true;
+    saveOrderHint.textContent = ''; saveOrderHint.style.color = '';
     updateOrderHeader();
     refreshOrderNumberPreview();
     markClean();
