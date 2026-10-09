@@ -57,6 +57,8 @@
   .print-sheet .ld-p-thumb{width:34mm; height:24mm; display:block;}
   .print-sheet .ld-p-thumb path{stroke:#111; fill:none; stroke-width:1; vector-effect:non-scaling-stroke;}
   .print-sheet h3.ld-p-h{font-family:'Space Grotesk',sans-serif; font-size:13px; margin:18px 0 0;}
+  /* Fichas do operador seguidas — cada uma começa numa folha nova. */
+  .print-sheet .ld-op-sheet + .ld-op-sheet{page-break-before:always; break-before:page;}
 </style>
 </head>
 <body>
@@ -1017,7 +1019,8 @@
       it.progress = 'A ler o desenho…'; render();
       const bin = bytesToBin(await file.arrayBuffer());
       it.an = analyse(bin, $('optDims').checked);
-      it.geo = sheetGeometryFromDXF(parseDXF(it.an.outBin), NaN);
+      it.dxf = parseDXF(it.an.outBin);
+      it.geo = sheetGeometryFromDXF(it.dxf, NaN);
       let lines = [];
       if(it.an.texts.length){
         lines = it.an.texts.flatMap(textLines);
@@ -1253,6 +1256,7 @@
     $('createBtn').disabled = true;
     render();
     const made = [];
+    lastCreated = [];
     let error = null, folderFails = 0;
     try{
       for(const it of list){
@@ -1262,6 +1266,7 @@
         await saveRecord(rec);
         it.created = rec.orderNumber;
         made.push(rec.orderNumber);
+        lastCreated.push({ it, rec });
         if(app.localFolder.ready){
           const fr = await writeOrderToLocalFolder(app.localFolder.handle, rec);
           if(!fr.ok && !fr.skipped) folderFails++;
@@ -1285,7 +1290,51 @@
     }
     hint.style.color = error ? '' : 'var(--readout)';
     hint.innerHTML = msg;
+    if(lastCreated.length){
+      // Fica também um botão, para voltar a imprimir mais tarde.
+      hint.insertAdjacentHTML('beforeend', ' <button class="ghost-btn sm" type="button" id="printOpBtn" style="margin-left:6px;">Imprimir fichas do operador (' + lastCreated.length + ')</button>');
+      $('printOpBtn').addEventListener('click', ()=>printOperatorSheets(lastCreated));
+      const n = lastCreated.length;
+      const wantPrint = await showConfirm(
+        (n===1 ? 'Encomenda criada.' : n + ' encomendas criadas.') + '\n\nImprimir já ' + (n===1 ? 'a ficha do operador?' : 'as ' + n + ' fichas do operador (uma por folha)?'),
+        { okLabel:'Imprimir fichas', cancelLabel:'Agora não' });
+      if(wantPrint) printOperatorSheets(lastCreated);
+    }
   });
+
+  /* ---------------------------------------------------------------- */
+  /* FICHAS DO OPERADOR — as mesmas da Encomenda Chapa, uma por folha.  */
+  /* ---------------------------------------------------------------- */
+  let lastCreated = []; // [{ it, rec }] das encomendas criadas na última vez
+  function printOperatorSheets(list){
+    if(!list.length) return;
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'});
+    $('printSheet').innerHTML = list.map(({ it, rec })=>{
+      const r = computeSheetCost(costInputs(it));
+      return '<div class="ld-op-sheet">' + window.LC.operatorSheetHTML({
+        orderNumber: rec.orderNumber,
+        orderName: rec.orderName,
+        client: rec.client,
+        source: rec.dxfFileName || 'Ficheiro DXF',
+        material: findAppMaterial(it),
+        qty: rec.quantity,
+        geo: it.geo,
+        weightPerPiece: r.valid ? r.weightPerPiece : 0,
+        drawing: window.LC.sheetDrawingFromDXF(it.dxf),
+        dxf: it.dxf,
+        comments: rec.comments,
+        dateStr,
+      }) + '</div>';
+    }).join('');
+    const originalTitle = document.title;
+    const first = list[0].rec, last = list[list.length-1].rec;
+    document.title = ('Fichas operador ' + first.orderNumber + (list.length>1 ? ' a ' + last.orderNumber : '') + ' - ' + (first.client || '')).replace(/[\\/:*?"<>|]+/g,'_').trim();
+    const img = $('printSheet').querySelector('img');
+    let done = false;
+    const go = ()=>{ if(done) return; done = true; window.print(); setTimeout(()=>{ document.title = originalTitle; }, 500); };
+    if(!img || img.complete) go(); else { img.addEventListener('load', go); img.addEventListener('error', go); setTimeout(go, 1500); }
+  }
 
   /* ---------------------------------------------------------------- */
   /* ARRANQUE                                                          */
