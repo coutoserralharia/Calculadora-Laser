@@ -39,6 +39,7 @@
       <a href="dashboard.html">Dashboard</a>
       <a href="index.html" class="active">Encomenda Chapa</a>
       <a href="tubo.html">Encomenda Tubo</a>
+      <a href="importar-dxf.html">Importar DXF</a>
       <a href="orcamentos.html">Orçamentos</a>
       <a href="producao.html">Produção</a>
       <a href="encomendas.html">Histórico</a>
@@ -646,117 +647,30 @@
   function getGeometry(){
     if(state.mode==='dxf'){
       if(!state.dxfResult) return null;
-      const r = state.dxfResult;
-      const bbox = r.bbox;
-      const width = bbox ? (bbox.maxX-bbox.minX) : 0;
-      const height = bbox ? (bbox.maxY-bbox.minY) : 0;
-      const closed = r.closedContours.slice().sort((a,b)=>b.area-a.area);
-      let netArea = 0;
-      if(closed.length){
-        const outer = closed[0].area;
-        const holes = closed.slice(1).reduce((s,c)=>s+c.area,0);
-        netArea = Math.max(outer-holes, 0);
-      }
-      const overrideVal = parseInt(pierceOverrideInput.value, 10);
-      const pierces = Number.isFinite(overrideVal) && overrideVal>=0 ? overrideVal : Math.max(closed.length, r.contours.length ? 1 : 0);
-      return {
-        perimeterMm: r.totalLength,
-        bboxAreaMm2: width*height,
-        netAreaMm2: netArea,
-        width, height,
-        pierces,
-        hasOpen: r.openContours.length>0,
-      };
+      return window.LC.sheetGeometryFromDXF(state.dxfResult, parseInt(pierceOverrideInput.value, 10));
     } else {
       return getManualGeometry();
     }
   }
 
+  // O cálculo está em shared.js (LC.computeSheetCost) — o mesmo que o "Importar DXF" usa.
   function computeCost(){
-    const geo = getGeometry();
-    const material = getSelectedMaterial();
-    const qty = Math.max(1, parseInt(qtyInput.value,10)||1);
-    if(!geo || !material || !geo.perimeterMm){
-      return { valid:false, geo, material };
-    }
     const realTimeRaw = realCuttingTimeInput.value.trim();
     const realTimeVal = parseFloat(realTimeRaw);
     const isFinalTime = realTimeRaw !== '' && Number.isFinite(realTimeVal) && realTimeVal >= 0;
-    const speed = Math.max(material.speed, 1);
-    // "unit" = o ficheiro/dimensões são de 1 peça só, multiplica-se pela quantidade (padrão).
-    // "batch" = já representam a chapa/corte de todas as peças juntas (aninhadas), não se multiplica.
-    const isBatchGeometry = geometryScopeSelect.value === 'batch';
-
-    // Tempo estimado TOTAL da encomenda: corte + perfurações, multiplicado pela quantidade só
-    // quando o ficheiro/dimensões são de 1 peça — se já forem de todas juntas, usa-se tal qual.
-    const pierceTimeMinPerPiece = geo.pierces * state.machine.pierceTime / 60;
-    const cuttingTimeMinPerPiece = geo.perimeterMm / speed;
-    const estimatedTotalTimeMin = isBatchGeometry
-      ? (cuttingTimeMinPerPiece + pierceTimeMinPerPiece)
-      : (cuttingTimeMinPerPiece + pierceTimeMinPerPiece) * qty;
-
-    // O "Tempo de corte real" introduzido é sempre o TOTAL para todas as peças da encomenda
-    // (já inclui as perfurações de todas elas) — nunca é multiplicado pela quantidade.
-    const cuttingTimeMin = isFinalTime ? realTimeVal : estimatedTotalTimeMin;
-    const corteCost = cuttingTimeMin * (state.machine.hourlyRate/60);
-
-    // Waste margin: adds to the bounding-box width/height before computing area, to reflect the
-    // sheet space around each part that isn't reused (parts aren't nested together). Only applies
-    // to the "retângulo envolvente" basis — net (líquida) area is left as an exact calculation.
-    const marginMm = state.machine.wasteMarginMm || 0;
-    let areaMm2;
-    if(state.machine.areaBasis==='net'){
-      areaMm2 = geo.netAreaMm2;
-    } else if(geo.width!=null && geo.height!=null){
-      areaMm2 = (geo.width+marginMm) * (geo.height+marginMm);
-    } else {
-      areaMm2 = geo.bboxAreaMm2; // manual "custom" shape: no width/height to add margin to
-    }
-    const areaM2 = areaMm2/1e6;
-    const weightFromGeometry = areaM2 * (material.thickness||0) * (material.density||0);
-    const basePricePerKg = material.pricePerKg||0;
-    const effectivePricePerKg = basePricePerKg * (1 + (material.markupPct||0)/100);
-    const materialCostFromGeometry = weightFromGeometry * effectivePricePerKg;
-    const materialCostBaseFromGeometry = weightFromGeometry * basePricePerKg;   // sem margem
-    // Em modo "batch" a área/peso calculados já são o total da encomenda; em modo "unit" são de
-    // 1 peça e multiplicam-se pela quantidade. O valor "por peça" fica sempre como referência.
-    const weightTotal = isBatchGeometry ? weightFromGeometry : weightFromGeometry * qty;
-    const weightPerPiece = weightTotal / qty;
-    const materialCostTotal = isBatchGeometry ? materialCostFromGeometry : materialCostFromGeometry * qty;
-    const materialCostPerPiece = materialCostTotal / qty;
-    const materialCostBaseTotal = isBatchGeometry ? materialCostBaseFromGeometry : materialCostBaseFromGeometry * qty;
-
-    const drawingType = drawingTypeSel.value;
-    const designTimeMin = drawingType==='client_direct' ? 0 : (parseFloat(designTimeInput.value)||0);
-    const setupTimeMin = parseFloat(setupTimeInput.value)||0;
-    const designCost = (designTimeMin/60) * (state.machine.designRate||0);
-    const setupCost = (setupTimeMin/60) * (state.machine.setupRate||0);
-    const preCorteCostRaw = designCost + setupCost;
-
-    const subtotal = corteCost + materialCostTotal + preCorteCostRaw;
-    const adjustmentValue = parseFloat(adjustmentValueInput.value) || 0;
-    const totalCost = subtotal + adjustmentValue;
-    // Custo real para a empresa: tudo igual, mas com o material ao preço de compra (sem margem).
-    // O corte e a preparação já são cobrados ao custo/hora interno, por isso não mudam.
-    const realCost = corteCost + materialCostBaseTotal + preCorteCostRaw;
-    const marginValue = totalCost - realCost;
-    const marginPct = realCost > 0 ? (marginValue/realCost)*100 : null;
-    const avgPerPiece = totalCost / qty;
-    const totalTimeMin = cuttingTimeMin + designTimeMin + setupTimeMin; // cuttingTimeMin já é total e já inclui perfurações
-
-    return {
-      valid:true, geo, material, qty,
-      cuttingTimeMin, estimatedCuttingTimeMin: estimatedTotalTimeMin, corteCost,
-      materialCostTotal, materialCostPerPiece, materialCostBaseTotal, weightPerPiece, weightTotal, isBatchGeometry,
-      realCost, marginValue, marginPct,
-      drawingType, designTimeMin, setupTimeMin, designCost,
-      totalTimeMin,
-      preCorteCost: preCorteCostRaw, subtotal, adjustmentValue,
+    return window.LC.computeSheetCost({
+      geo: getGeometry(),
+      material: getSelectedMaterial(),
+      qty: qtyInput.value,
+      machine: state.machine,
+      isBatch: geometryScopeSelect.value === 'batch',
+      realTimeMin: isFinalTime ? realTimeVal : null,
+      drawingType: drawingTypeSel.value,
+      designTimeMin: parseFloat(designTimeInput.value)||0,
+      setupTimeMin: parseFloat(setupTimeInput.value)||0,
+      adjustmentValue: parseFloat(adjustmentValueInput.value) || 0,
       adjustmentReason: adjustmentReasonSelect.value,
-      setupCost,
-      totalCost, avgPerPiece,
-      isFinalDisplay: isFinalTime,
-    };
+    });
   }
 
   realCuttingTimeInput.addEventListener('input', recalcAndRender);

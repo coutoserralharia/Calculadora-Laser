@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Importar DXF — Custo de Corte Laser</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111417">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Custo Laser">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('laser_theme')||'dark');</script>
+<style>
+  .layout-single{max-width:1400px; margin:0 auto; display:flex; flex-direction:column; gap:13px;}
+  .ld-top{display:grid; grid-template-columns:1fr 1fr; gap:13px;}
+  @media (max-width:900px){ .ld-top{grid-template-columns:1fr;} }
+  .ld-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;}
+  .ld-opt{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted); margin-top:10px;}
+  .ld-opt input{accent-color:var(--accent);}
+
+  table.ld-table{min-width:1050px;}
+  table.ld-table td{vertical-align:top; padding-top:8px; padding-bottom:8px;}
+  table.ld-table td:first-child, table.ld-table th:first-child{min-width:0;}
+  table.ld-table select{min-width:140px; padding:6px 7px; font-size:12.5px;}
+  table.ld-table input[data-f="material"]{min-width:90px;}
+  #createHint a{color:inherit; text-decoration:underline; font-weight:600;}
+  .ld-thumb{width:150px; height:110px; background:var(--canvas-bg); border:1px solid var(--border-soft); border-radius:7px; display:block;}
+  .ld-thumb .k{stroke:var(--readout); fill:none; stroke-width:1.2; vector-effect:non-scaling-stroke;}
+  .ld-thumb .r{stroke:var(--danger); fill:none; stroke-width:0.8; opacity:.55; vector-effect:non-scaling-stroke;}
+  .ld-ocr{max-width:190px; max-height:110px; display:block; background:#fff; border-radius:6px; border:1px solid var(--border-soft);}
+  .ld-file{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text); word-break:break-all;}
+  .ld-sub{font-size:11px; color:var(--text-dim); margin-top:4px; line-height:1.5;}
+  .ld-sub.bad{color:#f0b429;}
+  .ld-dims{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--readout); white-space:nowrap;}
+  .ld-status{font-size:11.5px; color:var(--text-muted);}
+  .ld-status.ok{color:var(--readout);}
+  .ld-status.err{color:var(--danger); background:none; border:none; padding:0; margin:0;}
+  .ld-raw{font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--text-dim); white-space:pre-wrap; margin-top:6px; max-width:190px;}
+  .ld-row-btns{display:flex; flex-direction:column; gap:6px;}
+  .ld-empty{font-size:13px; color:var(--text-dim); text-align:center; padding:30px 0;}
+  .ld-legend{display:flex; gap:14px; font-size:11.5px; color:var(--text-muted); margin-bottom:10px; flex-wrap:wrap;}
+  .ld-legend i{display:inline-block; width:14px; height:2px; vertical-align:middle; margin-right:5px;}
+
+  /* Impressão — lista de peças */
+  .print-sheet table.ld-p-table{width:100%; border-collapse:collapse; margin:14px 0 8px; font-size:12px;}
+  .print-sheet table.ld-p-table th{text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:#555; border-bottom:1.5px solid #111; padding:0 6px 6px;}
+  .print-sheet table.ld-p-table td{padding:6px; border-bottom:1px solid #ddd; color:#111; vertical-align:middle;}
+  .print-sheet table.ld-p-table tr{page-break-inside:avoid; break-inside:avoid;}
+  .print-sheet table.ld-p-table .num{text-align:right;}
+  .print-sheet table.ld-p-table .mono{font-family:'JetBrains Mono',monospace;}
+  .print-sheet .ld-p-thumb{width:34mm; height:24mm; display:block;}
+  .print-sheet .ld-p-thumb path{stroke:#111; fill:none; stroke-width:1; vector-effect:non-scaling-stroke;}
+  .print-sheet h3.ld-p-h{font-family:'Space Grotesk',sans-serif; font-size:13px; margin:18px 0 0;}
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">Saltar para o conteúdo</a>
+<div class="loading-veil" id="loadingVeil"><div class="lv-inner"><span class="lv-spin"></span>A carregar materiais e definições…</div></div>
+
+<div class="wrap">
+
+    <nav class="pagenav">
+      <div class="nav-brand"><img src="logo-mark.svg" alt="" class="nav-logo"><span class="nav-name">JGPVC<em>LASER</em></span></div>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="index.html">Encomenda Chapa</a>
+      <a href="tubo.html">Encomenda Tubo</a>
+      <a href="importar-dxf.html" class="active">Importar DXF</a>
+      <a href="orcamentos.html">Orçamentos</a>
+      <a href="producao.html">Produção</a>
+      <a href="encomendas.html">Histórico</a>
+      <a href="definicoes.html">Definições</a>
+      <button class="nav-theme-toggle" id="themeToggleBtn" type="button" title="Alternar modo claro/escuro">
+        <svg class="icon-moon" width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M13.5 9.5A6 6 0 016.5 2.5a6 6 0 106.999 7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <svg class="icon-sun" width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M8 1v1.6M8 13.4V15M15 8h-1.6M2.6 8H1M12.7 3.3l-1.1 1.1M4.4 11.6l-1.1 1.1M12.7 12.7l-1.1-1.1M4.4 4.4L3.3 3.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span id="themeToggleLabel">Modo claro</span>
+      </button>
+    </nav>
+
+  <header class="top">
+    <div class="top-row">
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+          <rect x="1" y="1" width="32" height="32" rx="8" stroke="#2b3138" stroke-width="1.2"/>
+          <line x1="6" y1="17" x2="22" y2="17" stroke="#ff5a2e" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="25" cy="17" r="3.4" fill="#3fe8d4"/>
+          <path d="M4 24L30 24" stroke="#3a4149" stroke-width="1" stroke-dasharray="1 3"/>
+        </svg>
+        <div class="brand-text">
+          <p class="eyebrow">Corte Laser // Ficheiros de clientes</p>
+          <h1>Importar DXF</h1>
+        </div>
+      </div>
+      <p class="top-note">Carregue vários DXF de uma vez: os textos saem do desenho, os valores escritos (espessura, material, quantidade, comprimento) são lidos e cria-se uma encomenda por peça.</p>
+    </div>
+  </header>
+
+  <main class="layout-single" id="main">
+
+    <div class="ld-top">
+      <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Ficheiros</h2>
+        <div class="dropzone" id="dropzone">
+          <div class="icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" style="margin:0 auto;display:block;"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <p>Arraste um ou vários ficheiros <strong>.dxf</strong> para aqui ou clique para escolher</p>
+        </div>
+        <input type="file" id="fileInput" accept=".dxf" multiple>
+        <label class="ld-opt"><input type="checkbox" id="optDims" checked> Tirar também cotas e chamadas (DIMENSION / LEADER)</label>
+        <p class="save-hint" style="margin-top:8px;">A peça é o maior contorno do desenho; tudo o que está dentro dela (furos, recortes) fica. O que está fora — letras, molduras, notas — sai. Confira sempre a miniatura: a vermelho está o que vai ser retirado.</p>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title with-action">
+          <span class="title-left"><span class="dot"></span>Encomendas a criar</span>
+          <span class="conn-badge" id="connBadge" style="margin-left:auto;"></span>
+        </h2>
+        <div class="field-row">
+          <div class="field"><label for="clientInput">Cliente</label><input type="text" id="clientInput" placeholder="Nome do cliente" list="clientList" autocomplete="off"><datalist id="clientList"></datalist></div>
+          <div class="field"><label for="stateSel">Estado inicial</label><select id="stateSel"><option value="production">Produção</option><option value="quote">Orçamento</option></select></div>
+        </div>
+        <p class="save-hint" style="margin:0;">Uma encomenda por desenho, com o nome do ficheiro como nome da peça e o DXF já limpo. Preço calculado como na Encomenda Chapa (converter desenho do cliente, 2 min de desenho, setup das Definições — pode alterar depois na encomenda).</p>
+        <div class="ld-actions">
+          <button class="ghost-btn accent" id="createBtn" type="button" disabled>Criar encomendas</button>
+          <button class="ghost-btn" id="saveAllBtn" type="button" disabled>Guardar DXF limpos…</button>
+          <button class="ghost-btn" id="pdfBtn" type="button" disabled><svg class="btn-icon" viewBox="0 0 16 16"><path d="M4 6V2h8v4M4 12H2V7h12v5h-2M4 10h8v4H4z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>Lista de peças (PDF)</button>
+          <button class="ghost-btn" id="clearBtn" type="button" disabled>Limpar lista</button>
+        </div>
+        <p class="save-hint" id="createHint" style="margin-top:10px;"></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title with-action">
+        <span class="title-left"><span class="dot"></span>Desenhos</span>
+        <span class="alert-count" id="countLbl" style="margin-left:auto;"></span>
+      </h2>
+      <div class="ld-legend"><span><i style="background:var(--readout)"></i>fica (peça)</span><span><i style="background:var(--danger)"></i>sai (texto, molduras)</span></div>
+      <div class="mat-table-wrap">
+        <table class="mat-table ld-table">
+          <thead><tr>
+            <th>Desenho</th><th>Nome da peça</th><th>Texto lido</th><th>Material (desenho)</th><th>Material na app</th><th style="width:80px;">Espessura (mm)</th><th style="width:70px;">Quantidade</th><th style="width:90px;">Comprimento (mm)</th><th>Medidas da peça</th><th>Preço</th><th></th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="ld-empty" id="emptyMsg">Ainda não há desenhos carregados.</div>
+    </div>
+
+  </main>
+
+  <footer class="disclaimer">
+    Os desenhos são lidos e limpos neste computador. Quando o texto vem desenhado com linhas (e não como texto do CAD), cada letra é comparada com as letras das fontes do computador para a ler — confirme sempre os valores antes de criar as encomendas. "Guardar DXF limpos" pede uma pasta e grava lá cada ficheiro com o mesmo nome do original; na lista de peças, escolha "Guardar como PDF" na janela de impressão.
+  </footer>
+
+</div>
+
+<div id="printSheet" class="print-sheet"></div>
+
+<script src="shared.js"></script>
+<script>
+(function(){
+  "use strict";
+  const { escapeHtml, fmtNum, fmtEUR, showAlert, showConfirm, registerServiceWorker, parseDXF,
+    sheetGeometryFromDXF, computeSheetCost, loadMaterials, loadMachine, loadOrders, saveOrders,
+    loadRemoteConfig, remoteLoadOrders, remoteInsertOrder, computeNextOrderNumber,
+    idbGet, writeOrderToLocalFolder } = window.LC;
+  const $ = id => document.getElementById(id);
+
+  /* ---------------------------------------------------------------- */
+  /* LEITURA DO DXF EM BRUTO                                           */
+  /* O ficheiro é lido byte a byte (cada byte → um carácter) para que  */
+  /* o que se grava de volta seja exatamente o original menos as       */
+  /* entidades retiradas — sem estragar acentos nem codificação.       */
+  /* ---------------------------------------------------------------- */
+  function bytesToBin(buf){
+    const u8 = new Uint8Array(buf);
+    let s = '';
+    for(let i=0;i<u8.length;i+=0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i+0x8000));
+    return s;
+  }
+  function binToBytes(s){
+    const u8 = new Uint8Array(s.length);
+    for(let i=0;i<s.length;i++) u8[i] = s.charCodeAt(i) & 0xff;
+    return u8;
+  }
+
+  // Lê o DXF em pares código/valor e separa as entidades da secção ENTITIES em "unidades"
+  // (uma POLYLINE leva consigo os VERTEX e o SEQEND; um INSERT leva os ATTRIB e o SEQEND).
+  function readDxf(bin){
+    if(bin.startsWith('AutoCAD Binary DXF')) throw new Error('DXF binário — grave o ficheiro como DXF de texto (ASCII).');
+    const eolMatch = bin.match(/\r\n|\n|\r/);
+    const eol = eolMatch ? eolMatch[0] : '\r\n';
+    const lines = bin.split(/\r\n|\n|\r/);
+    const trailingEol = lines.length && lines[lines.length-1] === '';
+    if(trailingEol) lines.pop();
+
+    let acadver = '';
+    let entStart = -1, entEnd = -1;
+    for(let i=0;i+1<lines.length;i+=2){
+      const c = lines[i].trim(), v = lines[i+1].trim();
+      if(c==='9' && v==='$ACADVER' && i+3<lines.length) acadver = lines[i+3].trim();
+      if(c==='2' && v==='ENTITIES' && i>=2 && lines[i-2].trim()==='0' && lines[i-1].trim()==='SECTION') entStart = i+2;
+      if(entStart>=0 && i>=entStart && c==='0' && v==='ENDSEC'){ entEnd = i; break; }
+    }
+    if(entStart<0) throw new Error('Secção ENTITIES não encontrada — não parece um DXF válido.');
+    if(entEnd<0) entEnd = lines.length - (lines.length%2);
+
+    const ents = [];
+    let cur = null;
+    for(let i=entStart;i+1<entEnd+1 && i<entEnd;i+=2){
+      const c = parseInt(lines[i].trim(),10), v = lines[i+1].trim();
+      if(c===0){
+        if(cur){ cur.end = i; ents.push(cur); }
+        cur = { type:v, start:i, end:-1, g:[] };
+      } else if(cur) cur.g.push([c, lines[i+1]]);
+    }
+    if(cur){ cur.end = entEnd; ents.push(cur); }
+
+    const units = [];
+    for(let k=0;k<ents.length;k++){
+      const e = ents[k];
+      const u = { type:e.type, start:e.start, end:e.end, ents:[e] };
+      const hasAttribs = e.type==='INSERT' && e.g.some(([c,v])=>c===66 && v.trim()==='1');
+      if(e.type==='POLYLINE' || hasAttribs){
+        let j = k+1;
+        while(j<ents.length && ents[j].type!=='SEQEND' && (ents[j].type==='VERTEX' || ents[j].type==='ATTRIB')){ u.ents.push(ents[j]); j++; }
+        if(j<ents.length && ents[j].type==='SEQEND'){ u.ents.push(ents[j]); j++; }
+        u.end = ents[j-1].end;
+        k = j-1;
+      }
+      units.push(u);
+    }
+    // Versões antigas (até AC1018) gravam o texto na página de código do Windows; a partir
+    // da AC1021 (AutoCAD 2007) é UTF-8.
+    const utf8 = /^AC10(2[1-9]|3\d)/.test(acadver);
+    return { lines, eol, trailingEol, units, utf8 };
+  }
+
+  function decodeText(s, utf8){
+    try{ return new TextDecoder(utf8 ? 'utf-8' : 'windows-1252').decode(binToBytes(s)); }catch(e){ return s; }
+  }
+  // Limpa os códigos de formatação de TEXT/MTEXT (\P, \f...;, {}, %%c, \U+00E7...).
+  function cleanCadText(s){
+    return s
+      .replace(/\\U\+([0-9a-fA-F]{4})/g, (m,h)=>String.fromCharCode(parseInt(h,16)))
+      .replace(/\\P/g, '\n')
+      .replace(/\\[ACcFfHhQqTtWwp][^;\\]*;/g, '')
+      .replace(/\\[LlOoKk]/g, '')
+      .replace(/\\S([^;]*)[\^#\/]([^;]*);/g, '$1/$2')
+      .replace(/[{}]/g, '')
+      .replace(/%%[cC]/g, 'Ø').replace(/%%[dD]/g, '°').replace(/%%[pP]/g, '±').replace(/%%%/g, '%')
+      .replace(/\\~/g, ' ').replace(/\\\\/g, '\\');
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* GEOMETRIA DE CADA UNIDADE                                         */
+  /* ---------------------------------------------------------------- */
+  const TEXT_TYPES = new Set(['TEXT','MTEXT','ATTDEF','ATTRIB']);
+  const DIM_TYPES = new Set(['DIMENSION','LEADER','MLEADER','MULTILEADER','TOLERANCE','ARC_DIMENSION','LARGE_RADIAL_DIMENSION']);
+  const ALWAYS_OUT = new Set(['HATCH','SOLID','IMAGE','WIPEOUT','VIEWPORT','OLE2FRAME']);
+
+  function num(e, code){ const t = e.g.find(x=>x[0]===code); return t ? parseFloat(t[1]) : NaN; }
+  function all(e, code){ return e.g.filter(x=>x[0]===code).map(x=>parseFloat(x[1])); }
+
+  function arcPts(cx, cy, r, a1, a2){
+    let sweep = a2 - a1; if(sweep<=0) sweep += Math.PI*2;
+    const n = Math.max(8, Math.ceil(sweep/(Math.PI/36)));
+    const pts = [];
+    for(let i=0;i<=n;i++){ const a = a1 + sweep*i/n; pts.push([cx + r*Math.cos(a), cy + r*Math.sin(a)]); }
+    return pts;
+  }
+  function bulgePts(p1, p2, b){
+    if(!b || Math.abs(b)<1e-9) return [p2];
+    const chord = Math.hypot(p2[0]-p1[0], p2[1]-p1[1]);
+    if(chord<1e-9) return [p2];
+    const theta = 4*Math.atan(b), r = chord/(2*Math.sin(theta/2));
+    const mx=(p1[0]+p2[0])/2, my=(p1[1]+p2[1])/2;
+    const h = Math.sqrt(Math.max(r*r - chord*chord/4, 0)) * (Math.abs(theta)>Math.PI ? -1 : 1) * Math.sign(b);
+    const ux=-(p2[1]-p1[1])/chord, uy=(p2[0]-p1[0])/chord;
+    const cx = mx + ux*h, cy = my + uy*h;
+    const a1 = Math.atan2(p1[1]-cy, p1[0]-cx);
+    const n = Math.max(4, Math.ceil(Math.abs(theta)/(Math.PI/36)));
+    const pts = [];
+    for(let i=1;i<=n;i++){ const a = a1 + theta*i/n; pts.push([cx + Math.abs(r)*Math.cos(a), cy + Math.abs(r)*Math.sin(a)]); }
+    pts[pts.length-1] = p2;
+    return pts;
+  }
+  function polyPts(verts, closed){
+    if(!verts.length) return [];
+    const out = [[verts[0].x, verts[0].y]];
+    const n = verts.length, count = closed ? n : n-1;
+    for(let i=0;i<count;i++){
+      const a = verts[i], b = verts[(i+1)%n];
+      bulgePts([a.x,a.y],[b.x,b.y], a.b).forEach(p=>out.push(p));
+    }
+    return out;
+  }
+  // B-spline (racional) pelo algoritmo de de Boor; se os nós não baterem certo, usa os
+  // fit points ou, em último caso, o polígono de controlo.
+  function splinePts(e){
+    const deg = num(e,71) || 3;
+    const knots = all(e,40);
+    const cx = all(e,10), cy = all(e,20);
+    const w = all(e,41);
+    const ctrl = cx.map((x,i)=>[x, cy[i]]);
+    const fx = all(e,11), fy = all(e,21);
+    const fit = fx.map((x,i)=>[x, fy[i]]);
+    const n = ctrl.length;
+    if(n>deg && knots.length===n+deg+1){
+      const W = w.length===n ? w : ctrl.map(()=>1);
+      const t0 = knots[deg], t1 = knots[n];
+      const samples = Math.max(8, (n-deg)*8);
+      const pts = [];
+      for(let s=0;s<=samples;s++){
+        const t = t0 + (t1-t0)*s/samples;
+        let k = deg;
+        while(k<n-1 && t>=knots[k+1]) k++;
+        const d = [];
+        for(let j=0;j<=deg;j++){ const P = ctrl[k-deg+j], ww = W[k-deg+j]; d.push([P[0]*ww, P[1]*ww, ww]); }
+        for(let r=1;r<=deg;r++){
+          for(let j=deg;j>=r;j--){
+            const i = k-deg+j;
+            const den = knots[i+deg-r+1] - knots[i];
+            const a = den ? (t - knots[i]) / den : 0;
+            d[j] = [(1-a)*d[j-1][0] + a*d[j][0], (1-a)*d[j-1][1] + a*d[j][1], (1-a)*d[j-1][2] + a*d[j][2]];
+          }
+        }
+        pts.push([d[deg][0]/d[deg][2], d[deg][1]/d[deg][2]]);
+      }
+      return pts;
+    }
+    return fit.length>=2 ? fit : ctrl;
+  }
+
+  // Devolve {kind:'geom'|'text'|'dim'|'other', pts, closed, text}
+  function unitGeom(u, utf8){
+    const e = u.ents[0];
+    const lt = (e.g.find(x=>x[0]===6)||[])[1];
+    const dashed = !!lt && !/^(BYLAYER|BYBLOCK|CONTINUOUS)$/i.test(lt.trim());
+    const base = { kind:'geom', pts:[], closed:false, dashed, text:null };
+    const t = u.type;
+    if(TEXT_TYPES.has(t)){
+      const parts = e.g.filter(x=>x[0]===3).map(x=>x[1]).concat(e.g.filter(x=>x[0]===1).map(x=>x[1]));
+      return Object.assign(base, { kind:'text', text: cleanCadText(decodeText(parts.join(''), utf8)) });
+    }
+    if(t==='INSERT' && u.ents.length>1){
+      // Atributos de um bloco: o texto sai mas o bloco em si fica (pode ter geometria).
+      const txt = u.ents.filter(x=>x.type==='ATTRIB').map(a=>cleanCadText(decodeText(((a.g.find(x=>x[0]===1)||[])[1])||'', utf8))).filter(Boolean).join('\n');
+      return Object.assign(base, { kind:'insert', text: txt || null });
+    }
+    if(DIM_TYPES.has(t)) return Object.assign(base, { kind:'dim' });
+    if(ALWAYS_OUT.has(t)) return Object.assign(base, { kind:'out' });
+    if(t==='LINE') return Object.assign(base, { pts:[[num(e,10),num(e,20)],[num(e,11),num(e,21)]] });
+    if(t==='CIRCLE'){
+      const pts = arcPts(num(e,10), num(e,20), num(e,40), 0, Math.PI*2);
+      return Object.assign(base, { pts, closed:true });
+    }
+    if(t==='ARC') return Object.assign(base, { pts: arcPts(num(e,10), num(e,20), num(e,40), num(e,50)*Math.PI/180, num(e,51)*Math.PI/180) });
+    if(t==='LWPOLYLINE'){
+      const verts = []; let v = null;
+      e.g.forEach(([c,val])=>{
+        if(c===10){ v = {x:parseFloat(val), y:0, b:0}; verts.push(v); }
+        else if(c===20 && v) v.y = parseFloat(val);
+        else if(c===42 && v) v.b = parseFloat(val);
+      });
+      const closed = ((num(e,70)|0) & 1) === 1;
+      return Object.assign(base, { pts: polyPts(verts, closed), closed });
+    }
+    if(t==='POLYLINE'){
+      const closed = ((num(e,70)|0) & 1) === 1;
+      const verts = u.ents.filter(x=>x.type==='VERTEX').map(x=>({x:num(x,10), y:num(x,20), b:num(x,42)||0}));
+      return Object.assign(base, { pts: polyPts(verts, closed), closed });
+    }
+    if(t==='ELLIPSE'){
+      const cx=num(e,10), cy=num(e,20), mx=num(e,11), my=num(e,21), ratio=num(e,40)||1;
+      let t1 = num(e,41), t2 = num(e,42);
+      if(!isFinite(t1)) t1 = 0; if(!isFinite(t2)) t2 = Math.PI*2;
+      let sweep = t2 - t1; if(sweep<=0) sweep += Math.PI*2;
+      const a = Math.hypot(mx,my), b = a*ratio, rot = Math.atan2(my,mx);
+      const n = Math.max(16, Math.ceil(sweep/(Math.PI/36)));
+      const pts = [];
+      for(let i=0;i<=n;i++){
+        const tt = t1 + sweep*i/n, ex = a*Math.cos(tt), ey = b*Math.sin(tt);
+        pts.push([cx + ex*Math.cos(rot) - ey*Math.sin(rot), cy + ex*Math.sin(rot) + ey*Math.cos(rot)]);
+      }
+      return Object.assign(base, { pts, closed: sweep >= Math.PI*2 - 1e-6 });
+    }
+    if(t==='SPLINE'){
+      const closed = ((num(e,70)|0) & 1) === 1;
+      return Object.assign(base, { pts: splinePts(e), closed });
+    }
+    if(t==='POINT') return Object.assign(base, { pts:[[num(e,10),num(e,20)]] });
+    return Object.assign(base, { kind:'other' });
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* SEPARAR A PEÇA DO TEXTO                                           */
+  /* ---------------------------------------------------------------- */
+  const JOIN_TOL = 0.02; // mm — duas pontas a menos disto contam como ligadas
+
+  function bboxOf(ptsList){
+    let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity;
+    ptsList.forEach(pts=>pts.forEach(([x,y])=>{ if(x<a)a=x; if(y<b)b=y; if(x>c)c=x; if(y>d)d=y; }));
+    return isFinite(a) ? {minX:a,minY:b,maxX:c,maxY:d} : null;
+  }
+
+  // Junta as unidades em componentes ligadas pelas pontas (uma letra desenhada com 12 arcos
+  // vira uma componente; um contorno feito de LINE soltas também).
+  function components(geoms){
+    const idx = geoms.map((g,i)=>i).filter(i=>geoms[i].kind==='geom' && geoms[i].pts.length && geoms[i].pts.every(p=>isFinite(p[0])&&isFinite(p[1])));
+    const parent = new Map(idx.map(i=>[i,i]));
+    const find = i => { while(parent.get(i)!==i){ parent.set(i, parent.get(parent.get(i))); i = parent.get(i); } return i; };
+    const union = (a,b) => { a=find(a); b=find(b); if(a!==b) parent.set(a,b); };
+    const cell = 0.1, grid = new Map();
+    const key = (x,y) => Math.floor(x/cell)+','+Math.floor(y/cell);
+    idx.forEach(i=>{
+      const g = geoms[i];
+      if(g.closed) return;
+      [g.pts[0], g.pts[g.pts.length-1]].forEach(p=>{
+        const cx = Math.floor(p[0]/cell), cy = Math.floor(p[1]/cell);
+        for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++){
+          const list = grid.get((cx+dx)+','+(cy+dy));
+          if(list) list.forEach(([j,q])=>{ if(Math.hypot(q[0]-p[0], q[1]-p[1])<=JOIN_TOL) union(i,j); });
+        }
+        const k = key(p[0],p[1]);
+        if(!grid.has(k)) grid.set(k, []);
+        grid.get(k).push([i,p]);
+      });
+    });
+    const groups = new Map();
+    idx.forEach(i=>{ const r = find(i); if(!groups.has(r)) groups.set(r, []); groups.get(r).push(i); });
+    return Array.from(groups.values()).map(members=>({
+      members,
+      bbox: bboxOf(members.map(i=>geoms[i].pts)),
+      dashed: members.every(i=>geoms[i].dashed),
+    }));
+  }
+
+  // Encadeia as unidades de uma componente em contornos (para preencher letras e para o
+  // teste "ponto dentro da peça").
+  function chainLoops(members, geoms){
+    const segs = members.map(i=>({ pts: geoms[i].pts, used:false, closed: geoms[i].closed }));
+    const loops = [];
+    const same = (a,b) => Math.hypot(a[0]-b[0], a[1]-b[1]) <= JOIN_TOL;
+    segs.forEach(s=>{
+      if(s.used) return;
+      s.used = true;
+      if(s.closed){ loops.push(s.pts.slice()); return; }
+      let chain = s.pts.slice();
+      let grew = true;
+      while(grew){
+        grew = false;
+        if(chain.length>2 && same(chain[0], chain[chain.length-1])) break;
+        for(const o of segs){
+          if(o.used || o.closed) continue;
+          const p = o.pts, tail = chain[chain.length-1], head = chain[0];
+          if(same(tail, p[0])){ chain = chain.concat(p.slice(1)); }
+          else if(same(tail, p[p.length-1])){ chain = chain.concat(p.slice(0,-1).reverse()); }
+          else if(same(head, p[p.length-1])){ chain = p.slice(0,-1).concat(chain); }
+          else if(same(head, p[0])){ chain = p.slice(1).reverse().concat(chain); }
+          else continue;
+          o.used = true; grew = true; break;
+        }
+      }
+      loops.push(chain);
+    });
+    return loops;
+  }
+
+  function pointInPoly(pt, poly){
+    let inside = false;
+    for(let i=0, j=poly.length-1; i<poly.length; j=i++){
+      const [xi,yi] = poly[i], [xj,yj] = poly[j];
+      if(((yi>pt[1]) !== (yj>pt[1])) && (pt[0] < (xj-xi)*(pt[1]-yi)/(yj-yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+
+  function analyse(bin, removeDims){
+    const dxf = readDxf(bin);
+    const geoms = dxf.units.map(u=>unitGeom(u, dxf.utf8));
+    const comps = components(geoms);
+    const area = b => (b.maxX-b.minX)*(b.maxY-b.minY);
+    const candidates = comps.filter(c=>!c.dashed && c.bbox);
+    if(!candidates.length) throw new Error('Não foi encontrada geometria de peça no desenho.');
+    const main = candidates.reduce((best,c)=>area(c.bbox)>area(best.bbox) ? c : best);
+    const mainLoops = chainLoops(main.members, geoms);
+    const outer = mainLoops.reduce((best,l)=>{ const b = bboxOf([l]); return (!best || area(b)>area(best.b)) ? {l, b} : best; }, null);
+    const outerClosed = outer && outer.l.length>2 && Math.hypot(outer.l[0][0]-outer.l[outer.l.length-1][0], outer.l[0][1]-outer.l[outer.l.length-1][1]) <= JOIN_TOL*5;
+    const pb = main.bbox, tol = 0.05;
+
+    const keep = new Array(dxf.units.length).fill(true);
+    const inPart = c => {
+      if(c===main) return true;
+      const b = c.bbox;
+      if(b.minX < pb.minX-tol || b.maxX > pb.maxX+tol || b.minY < pb.minY-tol || b.maxY > pb.maxY+tol) return false;
+      if(!outerClosed) return true;
+      const p = geoms[c.members[0]].pts[0];
+      return pointInPoly(p, outer.l);
+    };
+    const removedComps = [];
+    comps.forEach(c=>{ if(!inPart(c)){ c.members.forEach(i=>keep[i]=false); removedComps.push(c); } });
+
+    const texts = [];
+    geoms.forEach((g,i)=>{
+      if(g.kind==='text'){ keep[i] = false; if(g.text && g.text.trim()) texts.push(g.text.trim()); }
+      else if(g.kind==='insert'){ if(g.text) texts.push(g.text); }
+      else if(g.kind==='dim' && removeDims) keep[i] = false;
+      else if(g.kind==='out') keep[i] = false;
+    });
+    // Tira os ATTRIB de um INSERT mas deixa o bloco: marca 66=0 e salta ATTRIB/SEQEND.
+    const skipRanges = [];
+    const patch66 = [];
+    dxf.units.forEach((u,i)=>{
+      if(!keep[i]){ skipRanges.push([u.start, u.end]); return; }
+      if(geoms[i].kind==='insert'){
+        const first = u.ents[0];
+        skipRanges.push([u.ents[1].start, u.end]);
+        for(let l=first.start; l<first.end; l+=2){
+          if(dxf.lines[l].trim()==='66'){ patch66.push(l+1); break; }
+        }
+      }
+    });
+
+    const out = [];
+    let r = 0;
+    skipRanges.sort((a,b)=>a[0]-b[0]);
+    const patchSet = new Set(patch66);
+    for(let l=0;l<dxf.lines.length;l++){
+      while(r<skipRanges.length && l>=skipRanges[r][1]) r++;
+      if(r<skipRanges.length && l>=skipRanges[r][0] && l<skipRanges[r][1]) continue;
+      out.push(patchSet.has(l) ? dxf.lines[l].replace(/1/, '0') : dxf.lines[l]);
+    }
+    updateExtents(out, pb);
+    const outBin = out.join(dxf.eol) + (dxf.trailingEol ? dxf.eol : '');
+
+    const keptPts = [], remPts = [];
+    geoms.forEach((g,i)=>{ if(g.kind==='geom' && g.pts.length>1) (keep[i] ? keptPts : remPts).push(g.pts); });
+    const textComps = removedComps.filter(c=>!c.dashed);
+    return {
+      outBin, utf8: dxf.utf8, texts, partBox: pb, keptPts, remPts,
+      removedCount: keep.filter(k=>!k).length,
+      glyphLoops: textComps.map(c=>chainLoops(c.members.filter(i=>!geoms[i].dashed), geoms)),
+      glyphBoxes: textComps.map(c=>c.bbox),
+    };
+  }
+
+  // Atualiza $EXTMIN/$EXTMAX do cabeçalho para a peça (alguns programas fazem zoom a isto).
+  function updateExtents(lines, b){
+    const set = (name, x, y) => {
+      for(let i=0;i+1<lines.length;i+=2){
+        if(lines[i].trim()==='9' && lines[i+1].trim()===name){
+          for(let j=i+2;j+1<lines.length && j<i+10;j+=2){
+            const c = lines[j].trim();
+            if(c==='10') lines[j+1] = lines[j+1].replace(/\S+/, String(x));
+            else if(c==='20') lines[j+1] = lines[j+1].replace(/\S+/, String(y));
+            else if(c==='9' || c==='0') break;
+          }
+          return;
+        }
+        if(lines[i].trim()==='0' && lines[i+1].trim()==='ENDSEC') return;
+      }
+    };
+    set('$EXTMIN', b.minX, b.minY);
+    set('$EXTMAX', b.maxX, b.maxY);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* TEXTO DESENHADO COM LINHAS (letras "explodidas" em curvas)       */
+  /* ---------------------------------------------------------------- */
+  // Ponto do desenho → coordenadas de leitura para a orientação (rot, mirror) — a mesma
+  // y para baixo, espelho, depois rotação em passos de 90°.
+  function orientPt(x, y, rot, mirror){
+    let px = mirror ? -x : x, py = -y;
+    for(let r=0;r<rot;r++){ const t = px; px = -py; py = t; }
+    return [px, py];
+  }
+
+  // Separa o texto desenhado em caracteres e linhas, já na orientação de leitura.
+  function charLayout(an, rot, mirror){
+    const comps = an.glyphBoxes.map((b,i)=>({ b, loops: an.glyphLoops[i], area:(b.maxX-b.minX)*(b.maxY-b.minY) }))
+      .sort((a,b)=>b.area-a.area);
+    // Furos das letras (A, O, 4...) são componentes à parte, dentro do contorno da letra.
+    const chars = [];
+    comps.forEach(c=>{
+      const e = 1e-6;
+      const host = chars.find(h=>c.b.minX>=h.b.minX-e && c.b.maxX<=h.b.maxX+e && c.b.minY>=h.b.minY-e && c.b.maxY<=h.b.maxY+e);
+      if(host) host.loops = host.loops.concat(c.loops); else chars.push({ b:c.b, loops:c.loops.slice() });
+    });
+    chars.forEach(ch=>{
+      ch.op = ch.loops.map(l=>l.map(([x,y])=>orientPt(x,y,rot,mirror)));
+      ch.ob = bboxOf(ch.op);
+      ch.cy = (ch.ob.minY+ch.ob.maxY)/2;
+    });
+    const hs = chars.map(c=>c.ob.maxY-c.ob.minY).sort((a,b)=>a-b);
+    const H = hs[Math.floor(hs.length*0.75)] || 1;
+
+    const lines = [];
+    chars.slice().sort((a,b)=>a.cy-b.cy).forEach(ch=>{
+      const ln = lines.find(l=>Math.abs(l.cy-ch.cy) < H*0.5);
+      if(ln){ ln.chars.push(ch); ln.cy = ln.chars.reduce((s,c)=>s+c.cy,0)/ln.chars.length; }
+      else lines.push({ cy: ch.cy, chars:[ch] });
+    });
+    lines.sort((a,b)=>a.cy-b.cy);
+    lines.forEach(l=>{
+      l.chars.sort((a,b)=>a.ob.minX-b.ob.minX);
+      // Peças do mesmo carácter umas por cima das outras ("=", pinta do "i") juntam-se.
+      const merged = [];
+      l.chars.forEach(c=>{
+        const p = merged[merged.length-1];
+        const ov = p ? Math.min(p.ob.maxX, c.ob.maxX) - Math.max(p.ob.minX, c.ob.minX) : -1;
+        if(p && ov > 0.5*Math.min(p.ob.maxX-p.ob.minX, c.ob.maxX-c.ob.minX)){
+          p.op = p.op.concat(c.op); p.ob = bboxOf(p.op);
+        } else merged.push(c);
+      });
+      l.chars = merged;
+      l.top = Math.min.apply(null, merged.map(c=>c.ob.minY));
+      l.bottom = Math.max.apply(null, merged.map(c=>c.ob.maxY));
+      merged.forEach((c,i)=>{ c.space = i>0 && (c.ob.minX - merged[i-1].ob.maxX) > 0.45*H; });
+    });
+    return { lines, H };
+  }
+
+  function fillPaths(ctx, paths, tx, ty){
+    ctx.beginPath();
+    paths.forEach(l=>{
+      l.forEach(([x,y],i)=>{ const px = tx(x), py = ty(y); if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); });
+      ctx.closePath();
+    });
+    ctx.fillStyle = '#000';
+    ctx.fill('evenodd');
+  }
+
+  // Imagem do texto já direito, para mostrar ao utilizador o que foi lido.
+  function renderUpright(lay){
+    const { lines, H } = lay;
+    const s = 40 / H, pad = 24;
+    const widths = lines.map(l=>l.chars[l.chars.length-1].ob.maxX - l.chars[0].ob.minX);
+    const rowH = 1.6*H;
+    const cv = document.createElement('canvas');
+    cv.width = Math.ceil(Math.max.apply(null, widths)*s) + pad*2;
+    cv.height = Math.ceil(lines.length*rowH*s) + pad*2;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cv.width,cv.height);
+    lines.forEach((l, li)=>{
+      const x0 = l.chars[0].ob.minX;
+      fillPaths(ctx, l.chars.flatMap(c=>c.op), x=>pad+(x-x0)*s, y=>pad+(li*rowH + y - l.top)*s);
+    });
+    return cv;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* RECONHECIMENTO POR MODELOS                                        */
+  /* As letras do desenho são vetores perfeitos — compara-se cada uma  */
+  /* com as letras de várias fontes do sistema, desenhadas à mesma     */
+  /* escala. Não precisa de internet nem de dicionário.               */
+  /* ---------------------------------------------------------------- */
+  const GLYPH_SET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789=.,-/xmØ';
+  const FONTS = ['Arial','Century Gothic','Verdana','Segoe UI','Calibri','Tahoma','Consolas','Bahnschrift','Microsoft Sans Serif','Lucida Console','Courier New','Times New Roman'];
+  const G = 20;
+
+  function shrink(src, sx, sy, sw, sh){
+    const cv = document.createElement('canvas'); cv.width = G; cv.height = G;
+    const ctx = cv.getContext('2d', { willReadFrequently:true });
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,G,G);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, sx, sy, Math.max(sw,1), Math.max(sh,1), 0, 0, G, G);
+    const d = ctx.getImageData(0,0,G,G).data, out = new Float32Array(G*G);
+    for(let i=0;i<G*G;i++) out[i] = 1 - d[i*4]/255;
+    return out;
+  }
+  function fontAvailable(f){
+    const cv = document.createElement('canvas'), ctx = cv.getContext('2d');
+    const probe = 'mmmmmmmmmmlliWW05S';
+    return ['monospace','serif','sans-serif'].some(fb=>{
+      ctx.font = '72px ' + fb; const a = ctx.measureText(probe).width;
+      ctx.font = '72px "' + f + '", ' + fb; const b = ctx.measureText(probe).width;
+      return Math.abs(a-b) > 0.5;
+    });
+  }
+  function inkBox(ctx, w, h){
+    const d = ctx.getImageData(0,0,w,h).data;
+    let x0=w, y0=h, x1=-1, y1=-1;
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      if(d[(y*w+x)*4] < 128){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+    }
+    return x1<0 ? null : { x:x0, y:y0, w:x1-x0+1, h:y1-y0+1 };
+  }
+  let templates = null;
+  function getTemplates(){
+    if(templates) return templates;
+    templates = [];
+    const size = 160, W = 320, Hc = 300, base = 230;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = Hc;
+    const ctx = cv.getContext('2d', { willReadFrequently:true });
+    FONTS.filter(fontAvailable).forEach(f=>{
+      ctx.font = size + 'px "' + f + '"';
+      const draw = ch => { ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,Hc); ctx.fillStyle = '#000'; ctx.fillText(ch, 60, base); return inkBox(ctx, W, Hc); };
+      const hb = draw('H');
+      if(!hb) return;
+      const cap = hb.h, capTop = hb.y;
+      Array.from(GLYPH_SET).forEach(ch=>{
+        const b = draw(ch);
+        if(!b) return;
+        templates.push({ ch, font:f, bmp: shrink(cv, b.x, b.y, b.w, b.h), ar: b.w/b.h, rh: b.h/cap, rt: (b.y-capTop)/cap });
+      });
+    });
+    return templates;
+  }
+
+  function glyphFeatures(c, lineTop, H){
+    const S = 4*G;
+    const w = c.ob.maxX - c.ob.minX, h = c.ob.maxY - c.ob.minY;
+    const cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+    const ctx = cv.getContext('2d', { willReadFrequently:true });
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,S,S);
+    fillPaths(ctx, c.op, x=>(x-c.ob.minX)/Math.max(w,1e-9)*S, y=>(y-c.ob.minY)/Math.max(h,1e-9)*S);
+    return { bmp: shrink(cv, 0, 0, S, S), ar: w/Math.max(h,1e-9), rh: h/H, rt: (c.ob.minY-lineTop)/H };
+  }
+
+  function classify(f){
+    const tpl = getTemplates();
+    let best = null;
+    for(const t of tpl){
+      let diff = 0;
+      for(let i=0;i<f.bmp.length;i++) diff += Math.abs(f.bmp[i]-t.bmp[i]);
+      const d = diff/f.bmp.length + 0.35*Math.abs(Math.log((f.ar+0.02)/(t.ar+0.02))) + 0.6*Math.abs(f.rh-t.rh) + 0.6*Math.abs(f.rt-t.rt);
+      if(!best || d<best.d) best = { ch:t.ch, d, font:t.font };
+    }
+    return best;
+  }
+
+  // Lê todo o bloco numa orientação; devolve as linhas de texto e a "distância" média aos
+  // modelos (quanto menor, mais parecido com letras reais — serve para escolher o sentido).
+  function readLayout(lay){
+    let sum = 0, n = 0;
+    const lines = lay.lines.map(l=>{
+      let txt = '';
+      l.chars.forEach(c=>{
+        const r = classify(glyphFeatures(c, l.top, lay.H));
+        sum += r.d; n++;
+        txt += (c.space ? ' ' : '') + r.ch;
+      });
+      return txt;
+    });
+    return { lines, score: n ? sum/n : Infinity };
+  }
+
+  async function readGlyphsByTemplate(an, onProgress){
+    const parity = charLayout(an, 0, false).lines.length <= charLayout(an, 1, false).lines.length ? 0 : 1;
+    const order = [[parity,false],[parity+2,false],[parity,true],[parity+2,true]];
+    let best = null;
+    for(let k=0;k<order.length;k++){
+      const [rot, mir] = order[k];
+      onProgress && onProgress('A ler o texto desenhado… (' + (k+1) + '/' + order.length + ')');
+      await new Promise(r=>setTimeout(r, 0));
+      const lay = charLayout(an, rot, mir);
+      const res = readLayout(lay);
+      if(!best || res.score < best.score) best = Object.assign(res, { lay, rot, mir });
+    }
+    return { text: best.lines.join('\n'), canvas: renderUpright(best.lay) };
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* INTERPRETAR O TEXTO                                               */
+  /* ---------------------------------------------------------------- */
+  // Depois de uma palavra-chave numérica (ESPESSURA, QUANTIDADE...) a leitura pode trocar
+  // dígitos por letras parecidas — "ESPESSURA5" lido como "ESPESSURAS".
+  const DIGIT_FIX = { O:'0', o:'0', S:'5', s:'5', I:'1', l:'1', '|':'1', B:'8', Z:'2', z:'2', G:'6' };
+  function toNumber(raw){
+    if(!raw) return '';
+    const fixed = Array.from(raw).map(ch=>DIGIT_FIX[ch]||ch).join('').replace(/[^0-9.,]/g,'').replace(/^[.,]+|[.,]+$/g,'');
+    return fixed.replace('.', ',');
+  }
+  // Número logo a seguir à palavra-chave: começa por um dígito (ou letra que se confunde com
+  // dígito) e não pode continuar com outras letras.
+  const NUMISH = '([0-9OoSsIl|BZzG]+(?:[.,][0-9OoSsIl]+)?)(?=(?:MM|UN|PCS|X)?(?:$|[^0-9A-Za-z]))';
+
+  function parseInfo(lines){
+    const info = { material:'', espessura:'', quantidade:'', comprimento:'' };
+    const used = new Set();
+    const K = '(?![A-Z])'; // abreviatura não pode ser o início de outra palavra (QUANT de QUANTIDADE)
+    const rules = [
+      ['espessura',   new RegExp('(?:ESPESSURA|ESP\\.?' + K + '|E\\s*=|THK|THICKNESS)\\s*[:=]?\\s*' + NUMISH, 'i')],
+      ['quantidade',  new RegExp('(?:QUANTIDADE|QUANT\\.?' + K + '|QTDE?\\.?' + K + '|QTY|PCS)\\s*[:=]?\\s*' + NUMISH, 'i')],
+      ['comprimento', new RegExp('(?:COMPRIMENTO|COMP\\.?' + K + '|^C|^L)\\s*[:=]\\s*' + NUMISH, 'i')],
+    ];
+    // Compara sem espaços — a leitura com letras espaçadas pode dar "E S P E S S U R A 5".
+    const flat = lines.map(ln=>ln.replace(/\s+/g,''));
+    flat.forEach((ln, i)=>{
+      rules.forEach(([field, re])=>{
+        if(info[field]) return;
+        const m = ln.match(re);
+        if(m){ info[field] = toNumber(m[1]); used.add(i); }
+      });
+      if(!info.material){
+        const m = ln.match(/^(?:MATERIAL|MAT\.?(?![A-Z]))[:=]?(.+)/i);
+        if(m){ info.material = m[1]; used.add(i); }
+      }
+    });
+    if(!info.material){
+      const k = lines.findIndex((ln,i)=>!used.has(i) && /[A-Za-z]/.test(ln) && flat[i].length>=2);
+      if(k>=0) info.material = lines[k].split(' ').every(t=>t.length<=1) ? flat[k] : lines[k];
+    }
+    info.material = fixMaterial(info.material);
+    return info;
+  }
+  function fixMaterial(m){
+    let s = (m||'').replace(/\s+/g,' ').trim();
+    // Aços estruturais lidos com 5 em vez de S (S235 → 5235).
+    s = s.replace(/^[5$](235|275|355|420|460)\b/i, 'S$1');
+    s = s.replace(/\bS\s*(235|275|355)\s*(J[R0O2]|JR)?\b/i, (m0, g, q)=>'S'+g+(q?q.toUpperCase().replace('O','0'):''));
+    return s;
+  }
+  function textLines(t){
+    return t.split(/\r?\n/).map(s=>s.replace(/[|_~`]+/g,' ').replace(/\s+/g,' ').trim()).filter(Boolean);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* ESTADO E INTERFACE                                                */
+  /* ---------------------------------------------------------------- */
+  const items = []; // {id, name, status, err, an, info, rawText, ocrImg, progress}
+  let nextId = 1;
+  let creating = false;
+  const rowsEl = $('rows');
+
+  function fmtMm(v){ return fmtNum(Math.round(v*10)/10, (Math.round(v*10)%10) ? 1 : 0); }
+  function partDims(an){ const b = an.partBox; return { w: b.maxX-b.minX, h: b.maxY-b.minY }; }
+
+  function svgPath(ptsList, b, H, s){
+    return ptsList.map(pts=>pts.map(([x,y],i)=>(i?'L':'M') + ((x-b.minX)*s).toFixed(2) + ' ' + ((b.maxY-y)*s).toFixed(2)).join('')).join('');
+  }
+  function thumbSVG(an, cls, withRemoved){
+    const b0 = withRemoved ? bboxOf(an.keptPts.concat(an.remPts)) : an.partBox;
+    const w = Math.max(b0.maxX-b0.minX, 1e-6), h = Math.max(b0.maxY-b0.minY, 1e-6);
+    const s = 100/Math.max(w,h);
+    const pad = 4;
+    const vb = (-pad) + ' ' + (-pad) + ' ' + (w*s+pad*2).toFixed(2) + ' ' + (h*s+pad*2).toFixed(2);
+    let html = '<svg class="' + cls + '" viewBox="' + vb + '" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">';
+    if(withRemoved && an.remPts.length) html += '<path class="r" d="' + svgPath(an.remPts, b0, h, s) + '"/>';
+    html += '<path class="k" d="' + svgPath(an.keptPts, b0, h, s) + '"/>';
+    return html + '</svg>';
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* EQUIVALÊNCIA DE MATERIAIS — designação do cliente → material da app */
+  /* ---------------------------------------------------------------- */
+  let appMaterials = [];
+  const MATERIAL_RULES = [
+    { re:/\bS\s?(235|275|355)|\bDC0\d|FERRO|A[ÇC]O\s*CARB|\bST\s?37|\bS\s?JR\b/i, pick:/ferro|carbono/i },
+    { re:/INOX|AISI|\b30[14]L?\b|\b316L?\b|\b430\b/i,                              pick:/inox/i },
+    { re:/ALUM|\b(1050|5754|5083|6082)\b/i,                                         pick:/alum/i },
+  ];
+  function materialNames(){ return Array.from(new Set(appMaterials.map(m=>m.name))); }
+  function mapMaterial(txt){
+    const rule = MATERIAL_RULES.find(r=>r.re.test(txt||''));
+    if(!rule) return '';
+    return materialNames().find(n=>rule.pick.test(n)) || '';
+  }
+  function espNum(it){ return parseFloat(String(it.info.espessura||'').replace(',','.')); }
+  function findAppMaterial(it){
+    const e = espNum(it);
+    return appMaterials.find(m=>m.name===it.appMaterial && Math.abs(m.thickness-e)<1e-6) || null;
+  }
+  function appMaterialCell(it, dis){
+    const opts = ['<option value="">— escolher —</option>'].concat(materialNames().map(n=>'<option' + (n===it.appMaterial?' selected':'') + '>' + escapeHtml(n) + '</option>'));
+    let hint = '';
+    if(it.status==='ok'){
+      if(!it.appMaterial) hint = '<div class="ld-sub bad">Sem equivalência — escolha o material</div>';
+      else if(!findAppMaterial(it)) hint = '<div class="ld-sub bad">Não há ' + escapeHtml(it.appMaterial) + ' com ' + escapeHtml(it.info.espessura||'?') + ' mm na lista</div>';
+      else hint = '<div class="ld-sub">✓ ' + escapeHtml(it.appMaterial) + ' ' + escapeHtml(it.info.espessura) + ' mm</div>';
+    }
+    return '<select data-id="' + it.id + '" data-f="appMaterial"' + dis + '>' + opts.join('') + '</select>' + hint;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* PREÇO — o mesmo cálculo da Encomenda Chapa (LC.computeSheetCost),  */
+  /* com "Converter desenho do cliente" e o setup por omissão.         */
+  /* ---------------------------------------------------------------- */
+  const app = { machine: Object.assign({}, window.LC.DEFAULT_MACHINE), remote:{ configured:false }, orders:[], localFolder:{ ready:false, handle:null } };
+
+  // Todas as encomendas importadas: "Converter desenho do cliente" com 2 min de desenho (o
+  // ficheiro do cliente foi limpo aqui) e o setup por omissão das Definições.
+  const IMPORT_DESIGN_MIN = 2;
+
+  function qtyOf(it){ const q = parseInt(it.info.quantidade,10); return q>=1 ? q : null; }
+  function costInputs(it){
+    return {
+      geo: it.geo, material: findAppMaterial(it), qty: qtyOf(it), machine: app.machine,
+      isBatch: false, realTimeMin: null,
+      drawingType: 'client_convert', designTimeMin: IMPORT_DESIGN_MIN, setupTimeMin: app.machine.defaultSetupMin ?? 5,
+      adjustmentValue: 0, adjustmentReason: '',
+    };
+  }
+  // O que impede esta linha de virar encomenda (lista vazia = pronta).
+  function problemsOf(it){
+    if(it.status!=='ok') return ['ainda não lido'];
+    const p = [];
+    if(!it.pieceName.trim()) p.push('falta o nome da peça');
+    if(!it.geo || !it.geo.perimeterMm) p.push('sem geometria de corte');
+    if(!it.appMaterial) p.push('falta o material');
+    else if(!findAppMaterial(it)) p.push('material/espessura não existe na lista');
+    if(!qtyOf(it)) p.push('falta a quantidade');
+    return p;
+  }
+  function costFor(it){
+    if(problemsOf(it).length) return null;
+    const r = computeSheetCost(costInputs(it));
+    return r.valid ? r : null;
+  }
+  function priceCell(it){
+    if(it.created) return '<div class="ld-status ok">✓ Encomenda ' + escapeHtml(it.created) + '</div>';
+    if(it.status!=='ok') return '';
+    const probs = problemsOf(it);
+    if(probs.length) return '<div class="ld-sub bad">' + probs.map(escapeHtml).join('<br>') + '</div>';
+    const r = costFor(it);
+    if(!r) return '';
+    return '<span class="ld-dims">' + fmtEUR(r.totalCost) + '</span><div class="ld-sub">' + fmtEUR(r.avgPerPiece) + '/peça · ' + it.geo.pierces + ' perf.</div>';
+  }
+
+  function comprimentoHint(it){
+    if(!it.an || !it.info.comprimento) return '';
+    const c = parseFloat(String(it.info.comprimento).replace(',','.'));
+    if(!isFinite(c)) return '';
+    const { w, h } = partDims(it.an);
+    if(Math.abs(c-w)<=1 || Math.abs(c-h)<=1) return '<div class="ld-sub">✓ bate com o desenho</div>';
+    return '<div class="ld-sub bad">≠ medidas do desenho</div>';
+  }
+
+  function render(){
+    $('emptyMsg').hidden = items.length>0;
+    const ready = items.filter(i=>i.status==='ok');
+    $('countLbl').textContent = items.length ? (items.length + (items.length===1?' desenho':' desenhos') + (ready.length ? ' · ' + ready.reduce((s,i)=>s+(parseInt(i.info.quantidade,10)||0),0) + ' peças' : '')) : '';
+    $('saveAllBtn').disabled = !ready.length;
+    $('pdfBtn').disabled = !ready.length;
+    $('clearBtn').disabled = !items.length;
+    const creatable = items.filter(i=>!i.created && i.status==='ok' && !problemsOf(i).length);
+    const createBtn = $('createBtn');
+    if(!creating){
+      createBtn.disabled = !creatable.length || items.some(i=>i.status==='busy');
+      createBtn.textContent = creatable.length ? ('Criar ' + creatable.length + (creatable.length===1 ? ' encomenda' : ' encomendas')) : 'Criar encomendas';
+    }
+    rowsEl.innerHTML = items.map(it=>{
+      const dims = it.an ? partDims(it.an) : null;
+      let statusHtml = '';
+      if(it.status==='busy') statusHtml = '<div class="ld-status">' + escapeHtml(it.progress||'A processar…') + '</div>';
+      else if(it.status==='err') statusHtml = '<div class="ld-status err">' + escapeHtml(it.err) + '</div>';
+      else statusHtml = '<div class="ld-status ok">✓ ' + it.an.removedCount + ' elementos retirados</div>';
+      const textCell = it.ocrImg
+        ? '<img class="ld-ocr" src="' + it.ocrImg + '" alt="Texto do desenho">' + (it.rawText ? '<div class="ld-raw">' + escapeHtml(it.rawText) + '</div>' : '')
+        : (it.rawText ? '<div class="ld-raw" style="color:var(--text-muted)">' + escapeHtml(it.rawText) + '</div>' : '<span class="ld-sub">—</span>');
+      const dis = (it.status!=='ok' || it.created || creating) ? ' disabled' : '';
+      const inp = (f, w) => '<input type="text" data-id="' + it.id + '" data-f="' + f + '" value="' + escapeHtml(it.info[f]||'') + '"' + dis + (w?' style="width:'+w+'"':'') + '>';
+      return '<tr>' +
+        '<td>' + (it.an ? thumbSVG(it.an, 'ld-thumb', true) : '<div class="ld-thumb"></div>') + '</td>' +
+        '<td><input type="text" data-id="' + it.id + '" data-f="pieceName" value="' + escapeHtml(it.pieceName) + '"' + dis + ' style="min-width:150px;"><div class="ld-sub">' + escapeHtml(it.name) + '</div>' + statusHtml + '</td>' +
+        '<td>' + textCell + '</td>' +
+        '<td>' + inp('material') + '</td>' +
+        '<td>' + appMaterialCell(it, dis) + '</td>' +
+        '<td>' + inp('espessura') + '</td>' +
+        '<td>' + inp('quantidade') + '</td>' +
+        '<td>' + inp('comprimento') + comprimentoHint(it) + '</td>' +
+        '<td>' + (dims ? '<span class="ld-dims">' + fmtMm(dims.w) + ' × ' + fmtMm(dims.h) + ' mm</span>' : '') + '</td>' +
+        '<td>' + priceCell(it) + '</td>' +
+        '<td><div class="ld-row-btns">' +
+          '<button class="ghost-btn sm" type="button" data-dl="' + it.id + '"' + (it.status!=='ok' ? ' disabled' : '') + '>Descarregar</button>' +
+          '<button class="ghost-btn sm" type="button" data-rm="' + it.id + '" title="Tirar da lista"' + (creating ? ' disabled' : '') + '>Remover</button>' +
+        '</div></td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  rowsEl.addEventListener('input', ev=>{
+    const el = ev.target;
+    if(!el.dataset.f) return;
+    const it = items.find(i=>i.id===+el.dataset.id);
+    if(!it) return;
+    const f = el.dataset.f;
+    if(f==='pieceName' || f==='appMaterial') it[f] = el.value;
+    else it.info[f] = el.value;
+    if(f==='material'){ const m = mapMaterial(el.value); if(m) it.appMaterial = m; }
+    if(el.dataset.f==='quantidade'){
+      const ready = items.filter(i=>i.status==='ok');
+      $('countLbl').textContent = items.length + (items.length===1?' desenho':' desenhos') + ' · ' + ready.reduce((s,i)=>s+(parseInt(i.info.quantidade,10)||0),0) + ' peças';
+    }
+  });
+  rowsEl.addEventListener('change', ev=>{ if(['comprimento','material','espessura','appMaterial','quantidade','pieceName'].includes(ev.target.dataset.f)) render(); });
+  rowsEl.addEventListener('click', ev=>{
+    const dl = ev.target.closest('[data-dl]'), rm = ev.target.closest('[data-rm]');
+    if(dl){ const it = items.find(i=>i.id===+dl.dataset.dl); if(it) downloadOne(it); }
+    if(rm){ const k = items.findIndex(i=>i.id===+rm.dataset.rm); if(k>=0){ items.splice(k,1); render(); } }
+  });
+
+  // Ficheiros processados um de cada vez, pela ordem em que foram escolhidos.
+  let queue = Promise.resolve();
+  function addFiles(fileList){
+    const files = Array.from(fileList).filter(f=>/\.dxf$/i.test(f.name));
+    if(!files.length){ showAlert('Escolha ficheiros .dxf.'); return; }
+    files.forEach(f=>{
+      const it = { id: nextId++, name: f.name, pieceName: f.name.replace(/\.dxf$/i,''), appMaterial:'', status:'busy', progress:'Em fila…', info:{material:'',espessura:'',quantidade:'',comprimento:''}, rawText:'', ocrImg:'' };
+      items.push(it);
+      queue = queue.then(()=>processFile(it, f));
+    });
+    render();
+    return queue;
+  }
+
+  async function processFile(it, file){
+    try{
+      it.progress = 'A ler o desenho…'; render();
+      const bin = bytesToBin(await file.arrayBuffer());
+      it.an = analyse(bin, $('optDims').checked);
+      it.geo = sheetGeometryFromDXF(parseDXF(it.an.outBin), NaN);
+      let lines = [];
+      if(it.an.texts.length){
+        lines = it.an.texts.flatMap(textLines);
+        it.rawText = lines.join('\n');
+      }
+      if(it.an.glyphBoxes.length && !lines.length){
+        const res = await readGlyphsByTemplate(it.an, msg=>{ it.progress = msg; render(); });
+        lines = textLines(res.text);
+        it.rawText = lines.join('\n');
+        it.ocrImg = res.canvas.toDataURL('image/png');
+      }
+      it.info = parseInfo(lines);
+      it.appMaterial = mapMaterial(it.info.material);
+      it.status = 'ok';
+    }catch(err){
+      it.status = 'err';
+      it.err = 'Erro: ' + (err && err.message || err);
+      if(it.an){ it.status = 'ok'; it.rawText = '(não foi possível ler o texto: ' + (err.message||err) + ')'; }
+    }
+    render();
+  }
+
+  const dropzone = $('dropzone'), fileInput = $('fileInput');
+  dropzone.addEventListener('click', ()=>fileInput.click());
+  fileInput.addEventListener('change', ()=>{ if(fileInput.files.length) addFiles(fileInput.files); fileInput.value = ''; });
+  ['dragenter','dragover'].forEach(ev=>dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.classList.add('dragover'); }));
+  ['dragleave','drop'].forEach(ev=>dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.classList.remove('dragover'); }));
+  dropzone.addEventListener('drop', e=>{ if(e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+
+  $('clearBtn').addEventListener('click', async ()=>{
+    if(!(await showConfirm('Tirar todos os desenhos da lista?', { okLabel:'Limpar' }))) return;
+    items.length = 0;
+    render();
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* GUARDAR DXF                                                       */
+  /* ---------------------------------------------------------------- */
+  function blobOf(it){ return new Blob([binToBytes(it.an.outBin)], { type:'application/dxf' }); }
+  function downloadOne(it){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blobOf(it));
+    a.download = it.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  }
+
+  $('saveAllBtn').addEventListener('click', async ()=>{
+    const ready = items.filter(i=>i.status==='ok');
+    if(!window.showDirectoryPicker){
+      ready.forEach((it,k)=>setTimeout(()=>downloadOne(it), k*250));
+      return;
+    }
+    let dir;
+    try{ dir = await window.showDirectoryPicker({ id:'limpar-dxf', mode:'readwrite' }); }
+    catch(e){ return; }
+    const existing = [];
+    for(const it of ready){
+      try{ await dir.getFileHandle(it.name); existing.push(it.name); }catch(e){}
+    }
+    if(existing.length){
+      const ok = await showConfirm('Já existem nesta pasta ' + existing.length + ' ficheiro(s) com o mesmo nome:\n' + existing.slice(0,8).join('\n') + (existing.length>8?'\n…':'') + '\n\nSubstituir pelos desenhos limpos?', { okLabel:'Substituir', danger:true });
+      if(!ok) return;
+    }
+    try{
+      for(const it of ready){
+        const fh = await dir.getFileHandle(it.name, { create:true });
+        const w = await fh.createWritable();
+        await w.write(blobOf(it));
+        await w.close();
+      }
+      showAlert(ready.length + (ready.length===1 ? ' ficheiro gravado' : ' ficheiros gravados') + ' na pasta "' + dir.name + '".');
+    }catch(err){
+      showAlert('Não foi possível gravar: ' + (err.message||err));
+    }
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* PDF                                                               */
+  /* ---------------------------------------------------------------- */
+  $('pdfBtn').addEventListener('click', ()=>{
+    const ready = items.filter(i=>i.status==='ok');
+    if(!ready.length) return;
+    const client = $('clientInput').value.trim();
+    const now = new Date();
+    const totalQty = ready.reduce((s,i)=>s+(parseInt(i.info.quantidade,10)||0),0);
+    const meta = [client, ready.length + (ready.length===1?' desenho':' desenhos'), totalQty + ' peças',
+      'gerado em ' + now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})].filter(Boolean);
+
+    let html = '<div class="p-logo"><img src="logo.svg" alt="Serralharia José Gabriel P. V. do Couto"></div>';
+    html += '<div class="p-title">Lista de peças</div>';
+    html += '<div class="p-meta">' + meta.map(escapeHtml).join(' · ') + '</div>';
+    html += '<table class="ld-p-table"><thead><tr><th>Desenho</th><th>Peça</th><th>Material</th><th class="num">Espessura</th><th class="num">Qt.</th><th class="num">Comprimento</th><th class="num">Medidas da peça</th></tr></thead><tbody>';
+    ready.forEach(it=>{
+      const d = partDims(it.an);
+      html += '<tr>' +
+        '<td>' + thumbSVG(it.an, 'ld-p-thumb', false) + '</td>' +
+        '<td class="mono">' + escapeHtml(it.name.replace(/\.dxf$/i,'')) + '</td>' +
+        '<td>' + escapeHtml(it.info.material||'—') + '</td>' +
+        '<td class="num">' + (it.info.espessura ? escapeHtml(it.info.espessura) + ' mm' : '—') + '</td>' +
+        '<td class="num"><strong>' + escapeHtml(it.info.quantidade||'—') + '</strong></td>' +
+        '<td class="num">' + (it.info.comprimento ? escapeHtml(it.info.comprimento) + ' mm' : '—') + '</td>' +
+        '<td class="num mono">' + fmtMm(d.w) + ' × ' + fmtMm(d.h) + ' mm</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table>';
+
+    // Resumo por material/espessura — o que é preciso de cada chapa.
+    const groups = new Map();
+    ready.forEach(it=>{
+      const k = (it.info.material||'—') + '|' + (it.info.espessura||'—');
+      const g = groups.get(k) || { mat: it.info.material||'—', esp: it.info.espessura||'—', n:0, q:0 };
+      g.n++; g.q += parseInt(it.info.quantidade,10)||0;
+      groups.set(k, g);
+    });
+    html += '<h3 class="ld-p-h">Resumo por material</h3>';
+    html += '<table class="ld-p-table"><thead><tr><th>Material</th><th class="num">Espessura</th><th class="num">Desenhos</th><th class="num">Peças</th></tr></thead><tbody>';
+    Array.from(groups.values()).forEach(g=>{
+      html += '<tr><td>' + escapeHtml(g.mat) + '</td><td class="num">' + escapeHtml(g.esp) + (g.esp!=='—'?' mm':'') + '</td><td class="num">' + g.n + '</td><td class="num"><strong>' + g.q + '</strong></td></tr>';
+    });
+    html += '</tbody></table>';
+
+    $('printSheet').innerHTML = html;
+    const originalTitle = document.title;
+    document.title = ('Lista de peças ' + (client || '') + ' ' + now.toISOString().slice(0,10)).replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,' ').trim();
+    const img = $('printSheet').querySelector('img');
+    let done = false;
+    const go = ()=>{ if(done) return; done = true; window.print(); setTimeout(()=>{ document.title = originalTitle; }, 500); };
+    if(!img || img.complete) go(); else { img.addEventListener('load', go); img.addEventListener('error', go); setTimeout(go, 1500); }
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* CRIAR ENCOMENDAS — uma por desenho, gravadas como as da           */
+  /* Encomenda Chapa (servidor central ou este aparelho).              */
+  /* ---------------------------------------------------------------- */
+  function dxfTextOf(it){ return decodeText(it.an.outBin, it.an.utf8); }
+
+  function buildRecord(it, orderNumber, r, material){
+    const orderState = $('stateSel').value;
+    const fromDrawing = [
+      it.info.material,
+      it.info.espessura ? 'esp. ' + it.info.espessura + ' mm' : '',
+      it.info.quantidade ? 'qt. ' + it.info.quantidade : '',
+      it.info.comprimento ? 'C=' + it.info.comprimento + ' mm' : '',
+    ].filter(Boolean).join(' · ');
+    return {
+      id: 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+      client: $('clientInput').value.trim(),
+      comments: 'Importado do DXF do cliente' + (fromDrawing ? ' (' + fromDrawing + ')' : '') + '.',
+      clientRef: null,
+      orderState,
+      wasQuoted: orderState === 'quote',
+      orderName: it.pieceName.trim(),
+      orderNumber,
+      createdAt: new Date().toISOString(),
+      mode: 'dxf',
+      pieceType: 'sheet',
+      geometryScope: 'unit',
+      dxfFileName: it.name,
+      dxfText: dxfTextOf(it),
+      manual: null,
+      materialId: material.id,
+      materialSnapshot: { name:material.name, thickness:material.thickness, speed:material.speed, density:material.density, pricePerKg:material.pricePerKg, markupPct:material.markupPct },
+      quantity: r.qty,
+      machineSnapshot: Object.assign({}, app.machine),
+      costSnapshot: {
+        totalCost: r.totalCost, avgPerPiece: r.avgPerPiece,
+        cuttingTimeMin: r.cuttingTimeMin, pierces: r.geo.pierces,
+        corteCost: r.corteCost,
+        materialCost: r.materialCostPerPiece, weightPerPiece: r.weightPerPiece, weightTotal: r.weightTotal,
+        designCost: r.designCost, setupCost: r.setupCost, preCorteCost: r.preCorteCost,
+        subtotal: r.subtotal, adjustmentValue: r.adjustmentValue, adjustmentReason: r.adjustmentReason,
+        realCost: r.realCost, marginValue: r.marginValue, marginPct: r.marginPct,
+        isFinal: r.isFinalDisplay,
+        estimadoCuttingTimeMin: r.estimatedCuttingTimeMin,
+        geoSnapshot: {
+          widthMm: r.geo.width, heightMm: r.geo.height,
+          perimeterMm: r.geo.perimeterMm, netAreaMm2: r.geo.netAreaMm2,
+          batch: false,
+        },
+        setupInputs: { drawingType: r.drawingType, designTimeMin: r.designTimeMin, setupTimeMin: r.setupTimeMin },
+        completedAt: null,
+      },
+    };
+  }
+
+  async function saveRecord(rec){
+    if(app.remote.configured){
+      // Dois aparelhos podem gerar o mesmo número quase ao mesmo tempo — a base de dados rejeita
+      // o duplicado e tenta-se com o número seguinte (igual à Encomenda Chapa).
+      for(let attempt=0; ; attempt++){
+        try{ await remoteInsertOrder(app.remote, rec); break; }
+        catch(err){
+          const isDupNumber = /orders_order_number_unique|duplicate key/i.test(err.message||'');
+          if(!isDupNumber || attempt>=3) throw err;
+          rec.orderNumber = await computeNextOrderNumber(app.remote, app.orders);
+        }
+      }
+      app.orders.unshift(rec);
+    } else {
+      app.orders.unshift(rec);
+      await saveOrders(app.orders);
+      const verify = await loadOrders();
+      if(!verify.some(o=>o.id===rec.id)){
+        app.orders.shift();
+        throw new Error('o armazenamento deste navegador não aceitou a gravação (pode estar cheio ou bloqueado)');
+      }
+    }
+  }
+
+  $('createBtn').addEventListener('click', async ()=>{
+    const list = items.filter(i=>!i.created && i.status==='ok' && !problemsOf(i).length);
+    if(!list.length) return;
+    const client = $('clientInput').value.trim();
+    if(!client){
+      await showAlert('Indique o cliente antes de criar as encomendas.');
+      $('clientInput').focus();
+      return;
+    }
+    const left = items.filter(i=>!i.created && i.status==='ok' && problemsOf(i).length).length;
+    const toQuote = $('stateSel').value === 'quote';
+    const total = list.reduce((s,i)=>s + costFor(i).totalCost, 0);
+    const ok = await showConfirm(
+      'Criar ' + list.length + (list.length===1 ? ' encomenda' : ' encomendas') + ' para "' + client + '", em ' + (toQuote ? 'Orçamento' : 'Produção') + '?\n' +
+      'Total: ' + fmtEUR(total) + ' sem IVA.' +
+      (left ? '\n\n' + left + (left===1 ? ' desenho com dados em falta fica' : ' desenhos com dados em falta ficam') + ' de fora.' : ''),
+      { okLabel:'Criar' });
+    if(!ok) return;
+
+    const hint = $('createHint');
+    creating = true;
+    $('createBtn').disabled = true;
+    render();
+    const made = [];
+    let error = null, folderFails = 0;
+    try{
+      for(const it of list){
+        $('createBtn').textContent = 'A criar… (' + (made.length+1) + '/' + list.length + ')';
+        const r = costFor(it), material = findAppMaterial(it);
+        const rec = buildRecord(it, await computeNextOrderNumber(app.remote, app.orders), r, material);
+        await saveRecord(rec);
+        it.created = rec.orderNumber;
+        made.push(rec.orderNumber);
+        if(app.localFolder.ready){
+          const fr = await writeOrderToLocalFolder(app.localFolder.handle, rec);
+          if(!fr.ok && !fr.skipped) folderFails++;
+        }
+        render();
+      }
+    }catch(err){
+      error = err;
+    }
+    creating = false;
+    render();
+
+    const dest = toQuote ? '<a href="orcamentos.html">Orçamentos</a>' : '<a href="producao.html">Produção</a>';
+    let msg = '';
+    if(made.length){
+      msg = '✓ ' + made.length + (made.length===1 ? ' encomenda criada' : ' encomendas criadas') + ' (' + escapeHtml(made[0]) + (made.length>1 ? ' a ' + escapeHtml(made[made.length-1]) : '') + ') — ver em ' + dest + '.';
+      if(folderFails) msg += ' Falhou a gravação de ' + folderFails + ' na pasta local.';
+    }
+    if(error){
+      msg += (msg ? ' ' : '') + '<span style="color:var(--danger)">Não foi possível criar ' + (made.length ? 'as restantes' : 'as encomendas') + ': ' + escapeHtml(error.message||String(error)) + '</span>';
+    }
+    hint.style.color = error ? '' : 'var(--readout)';
+    hint.innerHTML = msg;
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* ARRANQUE                                                          */
+  /* ---------------------------------------------------------------- */
+  function updateConnBadge(){
+    const badge = $('connBadge');
+    if(app.remote.configured){ badge.textContent = '● servidor central'; badge.className = 'conn-badge conn-online'; }
+    else { badge.textContent = '● só este aparelho'; badge.className = 'conn-badge conn-local'; }
+  }
+
+  async function init(){
+    appMaterials = await loadMaterials();
+    app.machine = await loadMachine();
+    app.remote = await loadRemoteConfig();
+    updateConnBadge();
+    let ordersError = null;
+    try{
+      // Lista sem os ficheiros DXF — só serve para os números e para sugerir clientes.
+      app.orders = app.remote.configured ? await remoteLoadOrders(app.remote, {light:true}) : await loadOrders();
+    }catch(e){ app.orders = []; ordersError = e; }
+    const clients = Array.from(new Set(app.orders.map(o=>(o.client||'').trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt'));
+    $('clientList').innerHTML = clients.map(c=>'<option value="' + escapeHtml(c) + '">').join('');
+
+    if('showDirectoryPicker' in window){
+      try{
+        const handle = await idbGet('rootDir');
+        if(handle && (await handle.queryPermission({mode:'readwrite'}))==='granted') app.localFolder = { ready:true, handle };
+      }catch(e){ /* sem pasta ligada */ }
+    }
+
+    items.forEach(it=>{ if(!it.appMaterial) it.appMaterial = mapMaterial(it.info.material); });
+    render();
+    $('loadingVeil').classList.add('done');
+    if(ordersError) showAlert('Não foi possível ligar ao servidor central (' + ordersError.message + ').\n\nPode ler e limpar os desenhos, mas criar encomendas vai falhar até a ligação voltar.');
+  }
+
+  render();
+  init();
+  registerServiceWorker();
+})();
+</script>
+</body>
+</html>
