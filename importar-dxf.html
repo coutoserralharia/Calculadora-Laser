@@ -33,6 +33,17 @@
   .ld-thumb{width:150px; height:110px; background:var(--canvas-bg); border:1px solid var(--border-soft); border-radius:7px; display:block;}
   .ld-thumb .k{stroke:var(--readout); fill:none; stroke-width:1.2; vector-effect:non-scaling-stroke;}
   .ld-thumb .r{stroke:var(--danger); fill:none; stroke-width:0.8; opacity:.55; vector-effect:non-scaling-stroke;}
+  .ld-thumb-btn{padding:0; border:none; background:none; cursor:zoom-in; display:block; border-radius:7px;}
+  .ld-thumb-btn:hover .ld-thumb, .ld-thumb-btn:focus-visible .ld-thumb{border-color:var(--accent);}
+  /* Desenho ampliado — fecha ao carregar fora dele (ou Esc). */
+  .ld-zoom{position:fixed; inset:0; z-index:250; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(0,0,0,0.6); cursor:zoom-out;}
+  .ld-zoom[hidden]{display:none;}
+  .ld-zoom-box{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px; box-shadow:0 12px 40px rgba(0,0,0,0.35); cursor:default; max-width:100%;}
+  .ld-zoom-svg{display:block; width:min(1000px, calc(100vw - 72px)); height:min(680px, calc(100vh - 140px)); background:var(--canvas-bg); border-radius:7px;}
+  .ld-zoom-svg .k{stroke:var(--readout); fill:none; stroke-width:1.6; vector-effect:non-scaling-stroke;}
+  .ld-zoom-svg .r{stroke:var(--danger); fill:none; stroke-width:1; opacity:.6; vector-effect:non-scaling-stroke;}
+  .ld-zoom-cap{display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:10px; font-size:12.5px; color:var(--text-muted);}
+  .ld-zoom-cap strong{font-family:"JetBrains Mono",monospace; color:var(--text);}
   .ld-ocr{max-width:190px; max-height:110px; display:block; background:#fff; border-radius:6px; border:1px solid var(--border-soft);}
   .ld-file{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text); word-break:break-all;}
   .ld-sub{font-size:11px; color:var(--text-dim); margin-top:4px; line-height:1.5;}
@@ -162,6 +173,8 @@
   </footer>
 
 </div>
+
+<div class="ld-zoom" id="zoomOverlay" hidden role="dialog" aria-modal="true" aria-label="Desenho ampliado"><div class="ld-zoom-box" id="zoomBox"></div></div>
 
 <div id="printSheet" class="print-sheet"></div>
 
@@ -961,7 +974,7 @@
       const dis = (it.status!=='ok' || it.created || creating) ? ' disabled' : '';
       const inp = (f, w) => '<input type="text" data-id="' + it.id + '" data-f="' + f + '" value="' + escapeHtml(it.info[f]||'') + '"' + dis + (w?' style="width:'+w+'"':'') + '>';
       return '<tr>' +
-        '<td>' + (it.an ? thumbSVG(it.an, 'ld-thumb', true) : '<div class="ld-thumb"></div>') + '</td>' +
+        '<td>' + (it.an ? '<button type="button" class="ld-thumb-btn" data-zoom="' + it.id + '" title="Ampliar o desenho">' + thumbSVG(it.an, 'ld-thumb', true) + '</button>' : '<div class="ld-thumb"></div>') + '</td>' +
         '<td><input type="text" data-id="' + it.id + '" data-f="pieceName" value="' + escapeHtml(it.pieceName) + '"' + dis + ' style="min-width:150px;"><div class="ld-sub">' + escapeHtml(it.name) + '</div>' + statusHtml + '</td>' +
         '<td>' + textCell + '</td>' +
         '<td>' + inp('material') + '</td>' +
@@ -993,9 +1006,30 @@
       $('countLbl').textContent = items.length + (items.length===1?' desenho':' desenhos') + ' · ' + ready.reduce((s,i)=>s+(parseInt(i.info.quantidade,10)||0),0) + ' peças';
     }
   });
+  // Desenho ampliado: abre ao carregar na miniatura, fecha ao carregar fora dele ou com Esc.
+  const zoomOverlay = $('zoomOverlay'), zoomBox = $('zoomBox');
+  let zoomReturnFocus = null;
+  function openZoom(it){
+    const d = partDims(it.an);
+    zoomBox.innerHTML = thumbSVG(it.an, 'ld-zoom-svg', true) +
+      '<div class="ld-zoom-cap"><span><strong>' + escapeHtml(it.pieceName || it.name) + '</strong> · ' + fmtMm(d.w) + ' × ' + fmtMm(d.h) + ' mm</span>' +
+      '<span class="ld-legend" style="margin:0;"><span><i style="background:var(--readout)"></i>fica (peça)</span><span><i style="background:var(--danger)"></i>sai (texto, molduras)</span></span></div>';
+    zoomReturnFocus = document.activeElement;
+    zoomOverlay.hidden = false;
+  }
+  function closeZoom(){
+    if(zoomOverlay.hidden) return;
+    zoomOverlay.hidden = true;
+    zoomBox.innerHTML = '';
+    if(zoomReturnFocus && zoomReturnFocus.focus) zoomReturnFocus.focus();
+  }
+  zoomOverlay.addEventListener('click', ev=>{ if(!zoomBox.contains(ev.target)) closeZoom(); });
+  document.addEventListener('keydown', ev=>{ if(ev.key==='Escape') closeZoom(); });
+
   rowsEl.addEventListener('change', ev=>{ if(['comprimento','material','espessura','appMaterial','quantidade','pieceName'].includes(ev.target.dataset.f)) render(); });
   rowsEl.addEventListener('click', ev=>{
-    const dl = ev.target.closest('[data-dl]'), rm = ev.target.closest('[data-rm]');
+    const dl = ev.target.closest('[data-dl]'), rm = ev.target.closest('[data-rm]'), zoom = ev.target.closest('[data-zoom]');
+    if(zoom){ const it = items.find(i=>i.id===+zoom.dataset.zoom); if(it && it.an) openZoom(it); return; }
     if(dl){ const it = items.find(i=>i.id===+dl.dataset.dl); if(it) downloadOne(it); }
     if(rm){ const k = items.findIndex(i=>i.id===+rm.dataset.rm); if(k>=0){ items.splice(k,1); render(); } }
   });
