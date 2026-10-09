@@ -167,7 +167,7 @@
 <script>
 (function(){
   "use strict";
-  const { escapeHtml, fmtNum, fmtEUR, showAlert, showConfirm, registerServiceWorker, parseDXF,
+  const { escapeHtml, searchKey, fmtNum, fmtEUR, showAlert, showConfirm, registerServiceWorker, parseDXF,
     sheetGeometryFromDXF, computeSheetCost, loadMaterials, loadMachine, loadOrders, saveOrders,
     loadRemoteConfig, remoteLoadOrders, remoteInsertOrder, computeNextOrderNumber,
     idbGet, writeOrderToLocalFolder } = window.LC;
@@ -1101,7 +1101,7 @@
   $('pdfBtn').addEventListener('click', ()=>{
     const ready = items.filter(i=>i.status==='ok');
     if(!ready.length) return;
-    const client = $('clientInput').value.trim();
+    const client = clientName();
     const now = new Date();
     const totalQty = ready.reduce((s,i)=>s+(parseInt(i.info.quantidade,10)||0),0);
     const meta = [client, ready.length + (ready.length===1?' desenho':' desenhos'), totalQty + ' peças',
@@ -1165,7 +1165,7 @@
     ].filter(Boolean).join(' · ');
     return {
       id: 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
-      client: $('clientInput').value.trim(),
+      client: clientName(),
       comments: 'Importado do DXF do cliente' + (fromDrawing ? ' (' + fromDrawing + ')' : '') + '.',
       clientRef: null,
       orderState,
@@ -1231,7 +1231,8 @@
   $('createBtn').addEventListener('click', async ()=>{
     const list = items.filter(i=>!i.created && i.status==='ok' && !problemsOf(i).length);
     if(!list.length) return;
-    const client = $('clientInput').value.trim();
+    const client = clientName();
+    $('clientInput').value = client;
     if(!client){
       await showAlert('Indique o cliente antes de criar as encomendas.');
       $('clientInput').focus();
@@ -1289,6 +1290,26 @@
   /* ---------------------------------------------------------------- */
   /* ARRANQUE                                                          */
   /* ---------------------------------------------------------------- */
+  // Clientes já usados, sem repetir os que só diferem em maiúsculas/minúsculas ou acentos
+  // (fica a primeira forma escrita) — igual à Encomenda Chapa.
+  function knownClients(){
+    const seen = new Map();
+    app.orders.forEach(o=>{
+      const n = (o.client||'').trim();
+      if(!n) return;
+      const k = searchKey(n);
+      if(!seen.has(k)) seen.set(k, n);
+    });
+    return Array.from(seen.values()).sort((a,b)=>a.localeCompare(b,'pt'));
+  }
+  // O cliente escrito; se já existir com outras maiúsculas/minúsculas, usa-se o nome existente
+  // para as encomendas ficarem todas no mesmo cliente.
+  function clientName(){
+    const typed = $('clientInput').value.trim();
+    const k = searchKey(typed);
+    return knownClients().find(n=>searchKey(n)===k) || typed;
+  }
+
   function updateConnBadge(){
     const badge = $('connBadge');
     if(app.remote.configured){ badge.textContent = '● servidor central'; badge.className = 'conn-badge conn-online'; }
@@ -1305,8 +1326,7 @@
       // Lista sem os ficheiros DXF — só serve para os números e para sugerir clientes.
       app.orders = app.remote.configured ? await remoteLoadOrders(app.remote, {light:true}) : await loadOrders();
     }catch(e){ app.orders = []; ordersError = e; }
-    const clients = Array.from(new Set(app.orders.map(o=>(o.client||'').trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt'));
-    $('clientList').innerHTML = clients.map(c=>'<option value="' + escapeHtml(c) + '">').join('');
+    $('clientList').innerHTML = knownClients().map(c=>'<option value="' + escapeHtml(c) + '">').join('');
 
     if('showDirectoryPicker' in window){
       try{
