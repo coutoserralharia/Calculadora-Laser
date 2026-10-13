@@ -142,6 +142,7 @@
         <div class="ld-actions">
           <button class="ghost-btn accent" id="createBtn" type="button" disabled>Criar encomendas</button>
           <button class="ghost-btn" id="saveAllBtn" type="button" disabled>Guardar DXF limpos…</button>
+          <button class="ghost-btn" id="mergeBtn" type="button" disabled>Juntar num só DXF…</button>
           <button class="ghost-btn" id="pdfBtn" type="button" disabled><svg class="btn-icon" viewBox="0 0 16 16"><path d="M4 6V2h8v4M4 12H2V7h12v5h-2M4 10h8v4H4z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>Lista de peças (PDF)</button>
           <button class="ghost-btn" id="clearBtn" type="button" disabled>Limpar lista</button>
         </div>
@@ -954,6 +955,7 @@
     const ready = items.filter(i=>i.status==='ok');
     $('countLbl').textContent = items.length ? (items.length + (items.length===1?' desenho':' desenhos') + (ready.length ? ' · ' + ready.reduce((s,i)=>s+(parseInt(i.info.quantidade,10)||0),0) + ' peças' : '')) : '';
     $('saveAllBtn').disabled = !ready.length;
+    $('mergeBtn').disabled = !ready.length;
     $('pdfBtn').disabled = !ready.length;
     $('clearBtn').disabled = !items.length;
     const creatable = items.filter(i=>!i.created && i.status==='ok' && !problemsOf(i).length);
@@ -1130,6 +1132,191 @@
     }catch(err){
       showAlert('Não foi possível gravar: ' + (err.message||err));
     }
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* JUNTAR NUM SÓ DXF                                                 */
+  /* As peças limpas vão lado a lado, em filas, num único ficheiro. As */
+  /* entidades são copiadas tal como estão (arcos, círculos e curvas   */
+  /* exatos) e só se deslocam. O cabeçalho e as tabelas vêm do 1º      */
+  /* ficheiro; cada entidade recebe um identificador (handle) novo.     */
+  /* ---------------------------------------------------------------- */
+  // Códigos de coordenadas a deslocar, por tipo de entidade (x → +10 no código do y).
+  const SHIFT_CODES = {
+    LINE:[10,11], CIRCLE:[10], ARC:[10], LWPOLYLINE:[10], VERTEX:[10], SPLINE:[10,11],
+    ELLIPSE:[10], POINT:[10], INSERT:[10], SOLID:[10,11,12,13], TRACE:[10,11,12,13],
+    DIMENSION:[10,11,13,14,15,16], LEADER:[10],
+  };
+  // Estas guardam as coordenadas no sistema da entidade (OCS): se estiver "virada" (extrusão -Z),
+  // o X anda ao contrário.
+  const OCS_TYPES = new Set(['CIRCLE','ARC','LWPOLYLINE','POLYLINE','VERTEX','INSERT','SOLID','TRACE']);
+
+  function fmtCoord(v){ return String(Math.round(v*1e6)/1e6); }
+
+  // Lista de nomes de uma tabela (LAYER, LTYPE) e o handle do *Model_Space no ficheiro base.
+  function baseTables(lines){
+    const layers = new Set(), ltypes = new Set();
+    let inTable = '', entry = '', handle = null, name = null, modelSpace = null;
+    const flush = ()=>{
+      if(entry==='LAYER' && name) layers.add(name.toUpperCase());
+      if(entry==='LTYPE' && name) ltypes.add(name.toUpperCase());
+      if(entry==='BLOCK_RECORD' && name && name.toUpperCase()==='*MODEL_SPACE') modelSpace = handle;
+      entry = ''; handle = null; name = null;
+    };
+    for(let i=0;i+1<lines.length;i+=2){
+      const c = lines[i].trim(), v = lines[i+1].trim();
+      if(c==='0'){
+        flush();
+        if(v==='TABLE'){ inTable = 'T'; continue; }
+        if(v==='ENDTAB'){ inTable = ''; continue; }
+        if(v==='ENDSEC' && inTable!=='') inTable = '';
+        if(inTable) entry = v;
+        continue;
+      }
+      if(!entry) continue;
+      if(c==='2' && name===null) name = v;
+      if(c==='5' && handle===null) handle = v;
+    }
+    flush();
+    return { layers, ltypes, modelSpace };
+  }
+
+  function maxHandle(lines){
+    let max = 0;
+    for(let i=0;i+1<lines.length;i+=2){
+      const c = lines[i].trim();
+      if(c==='5' || c==='105'){
+        const h = parseInt(lines[i+1].trim(), 16);
+        if(isFinite(h) && h>max) max = h;
+      }
+    }
+    return max;
+  }
+
+  // Copia as linhas de uma entidade já deslocada (dx, dy), com handle novo.
+  function copyEntity(ent, srcLines, dx, dy, ctx){
+    const out = [];
+    const ocsFlip = OCS_TYPES.has(ent.type) && ent.g.some(([c,v])=>c===230 && parseFloat(v)<0);
+    const shift = new Set(SHIFT_CODES[ent.type] || []);
+    const xCodes = new Set(), yCodes = new Set();
+    shift.forEach(c=>{ xCodes.add(c); yCodes.add(c+10); });
+    let inGroup102 = false;
+    out.push(srcLines[ent.start].replace(/\s+$/,''), ent.type);
+    for(let i=ent.start+2; i<ent.end; i+=2){
+      const c = parseInt(srcLines[i].trim(), 10), raw = srcLines[i+1];
+      const v = raw.trim();
+      if(c===102){ inGroup102 = v.startsWith('{'); continue; } // reactores/dicionários: referências a objetos do ficheiro de origem
+      if(inGroup102) continue;
+      let val = raw;
+      if(c===5){ val = (ctx.nextHandle++).toString(16).toUpperCase(); }
+      else if(c===330){ if(!ctx.modelSpace) continue; val = ctx.modelSpace; }
+      else if(c===8 && !ctx.layers.has(v.toUpperCase())){ val = '0'; }
+      else if(c===6 && !ctx.ltypes.has(v.toUpperCase())){ continue; }
+      else if(xCodes.has(c)){ const n = parseFloat(v); if(isFinite(n)) val = fmtCoord(n + (ocsFlip ? -dx : dx)); }
+      else if(yCodes.has(c)){ const n = parseFloat(v); if(isFinite(n)) val = fmtCoord(n + dy); }
+      out.push(srcLines[i].replace(/\s+$/,''), val);
+    }
+    return out;
+  }
+
+  // Posições das peças: filas da esquerda para a direita, a mais alta primeiro, sem passar uma
+  // largura parecida com a de um quadrado com a área de todas.
+  function layoutParts(parts, gap){
+    const sorted = parts.slice().sort((a,b)=>b.h-a.h || b.w-a.w);
+    const area = sorted.reduce((s,p)=>s+(p.w+gap)*(p.h+gap), 0);
+    const rowMax = Math.max(Math.max.apply(null, sorted.map(p=>p.w)), Math.sqrt(area)*1.3);
+    let x = 0, y = 0, rowH = 0;
+    const placed = [];
+    sorted.forEach(p=>{
+      if(x>0 && x + p.w > rowMax){ x = 0; y -= rowH + gap; rowH = 0; }
+      placed.push({ part:p, x, y: y - p.h }); // filas a crescer para baixo; (x, y) = canto inferior esquerdo
+      x += p.w + gap;
+      rowH = Math.max(rowH, p.h);
+    });
+    return placed;
+  }
+
+  function mergeParts(list, withQty, gap){
+    const parts = [];
+    list.forEach(it=>{
+      const b = it.an.partBox;
+      const copies = withQty ? (qtyOf(it) || 1) : 1;
+      for(let k=0;k<copies;k++) parts.push({ it, w:b.maxX-b.minX, h:b.maxY-b.minY });
+    });
+    const placed = layoutParts(parts, gap);
+
+    const base = readDxf(list[0].an.outBin);
+    const tables = baseTables(base.lines);
+    const ctx = { nextHandle: maxHandle(base.lines) + 1, layers: tables.layers, ltypes: tables.ltypes, modelSpace: tables.modelSpace };
+    if(!ctx.layers.size) ctx.layers.add('0');
+
+    const parsed = new Map();
+    const entLines = [];
+    const previewPts = [];
+    placed.forEach(({ part, x, y })=>{
+      const it = part.it;
+      if(!parsed.has(it)) parsed.set(it, readDxf(it.an.outBin));
+      const src = parsed.get(it);
+      const dx = x - it.an.partBox.minX, dy = y - it.an.partBox.minY;
+      src.units.forEach(u=>u.ents.forEach(ent=>{ entLines.push.apply(entLines, copyEntity(ent, src.lines, dx, dy, ctx)); }));
+      it.an.keptPts.forEach(pts=>previewPts.push(pts.map(([px,py])=>[px+dx, py+dy])));
+    });
+
+    // Ficheiro final: tudo do 1º ficheiro, com a secção ENTITIES trocada pelas peças arrumadas.
+    const L = base.lines;
+    let entStart = -1, entEnd = -1;
+    for(let i=0;i+1<L.length;i+=2){
+      if(L[i].trim()==='2' && L[i+1].trim()==='ENTITIES') entStart = i+2;
+      else if(entStart>=0 && L[i].trim()==='0' && L[i+1].trim()==='ENDSEC'){ entEnd = i; break; }
+    }
+    const out = L.slice(0, entStart).concat(entLines, L.slice(entEnd));
+    for(let i=0;i+3<out.length;i+=2){
+      if(out[i].trim()==='9' && out[i+1].trim()==='$HANDSEED'){ out[i+3] = ctx.nextHandle.toString(16).toUpperCase(); break; }
+    }
+    const bb = bboxOf(previewPts);
+    if(bb) updateExtents(out, bb);
+    return { bin: out.join(base.eol) + (base.trailingEol ? base.eol : ''), previewPts, bbox: bb, count: placed.length };
+  }
+
+  function mergeFileName(){
+    const client = $('clientInput').value.trim();
+    return LC_sanitize((client ? client + ' - ' : '') + 'peças juntas ' + new Date().toISOString().slice(0,10)) + '.dxf';
+  }
+  const LC_sanitize = window.LC.sanitizeFileName;
+
+  let mergeState = { withQty:false, gap:10, result:null };
+  function renderMerge(){
+    const list = items.filter(i=>i.status==='ok');
+    let res;
+    try{ res = mergeParts(list, mergeState.withQty, mergeState.gap); }
+    catch(err){ zoomBox.innerHTML = '<div class="ld-status err">Não foi possível juntar: ' + escapeHtml(err.message||String(err)) + '</div>'; return; }
+    mergeState.result = res;
+    const b = res.bbox, w = Math.max(b.maxX-b.minX, 1e-6), h = Math.max(b.maxY-b.minY, 1e-6);
+    const s = 1000/Math.max(w,h), pad = 10;
+    const svg = '<svg class="ld-zoom-svg" viewBox="' + (-pad) + ' ' + (-pad) + ' ' + (w*s+pad*2).toFixed(1) + ' ' + (h*s+pad*2).toFixed(1) + '" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><path class="k" d="' + svgPath(res.previewPts, b, h, s) + '"/></svg>';
+    zoomBox.innerHTML = svg +
+      '<div class="ld-zoom-cap" style="align-items:center;">' +
+        '<span><strong>' + res.count + (res.count===1 ? ' peça' : ' peças') + '</strong> · ' + fmtMm(w) + ' × ' + fmtMm(h) + ' mm</span>' +
+        '<span style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">' +
+          '<label class="ld-opt" style="margin:0;"><input type="checkbox" id="mergeQty"' + (mergeState.withQty?' checked':'') + '> Repetir cada peça pela quantidade</label>' +
+          '<label class="ld-opt" style="margin:0;">Espaço entre peças <input type="number" id="mergeGap" min="0" step="1" value="' + mergeState.gap + '" style="width:64px; padding:5px 6px;"> mm</label>' +
+          '<button class="ghost-btn accent" type="button" id="mergeDlBtn">Descarregar DXF</button>' +
+        '</span>' +
+      '</div>';
+    $('mergeQty').addEventListener('change', e=>{ mergeState.withQty = e.target.checked; renderMerge(); });
+    $('mergeGap').addEventListener('change', e=>{ const g = parseFloat(e.target.value); mergeState.gap = isFinite(g) && g>=0 ? g : 10; renderMerge(); });
+    $('mergeDlBtn').addEventListener('click', ()=>{
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([binToBytes(mergeState.result.bin)], { type:'application/dxf' }));
+      a.download = mergeFileName();
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+    });
+  }
+  $('mergeBtn').addEventListener('click', ()=>{
+    zoomReturnFocus = document.activeElement;
+    zoomOverlay.hidden = false;
+    renderMerge();
   });
 
   /* ---------------------------------------------------------------- */
