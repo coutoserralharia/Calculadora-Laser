@@ -280,7 +280,7 @@
     } else {
       drawDXF(rec.dxfText);
       $('specsGrid').innerHTML =
-        '<div><p class="k">Material</p><p class="v">' + escapeHtml((ms&&ms.name)||'—') + '</p></div>' +
+        '<div><p class="k">Material</p><p class="v">' + escapeHtml((ms&&ms.name)||'—') + (ms && ms.clientSupplied ? ' <small>(do cliente)</small>' : '') + '</p></div>' +
         '<div><p class="k">Espessura</p><p class="v">' + (ms ? ms.thickness+' mm' : '—') + '</p></div>' +
         '<div><p class="k">Medidas</p><p class="v">' + (cs.geoSnapshot && cs.geoSnapshot.widthMm ? fmtNum(cs.geoSnapshot.widthMm,0)+' x '+fmtNum(cs.geoSnapshot.heightMm,0)+' mm' : '—') + '</p></div>' +
         '<div><p class="k">Quantidade</p><p class="v">' + (rec.quantity||1) + ' peças</p></div>';
@@ -345,7 +345,7 @@
     html += pRow('Nº da encomenda', escapeHtml(rec.orderNumber||'—'));
     html += pRow('Encomenda / peça', escapeHtml(rec.orderName||'—'));
     html += pRow('Cliente', escapeHtml(rec.client||'—'));
-    html += pRow(isTube?'Perfil':'Material', escapeHtml((ms&&ms.name)||'—') + (isTube||!ms ? '' : ' — '+ms.thickness+'mm'));
+    html += pRow(isTube?'Perfil':'Material', escapeHtml((ms&&ms.name)||'—') + (isTube||!ms ? '' : ' — '+ms.thickness+'mm' + (ms.clientSupplied ? ' (fornecido pelo cliente)' : '')));
     html += pRow('Quantidade', rec.quantity||1);
     html += '</div>';
     html += '<div class="p-section">';

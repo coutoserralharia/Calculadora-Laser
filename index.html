@@ -228,6 +228,10 @@
           <select id="materialThicknessSelect"></select>
         </div>
         <select id="materialSelect" style="display:none;" aria-hidden="true" tabindex="-1"></select>
+        <label class="client-mat-opt" for="clientMaterialChk">
+          <input type="checkbox" id="clientMaterialChk">
+          <span>Material fornecido pelo cliente<small>Não entra no preço — cobra-se só o corte e a preparação.</small></span>
+        </label>
         <div class="breakdown-row" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-soft);"><span class="lbl">Peso unitário (1 peça)</span><span class="val" id="valWeightUnit">—</span></div>
         <div class="breakdown-row" style="border-bottom:none; padding-bottom:0;"><span class="lbl">Peso total<small id="weightTotalSub">—</small></span><span class="val" id="valWeightTotal">—</span></div>
       </div>
@@ -394,6 +398,7 @@
   const dimEmptyEl = $('dimEmpty');
   const orderNameInp = $('orderName'), clientNameInp = $('clientName');
   const orderCommentsInp = $('orderComments');
+  const clientMaterialChk = $('clientMaterialChk');
   const statePicker = $('statePicker');
   const clientSuggestionsEl = $('clientSuggestions');
   const adjustmentValueInput = $('adjustmentValueInput'), adjustmentReasonSelect = $('adjustmentReasonSelect');
@@ -601,6 +606,11 @@
     applySelectedMaterialFromDropdowns();
   });
   materialThicknessSelect.addEventListener('change', applySelectedMaterialFromDropdowns);
+  // Material do cliente: sai do preço e a nota entra/sai sozinha nos comentários.
+  clientMaterialChk.addEventListener('change', ()=>{
+    orderCommentsInp.value = window.LC.withClientMaterialNote(orderCommentsInp.value, clientMaterialChk.checked);
+    recalcAndRender();
+  });
 
   function populateMaterialSelect(){
     materialSelect.innerHTML = '';
@@ -670,6 +680,7 @@
       setupTimeMin: parseFloat(setupTimeInput.value)||0,
       adjustmentValue: parseFloat(adjustmentValueInput.value) || 0,
       adjustmentReason: adjustmentReasonSelect.value,
+      clientMaterial: clientMaterialChk.checked,
     });
   }
 
@@ -868,7 +879,7 @@
       html += '<div class="p-preview-big">' + (svg || '<div class="p-noprev">Sem pré-visualização disponível</div>') + '</div>';
 
       html += '<div class="p-section">';
-      html += pRow('Material', material ? material.name : '—');
+      html += pRow('Material', material ? material.name + (result.clientMaterial ? ' (fornecido pelo cliente)' : '') : '—');
       html += pRow('Espessura', material ? (material.thickness + ' mm') : '—');
       html += pRow('Quantidade', qty);
       html += '</div>';
@@ -889,6 +900,7 @@
         client: clientNameInp.value.trim(),
         source: state.dxfResult ? (state.dxfFileName || 'Ficheiro DXF') : describeManualShape(),
         material, qty, geo,
+        clientMaterial: result.clientMaterial,
         weightPerPiece: result.valid ? result.weightPerPiece : 0,
         drawing: printDrawing(),
         dxf: state.dxfResult,
@@ -904,7 +916,7 @@
     html += pRow('Encomenda / peça', orderName);
     html += pRow('Cliente', client);
     html += pRow('Ficheiro / forma', source);
-    html += pRow('Material', material ? material.name : '—');
+    html += pRow('Material', material ? material.name + (result.clientMaterial ? ' (fornecido pelo cliente)' : '') : '—');
     html += pRow('Espessura', material ? (material.thickness + ' mm') : '—');
     html += pRow('Quantidade a produzir', qty);
     html += '</div>';
@@ -922,7 +934,7 @@
 
     html += '<div class="p-section">';
     html += '<div class="p-costs-title">Custo da encomenda' + (result.valid ? '' : '') + '</div>';
-    html += pRow('Custo total do material', result.valid ? fmtEUR(result.materialCostTotal) : '—');
+    html += pRow('Custo total do material', result.valid ? (result.clientMaterial ? fmtEUR(0) + ' (material do cliente)' : fmtEUR(result.materialCostTotal)) : '—');
     html += pRow('Custo pré-corte', result.valid ? fmtEUR(result.preCorteCost) : '—');
     if(result.valid){
       const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[result.drawingType] || result.drawingType;
@@ -1144,7 +1156,9 @@
       ? 'já é o total (chapa aninhada) · ' + fmtNum(result.weightPerPiece,2) + ' kg/peça em média'
       : (result.qty>1 ? (result.qty+' × '+fmtNum(result.weightPerPiece,2)+' kg') : 'igual ao unitário (1 peça)');
 
-    $('matInfoSub').textContent = result.material.name+' '+result.material.thickness+'mm · €/kg'+(result.isBatchGeometry ? ' · já é o total' : (result.qty>1 ? ' · '+fmtEUR(result.materialCostPerPiece)+'/peça' : ''));
+    $('matInfoSub').textContent = result.clientMaterial
+      ? result.material.name+' '+result.material.thickness+'mm · fornecido pelo cliente'
+      : result.material.name+' '+result.material.thickness+'mm · €/kg'+(result.isBatchGeometry ? ' · já é o total' : (result.qty>1 ? ' · '+fmtEUR(result.materialCostPerPiece)+'/peça' : ''));
     $('costMaterial').textContent = fmtEUR(result.materialCostTotal);
 
     $('preCorteSub').textContent = 'Desenho '+fmtNum(result.designTimeMin,0)+'min ('+fmtEUR(result.designCost)+') + Setup '+fmtNum(result.setupTimeMin,0)+'min ('+fmtEUR(result.setupCost)+')';
@@ -1230,6 +1244,7 @@
     orderNameInp.value = '';
     clientNameInp.value = '';
     orderCommentsInp.value = '';
+    clientMaterialChk.checked = false;
     qtyInput.value = 1;
     state.dxfResult = null;
     state.dxfFileName = '';
@@ -1283,6 +1298,7 @@
     orderNameInp.value = o.orderName || '';
     clientNameInp.value = o.client || '';
     orderCommentsInp.value = o.comments || '';
+    clientMaterialChk.checked = !!(o.materialSnapshot && o.materialSnapshot.clientSupplied);
     qtyInput.value = o.quantity || 1;
     const savedBatch = o.costSnapshot && o.costSnapshot.geoSnapshot && o.costSnapshot.geoSnapshot.batch;
     geometryScopeSelect.value = o.geometryScope || (savedBatch ? 'batch' : 'unit');
@@ -1449,7 +1465,7 @@
         dxfText: state.mode==='dxf' ? state.dxfRawText : null,
         manual: state.mode==='manual' ? collectManualInputs() : null,
         materialId: material ? material.id : null,
-        materialSnapshot: material ? {name:material.name, thickness:material.thickness, speed:material.speed, density:material.density, pricePerKg:material.pricePerKg, markupPct:material.markupPct} : null,
+        materialSnapshot: material ? {name:material.name, thickness:material.thickness, speed:material.speed, density:material.density, pricePerKg:material.pricePerKg, markupPct:material.markupPct, ...(clientMaterialChk.checked ? {clientSupplied:true} : {})} : null,
         quantity: Math.max(1, parseInt(qtyInput.value,10)||1),
         machineSnapshot: Object.assign({}, state.machine),
         costSnapshot: result.valid ? {

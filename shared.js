@@ -21,6 +21,15 @@
     .filter(ch => { const c = ch.codePointAt(0); return c < 0x0300 || c > 0x036f; }) // remove marcas de acentuação (combining diacritics)
     .join('').toLowerCase();
 
+  // Material fornecido pelo cliente: nota que entra/sai sozinha no início dos comentários
+  // (aparece na ficha do operador). As outras linhas escritas mantêm-se.
+  LC.CLIENT_MATERIAL_NOTE = 'Material fornecido pelo cliente.';
+  LC.withClientMaterialNote = function(comments, on){
+    const lines = String(comments||'').split('\n').filter(l=>l.trim() !== LC.CLIENT_MATERIAL_NOTE);
+    if(on) lines.unshift(LC.CLIENT_MATERIAL_NOTE);
+    return lines.join('\n').replace(/^\n+|\n+$/g,'');
+  };
+
   // Clientes: o mesmo cliente escrito com outras maiúsculas/minúsculas ou acentos conta como um
   // só. knownClients devolve um nome por cliente (a 1ª forma gravada); canonicalClient devolve o
   // nome já existente para o que foi escrito (ou o escrito, se for um cliente novo) — usado ao
@@ -340,7 +349,8 @@
   };
 
   // p = { geo, material, qty, machine, isBatch, realTimeMin (null = estimado), drawingType,
-  //       designTimeMin, setupTimeMin, adjustmentValue, adjustmentReason }
+  //       designTimeMin, setupTimeMin, adjustmentValue, adjustmentReason,
+  //       clientMaterial (true = material fornecido pelo cliente: não entra no preço) }
   LC.computeSheetCost = function(p){
     const geo = p.geo, material = p.material, machine = p.machine;
     const qty = Math.max(1, parseInt(p.qty,10)||1);
@@ -352,6 +362,7 @@
     // "unit" = o ficheiro/dimensões são de 1 peça só, multiplica-se pela quantidade (padrão).
     // "batch" = já representam a chapa/corte de todas as peças juntas (aninhadas), não se multiplica.
     const isBatchGeometry = !!p.isBatch;
+    const clientMaterial = !!p.clientMaterial;
 
     // Tempo estimado TOTAL da encomenda: corte + perfurações, multiplicado pela quantidade só
     // quando o ficheiro/dimensões são de 1 peça — se já forem de todas juntas, usa-se tal qual.
@@ -380,7 +391,8 @@
     }
     const areaM2 = areaMm2/1e6;
     const weightFromGeometry = areaM2 * (material.thickness||0) * (material.density||0);
-    const basePricePerKg = material.pricePerKg||0;
+    // Material fornecido pelo cliente: não entra no preço nem no custo real (o peso fica como informação).
+    const basePricePerKg = clientMaterial ? 0 : (material.pricePerKg||0);
     const effectivePricePerKg = basePricePerKg * (1 + (material.markupPct||0)/100);
     const materialCostFromGeometry = weightFromGeometry * effectivePricePerKg;
     const materialCostBaseFromGeometry = weightFromGeometry * basePricePerKg;   // sem margem
@@ -422,6 +434,7 @@
       setupCost,
       totalCost, avgPerPiece,
       isFinalDisplay: isFinalTime,
+      clientMaterial,
     };
   };
 
@@ -662,7 +675,8 @@
   // Ficha do operador ("Ordem de Corte — Operador") de uma peça de chapa — a mesma folha para a
   // Encomenda Chapa e para o Importar DXF (várias fichas seguidas).
   // d = { orderNumber, orderName, client, source, material, qty, geo, weightPerPiece,
-  //       drawing (ver buildPrintSVG), dxf (resultado do parseDXF, ou null), comments, dateStr }
+  //       drawing (ver buildPrintSVG), dxf (resultado do parseDXF, ou null), comments, dateStr,
+  //       clientMaterial }
   function operatorSheetHTML(d){
     const material = d.material, geo = d.geo;
     let html = '';
@@ -681,7 +695,7 @@
     html += '<div class="p-preview-big">' + (svg || '<div class="p-noprev">Sem pré-visualização disponível</div>') + '</div>';
 
     html += '<div class="p-section">';
-    html += pRow('Material', material ? material.name : '—');
+    html += pRow('Material', material ? material.name + (d.clientMaterial ? ' (fornecido pelo cliente)' : '') : '—');
     html += pRow('Espessura', material ? (material.thickness + ' mm') : '—');
     html += pRow('Quantidade a produzir', d.qty);
     html += '</div>';
@@ -1464,7 +1478,7 @@
       }
       return lines.join('\n');
     }
-    lines.push('Material: ' + (ms ? (ms.name + (ms.thickness != null ? ' — ' + ms.thickness + ' mm' : '')) : '—'));
+    lines.push('Material: ' + (ms ? (ms.name + (ms.thickness != null ? ' — ' + ms.thickness + ' mm' : '') + (ms.clientSupplied ? ' (fornecido pelo cliente)' : '')) : '—'));
     lines.push('Quantidade: ' + (rec.quantity || 1));
     if(rec.costSnapshot && rec.costSnapshot.weightPerPiece > 0){
       lines.push('Peso unitário (1 peça): ' + fmtNum(rec.costSnapshot.weightPerPiece,2) + ' kg');

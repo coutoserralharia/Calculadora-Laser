@@ -609,3 +609,10 @@
   .lc-modal-actions{display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap;}
   .ghost-btn.danger{background:var(--danger); color:#2a0a0a; border-color:var(--danger); font-weight:600;}
   .ghost-btn.danger:hover{filter:brightness(1.08);}
+
+  /* ---- Material fornecido pelo cliente (Encomenda Chapa e Importar DXF) — destaca-se quando marcado ---- */
+  .client-mat-opt{display:flex; gap:10px; align-items:flex-start; margin-top:12px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--panel-2); cursor:pointer; font-size:13px; color:var(--text);}
+  .client-mat-opt input{margin-top:2px; width:16px; height:16px; accent-color:var(--accent); flex:0 0 auto;}
+  .client-mat-opt small{display:block; font-size:11.5px; color:var(--text-dim); margin-top:2px;}
+  .client-mat-opt:has(input:checked){border-color:var(--accent); background:rgba(59,130,246,0.08);}
+  :root[data-theme="light"] .client-mat-opt:has(input:checked){background:rgba(230,80,31,0.06);}

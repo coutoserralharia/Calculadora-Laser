@@ -137,6 +137,7 @@
         <div class="field-row">
           <div class="field"><label for="clientInput">Cliente</label><input type="text" id="clientInput" placeholder="Nome do cliente" list="clientList" autocomplete="off"><datalist id="clientList"></datalist></div>
           <div class="field"><label for="stateSel">Estado inicial</label><select id="stateSel"><option value="production">Produção</option><option value="quote">Orçamento</option></select></div>
+          <label class="client-mat-opt" for="clientMatChk" style="grid-column:1/-1; margin:0 0 10px;"><input type="checkbox" id="clientMatChk"><span>Material fornecido pelo cliente<small>Não entra no preço — vale para todas as encomendas desta lista.</small></span></label>
         </div>
         <p class="save-hint" style="margin:0;">Uma encomenda por desenho, com o nome do ficheiro como nome da peça e o DXF já limpo. Preço calculado como na Encomenda Chapa (converter desenho do cliente, 2 min de desenho, setup das Definições — pode alterar depois na encomenda).</p>
         <div class="ld-actions">
@@ -913,6 +914,7 @@
       isBatch: false, realTimeMin: null,
       drawingType: 'client_convert', designTimeMin: IMPORT_DESIGN_MIN, setupTimeMin: app.machine.defaultSetupMin ?? 5,
       adjustmentValue: 0, adjustmentReason: '',
+      clientMaterial: $('clientMatChk').checked,
     };
   }
   // O que impede esta linha de virar encomenda (lista vazia = pronta).
@@ -1078,6 +1080,9 @@
     }
     render();
   }
+
+  // Material do cliente (para todas as encomendas da lista): os preços da tabela atualizam logo.
+  $('clientMatChk').addEventListener('change', render);
 
   const dropzone = $('dropzone'), fileInput = $('fileInput');
   dropzone.addEventListener('click', ()=>fileInput.click());
@@ -1390,7 +1395,7 @@
     return {
       id: 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
       client: clientName(),
-      comments: 'Importado do DXF do cliente' + (fromDrawing ? ' (' + fromDrawing + ')' : '') + '.',
+      comments: window.LC.withClientMaterialNote('Importado do DXF do cliente' + (fromDrawing ? ' (' + fromDrawing + ')' : '') + '.', $('clientMatChk').checked),
       clientRef: null,
       orderState,
       wasQuoted: orderState === 'quote',
@@ -1404,7 +1409,7 @@
       dxfText: dxfTextOf(it),
       manual: null,
       materialId: material.id,
-      materialSnapshot: { name:material.name, thickness:material.thickness, speed:material.speed, density:material.density, pricePerKg:material.pricePerKg, markupPct:material.markupPct },
+      materialSnapshot: { name:material.name, thickness:material.thickness, speed:material.speed, density:material.density, pricePerKg:material.pricePerKg, markupPct:material.markupPct, ...($('clientMatChk').checked ? {clientSupplied:true} : {}) },
       quantity: r.qty,
       machineSnapshot: Object.assign({}, app.machine),
       costSnapshot: {
@@ -1467,7 +1472,7 @@
     const total = list.reduce((s,i)=>s + costFor(i).totalCost, 0);
     const ok = await showConfirm(
       'Criar ' + list.length + (list.length===1 ? ' encomenda' : ' encomendas') + ' para "' + client + '", em ' + (toQuote ? 'Orçamento' : 'Produção') + '?\n' +
-      'Total: ' + fmtEUR(total) + ' sem IVA.' +
+      'Total: ' + fmtEUR(total) + ' sem IVA' + ($('clientMatChk').checked ? ' (material fornecido pelo cliente)' : '') + '.' +
       (left ? '\n\n' + left + (left===1 ? ' desenho com dados em falta fica' : ' desenhos com dados em falta ficam') + ' de fora.' : ''),
       { okLabel:'Criar' });
     if(!ok) return;
@@ -1545,6 +1550,7 @@
         drawing: window.LC.sheetDrawingFromDXF(it.dxf),
         dxf: it.dxf,
         comments: rec.comments,
+        clientMaterial: !!(rec.materialSnapshot && rec.materialSnapshot.clientSupplied),
         dateStr,
       }) + '</div>';
     }).join('');
