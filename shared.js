@@ -1865,6 +1865,13 @@
       items: [ { label:'OK', result:undefined, cls:'accent', autofocus:true } ],
     });
   };
+  // Pergunta com várias respostas: items = [{ label, value, accent? }]; Esc devolve null.
+  LC.showChoice = function(message, items){
+    return openModal(message, {
+      escResult: null,
+      items: items.map((it, i)=>({ label: it.label, result: it.value, cls: it.accent ? 'accent' : '', autofocus: !!it.accent })),
+    });
+  };
 
   (function(){
   /* Helpers de formatação usados pelo desenho IGES (partilhado entre tubo.html e producao-item.html). */

@@ -1518,13 +1518,22 @@
     hint.innerHTML = msg;
     if(lastCreated.length){
       // Fica também um botão, para voltar a imprimir mais tarde.
-      hint.insertAdjacentHTML('beforeend', ' <button class="ghost-btn sm" type="button" id="printOpBtn" style="margin-left:6px;">Imprimir fichas do operador (' + lastCreated.length + ')</button>');
-      $('printOpBtn').addEventListener('click', ()=>printOperatorSheets(lastCreated));
       const n = lastCreated.length;
-      const wantPrint = await showConfirm(
-        (n===1 ? 'Encomenda criada.' : n + ' encomendas criadas.') + '\n\nImprimir já ' + (n===1 ? 'a ficha do operador?' : 'as ' + n + ' fichas do operador (uma por folha)?'),
-        { okLabel:'Imprimir fichas', cancelLabel:'Agora não' });
-      if(wantPrint) printOperatorSheets(lastCreated);
+      hint.insertAdjacentHTML('beforeend', ' <button class="ghost-btn sm" type="button" id="printOpBtn" style="margin-left:6px;">' +
+        (n===1 ? 'Imprimir ficha do operador' : 'Fichas do operador num só PDF (' + n + ')') + '</button>' +
+        (n>1 ? ' <button class="ghost-btn sm" type="button" id="printOpSepBtn" style="margin-left:6px;">Um PDF por encomenda (' + n + ')</button>' : ''));
+      $('printOpBtn').addEventListener('click', ()=>printOperatorSheets(lastCreated));
+      if(n>1) $('printOpSepBtn').addEventListener('click', ()=>printOperatorSheetsSeparately(lastCreated));
+      if(n===1){
+        const wantPrint = await showConfirm('Encomenda criada.\n\nImprimir já a ficha do operador?', { okLabel:'Imprimir ficha', cancelLabel:'Agora não' });
+        if(wantPrint) printOperatorSheets(lastCreated);
+      } else {
+        const choice = await window.LC.showChoice(
+          n + ' encomendas criadas.\n\nImprimir já as fichas do operador?\n\n• Num só PDF — todas seguidas, uma por folha.\n• Um PDF por encomenda — abre a impressão ' + n + ' vezes, uma por ficha, já com o nome "nº - peça"; em cada uma é só carregar em Guardar.',
+          [ { label:'Agora não', value:null }, { label:'Num só PDF', value:'one' }, { label:'Um PDF por encomenda', value:'each', accent:true } ]);
+        if(choice === 'one') printOperatorSheets(lastCreated);
+        else if(choice === 'each') printOperatorSheetsSeparately(lastCreated);
+      }
     }
   });
 
@@ -1532,11 +1541,55 @@
   /* FICHAS DO OPERADOR — as mesmas da Encomenda Chapa, uma por folha.  */
   /* ---------------------------------------------------------------- */
   let lastCreated = []; // [{ it, rec }] das encomendas criadas na última vez
+  function nowStr(){
+    const now = new Date();
+    return now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'});
+  }
+  // Espera pelo logótipo da ficha (senão sai em branco na impressão), com limite de tempo.
+  function printImagesReady(){
+    const img = $('printSheet').querySelector('img');
+    if(!img || img.complete) return Promise.resolve();
+    return new Promise(res=>{ img.addEventListener('load', res, {once:true}); img.addEventListener('error', res, {once:true}); setTimeout(res, 1500); });
+  }
+  // Todas as fichas numa só impressão (uma por folha).
   function printOperatorSheets(list){
     if(!list.length) return;
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'});
-    $('printSheet').innerHTML = list.map(({ it, rec })=>{
+    $('printSheet').innerHTML = list.map(entry=>operatorSheetBlock(entry, nowStr())).join('');
+    const originalTitle = document.title;
+    const first = list[0].rec, last = list[list.length-1].rec;
+    document.title = ('Fichas operador ' + first.orderNumber + (list.length>1 ? ' a ' + last.orderNumber : '') + ' - ' + (first.client || '')).replace(/[\\/:*?"<>|]+/g,'_').trim();
+    printImagesReady().then(()=>{ window.print(); setTimeout(()=>{ document.title = originalTitle; }, 500); });
+  }
+  // Uma impressão por encomenda — ao escolher "Guardar como PDF" sai um ficheiro por ficha, já com
+  // o nome "nº - peça" (o mesmo da ficha do operador na Encomenda Chapa).
+  async function printOperatorSheetsSeparately(list){
+    if(!list.length) return;
+    const originalTitle = document.title;
+    const dateStr = nowStr();
+    const sleep = ms => new Promise(r=>setTimeout(r, ms));
+    for(let i=0; i<list.length; i++){
+      const rec = list[i].rec;
+      setPrintProgress('A abrir a ficha ' + (i+1) + ' de ' + list.length + ' (' + rec.orderNumber + ')…');
+      $('printSheet').innerHTML = operatorSheetBlock(list[i], dateStr);
+      document.title = LC_sanitize((rec.orderNumber ? rec.orderNumber + ' - ' : '') + (rec.orderName || 'encomenda'));
+      await printImagesReady();
+      await sleep(50);
+      const t0 = Date.now();
+      window.print();
+      // O Chrome ignora um pedido de impressão logo a seguir a um "Cancelar" (volta ao fim de ~2 s):
+      // se a janela nem chegou a abrir, espera e tenta outra vez, para nenhuma ficha ficar de fora.
+      if(Date.now() - t0 < 150){ await sleep(2300); window.print(); }
+      await sleep(400);
+    }
+    document.title = originalTitle;
+    setPrintProgress('✓ ' + list.length + (list.length===1 ? ' ficha aberta' : ' fichas abertas, uma de cada vez') + '.');
+  }
+  function setPrintProgress(text){
+    let el = $('printProgress');
+    if(!el){ el = document.createElement('span'); el.id = 'printProgress'; el.style.cssText = 'margin-left:8px; color:var(--text-muted);'; $('createHint').appendChild(el); }
+    el.textContent = text;
+  }
+  function operatorSheetBlock({ it, rec }, dateStr){
       const r = computeSheetCost(costInputs(it));
       return '<div class="ld-op-sheet">' + window.LC.operatorSheetHTML({
         orderNumber: rec.orderNumber,
@@ -1553,14 +1606,6 @@
         clientMaterial: !!(rec.materialSnapshot && rec.materialSnapshot.clientSupplied),
         dateStr,
       }) + '</div>';
-    }).join('');
-    const originalTitle = document.title;
-    const first = list[0].rec, last = list[list.length-1].rec;
-    document.title = ('Fichas operador ' + first.orderNumber + (list.length>1 ? ' a ' + last.orderNumber : '') + ' - ' + (first.client || '')).replace(/[\\/:*?"<>|]+/g,'_').trim();
-    const img = $('printSheet').querySelector('img');
-    let done = false;
-    const go = ()=>{ if(done) return; done = true; window.print(); setTimeout(()=>{ document.title = originalTitle; }, 500); };
-    if(!img || img.complete) go(); else { img.addEventListener('load', go); img.addEventListener('error', go); setTimeout(go, 1500); }
   }
 
   /* ---------------------------------------------------------------- */
