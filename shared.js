@@ -64,12 +64,14 @@
     if (Math.abs(bulge) < 1e-9 || chord < 1e-9) return { points:[p2], length:chord };
     const theta = 4*Math.atan(bulge);
     const radius = Math.abs(chord/(2*Math.sin(theta/2)));
-    const sign = bulge >= 0 ? 1 : -1;
     const mx=(p1.x+p2.x)/2, my=(p1.y+p2.y)/2;
     const dx=p2.x-p1.x, dy=p2.y-p1.y;
-    const ux=-dy/chord, uy=dx/chord;
-    const h=Math.sqrt(Math.max(radius*radius-(chord/2)*(chord/2),0));
-    const cx=mx-sign*ux*h, cy=my-sign*uy*h;
+    const ux=-dy/chord, uy=dx/chord; // normal à esquerda do sentido p1→p2
+    // Distância (com sinal) do meio da corda ao centro: bulge > 0 = arco no sentido anti-horário,
+    // centro à esquerda; serve também para arcos maiores que 180° (|bulge| > 1). Antes o centro
+    // ficava do lado contrário e os cantos arredondados saíam virados para dentro.
+    const d = chord*(1-bulge*bulge)/(4*bulge);
+    const cx=mx+ux*d, cy=my+uy*d;
     const a1=Math.atan2(p1.y-cy,p1.x-cx);
     const points=[];
     for(let i=1;i<=segments;i++){
