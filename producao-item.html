@@ -101,6 +101,7 @@
       <h2 class="card-title"><span class="dot"></span>Resumo do preço</h2>
       <div class="pi-price-row"><span class="lbl">Custo total estimado</span><span class="val" id="estTotal">—</span></div>
       <div class="pi-price-row"><span class="lbl">Preço por peça estimado</span><span class="val" id="estPerPiece">—</span></div>
+      <div class="pi-price-row" id="estTimeRow" style="display:none;"><span class="lbl">Tempo de corte sugerido <small style="color:var(--text-dim);">(total, todas as peças)</small></span><span class="val" id="estTime">—</span></div>
 
       <button class="ghost-btn sm" id="showAdjustmentBtn" type="button" style="margin:10px 0 4px;">+ Ajuste comercial</button>
       <div class="field" id="adjustmentFields" hidden style="margin:10px 0 0;">
@@ -289,6 +290,16 @@
     const estTotal = cs.isFinal ? null : cs.totalCost;
     $('estTotal').textContent = isFinite(cs.totalCost) ? fmtEUR(cs.totalCost) : '—';
     $('estPerPiece').textContent = isFinite(cs.avgPerPiece) ? fmtEUR(cs.avgPerPiece) : '—';
+    // Tempo sugerido = estimativa original (fica fixa mesmo depois do tempo real). Encomendas antigas
+    // sem esse campo: enquanto ainda são estimativa, o tempo gravado é o estimado. Tubo: não há estimativa.
+    const estMin = isFinite(cs.estimadoCuttingTimeMin) && cs.estimadoCuttingTimeMin != null ? cs.estimadoCuttingTimeMin
+      : (!cs.isFinal && isFinite(cs.cuttingTimeMin) ? cs.cuttingTimeMin : null);
+    // style.display (e não "hidden"): o display:flex da linha sobrepunha-se ao atributo hidden.
+    $('estTimeRow').style.display = (isTube || estMin == null || estMin <= 0) ? 'none' : '';
+    if(estMin != null){
+      const tot = Math.round(estMin), h = Math.floor(tot/60), m = tot%60;
+      $('estTime').textContent = fmtNum(estMin, 1) + ' min' + (h ? ' (' + h + ' h ' + String(m).padStart(2,'0') + ')' : '');
+    }
     if(cs.isFinal && isFinite(cs.cuttingTimeMin)) $('realTimeInput').value = cs.cuttingTimeMin.toFixed(1);
     adjustmentValueInput.value = cs.adjustmentValue ? cs.adjustmentValue : '';
     adjustmentReasonSelect.value = cs.adjustmentReason || '';
