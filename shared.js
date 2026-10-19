@@ -753,6 +753,51 @@
   LC.detectSheetHoles = detectHoles;
   LC.pRow = pRow;
   LC.operatorSheetHTML = operatorSheetHTML;
+
+  // Ficha interna (custos de fabrico) — impressa ao fechar a encomenda na Produção, sozinha
+  // (producao-item.html) ou em lote ("Registar tempo do grupo" em producao.html).
+  LC.internalSheetHTML = function(rec){
+    const fmtEUR = LC.fmtEUR, fmtNum = LC.fmtNum, escapeHtml = LC.escapeHtml;
+    const cs = rec.costSnapshot || {};
+    const isTube = rec.pieceType === 'tube';
+    const ms = rec.materialSnapshot;
+    const now = new Date();
+    let html = '<div class="p-logo"><img src="logo.svg" alt="Serralharia José Gabriel P. V. do Couto"></div>';
+    html += '<div class="p-title">Ficha Interna — Custos de Fabrico</div>';
+    html += '<div class="p-meta">Gerado em ' + now.toLocaleDateString('pt-PT') + ' ' + now.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) + '</div>';
+    html += '<div class="p-section">';
+    html += pRow('Nº da encomenda', escapeHtml(rec.orderNumber||'—'));
+    html += pRow('Encomenda / peça', escapeHtml(rec.orderName||'—'));
+    html += pRow('Cliente', escapeHtml(rec.client||'—'));
+    html += pRow(isTube?'Perfil':'Material', escapeHtml((ms&&ms.name)||'—') + (isTube||!ms ? '' : ' — '+ms.thickness+'mm' + (ms.clientSupplied ? ' (fornecido pelo cliente)' : '')));
+    html += pRow('Quantidade', rec.quantity||1);
+    html += '</div>';
+    html += '<div class="p-section">';
+    html += '<div class="p-costs-title">Custo da encomenda</div>';
+    html += pRow('Custo total do material', isFinite(cs.materialCost) ? fmtEUR(cs.materialCost*(rec.quantity||1)) : '—');
+    html += pRow('Custo pré-corte', isFinite(cs.preCorteCost) ? fmtEUR(cs.preCorteCost) : '—');
+    html += pRow('Custo total do corte', isFinite(cs.corteCost) ? (fmtEUR(cs.corteCost)+' ('+fmtNum(cs.cuttingTimeMin,1)+' min, '+(cs.isFinal?'real':'estimado')+')') : '—');
+    if(cs.adjustmentValue){
+      html += pRow('Subtotal', fmtEUR(cs.subtotal));
+      html += pRow('Ajuste comercial' + (cs.adjustmentReason?' ('+escapeHtml(cs.adjustmentReason)+')':''), (cs.adjustmentValue>0?'+':'')+fmtEUR(cs.adjustmentValue));
+    }
+    html += '</div>';
+    html += '<div class="p-totals">';
+    html += '<div class="p-total-item p-total-main"><span>Total da encomenda — sem IVA</span><strong>' + (isFinite(cs.totalCost)?fmtEUR(cs.totalCost):'—') + '</strong></div>';
+    html += '<div class="p-total-item"><span>Total ÷ nº peças — sem IVA</span><strong>' + (isFinite(cs.avgPerPiece)?fmtEUR(cs.avgPerPiece):'—') + '</strong></div>';
+    html += '</div>';
+    if(isFinite(cs.realCost)){
+      html += '<div class="p-section p-margin-box"><div class="p-costs-title">Margem (uso interno)</div>';
+      html += pRow('Custo real para a empresa', fmtEUR(cs.realCost));
+      html += pRow('Margem', fmtEUR(cs.marginValue) + (cs.marginPct!=null?' · '+fmtNum(cs.marginPct,1)+'%':''));
+      html += '</div>';
+    }
+    const commentsText = (rec.comments||'').trim();
+    html += '<div class="p-notes-box"><div class="p-notes-title">Comentários</div>' +
+      (commentsText ? '<div class="p-notes-text">'+escapeHtml(commentsText).replace(/\n/g,'<br>')+'</div>' : '<div class="p-notes-lines"><span></span><span></span></div>') + '</div>';
+    html += '<div class="p-sign"><div>Operador: ______________________</div><div>Data: ______________</div></div>';
+    return html;
+  };
   })();
 
   /* ---------------------------------------------------------------- */

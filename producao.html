@@ -44,6 +44,8 @@
   .pg-actions{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
   .pg-actions .hint{font-size:12px; color:var(--text-muted);}
   .pg-off{color:var(--text-dim); font-size:12px;}
+  /* Fichas internas seguidas — cada uma começa numa folha nova. */
+  .print-sheet .pg-sheet + .pg-sheet{page-break-before:always; break-before:page;}
 </style>
 </head>
 <body>
@@ -104,6 +106,8 @@
   </footer>
 
 </div>
+
+<div id="printSheet" class="print-sheet"></div>
 
 <script src="shared.js"></script>
 <script>
@@ -311,6 +315,7 @@
     $('splitSave').disabled = $('splitDone').disabled = true;
     hint.style.color = '';
     let done = 0;
+    const closed = []; // encomendas gravadas, para imprimir as fichas internas a seguir
     try{
       for(const o of c.chosen){
         hint.textContent = 'A gravar ' + (done+1) + ' de ' + c.chosen.length + ' (' + (o.orderNumber||'') + ')…';
@@ -329,6 +334,7 @@
         // Atualiza a lista com o resultado (sem o DXF, para não pesar).
         const idx = state.orders.findIndex(x=>x.id===o.id);
         if(idx >= 0) state.orders[idx] = Object.assign({}, state.orders[idx], { costSnapshot: cs, orderState: full.orderState });
+        closed.push(Object.assign({}, full));
         done++;
       }
       if(!state.remote.configured) await saveOrders(state.orders);
@@ -342,7 +348,53 @@
     const key = split.key;
     split = null;
     renderList();
-    await window.LC.showAlert('✓ Tempo de ' + key + ' registado em ' + done + (done===1 ? ' encomenda' : ' encomendas') + (markDone ? ', já concluídas.' : '. Continuam em produção.'));
+    const okMsg = '✓ Tempo de ' + key + ' registado em ' + done + (done===1 ? ' encomenda' : ' encomendas') + (markDone ? ', já concluídas.' : '. Continuam em produção.');
+    if(!markDone){ await window.LC.showAlert(okMsg); return; }
+    // Como ao fechar uma encomenda sozinha: oferece logo a ficha interna com os custos.
+    if(closed.length === 1){
+      if(await window.LC.showConfirm(okMsg + '\n\nImprimir a ficha interna com os custos agora?', { okLabel:'Imprimir agora', cancelLabel:'Agora não' })) printInternalSheets(closed);
+    } else {
+      const choice = await window.LC.showChoice(
+        okMsg + '\n\nImprimir as fichas internas com os custos?\n\n• Num só PDF — todas seguidas, uma por folha.\n• Um PDF por encomenda — abre a impressão ' + closed.length + ' vezes, já com o nome de cada encomenda; em cada uma é só carregar em Guardar.',
+        [ { label:'Agora não', value:null }, { label:'Num só PDF', value:'one' }, { label:'Um PDF por encomenda', value:'each', accent:true } ]);
+      if(choice === 'one') printInternalSheets(closed);
+      else if(choice === 'each') printInternalSheetsSeparately(closed);
+    }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* FICHAS INTERNAS — as mesmas de "Fechar encomenda", uma por folha.  */
+  /* ---------------------------------------------------------------- */
+  const sheetFileName = rec => window.LC.sanitizeFileName((rec.orderNumber ? rec.orderNumber + ' (custos) - ' : '') + (rec.orderName || 'encomenda'));
+  function printImagesReady(){
+    const img = $('printSheet').querySelector('img');
+    if(!img || img.complete) return Promise.resolve();
+    return new Promise(res=>{ img.addEventListener('load', res, {once:true}); img.addEventListener('error', res, {once:true}); setTimeout(res, 1500); });
+  }
+  function printInternalSheets(list){
+    $('printSheet').innerHTML = list.map(r=>'<div class="pg-sheet">' + window.LC.internalSheetHTML(r) + '</div>').join('');
+    const orig = document.title;
+    document.title = list.length === 1 ? sheetFileName(list[0])
+      : window.LC.sanitizeFileName('Fichas internas ' + list[0].orderNumber + ' a ' + list[list.length-1].orderNumber);
+    printImagesReady().then(()=>{ window.print(); setTimeout(()=>{ document.title = orig; }, 500); });
+  }
+  // Uma impressão por encomenda — "Guardar como PDF" dá um ficheiro por ficha, com o nome da encomenda.
+  async function printInternalSheetsSeparately(list){
+    const orig = document.title;
+    const sleep = ms => new Promise(r=>setTimeout(r, ms));
+    for(const r of list){
+      $('printSheet').innerHTML = '<div class="pg-sheet">' + window.LC.internalSheetHTML(r) + '</div>';
+      document.title = sheetFileName(r);
+      await printImagesReady();
+      await sleep(50);
+      const t0 = Date.now();
+      window.print();
+      // O Chrome ignora um pedido de impressão logo a seguir a um "Cancelar" (volta ao fim de ~2 s):
+      // se a janela nem chegou a abrir, espera e tenta outra vez, para nenhuma ficha ficar de fora.
+      if(Date.now() - t0 < 150){ await sleep(2300); window.print(); }
+      await sleep(400);
+    }
+    document.title = orig;
   }
 
   async function init(){
