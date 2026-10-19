@@ -19,6 +19,31 @@
 <style>
   .layout-single{max-width:1400px; margin:0 auto;}
   .prod-empty-icon{font-size:13px; color:var(--text-dim); text-align:center; padding:30px 0;}
+  /* Grupos por material/espessura + "Tempo do grupo" (divide o tempo real de um lote). */
+  .pg-group{border-top:1px solid var(--border-soft); padding:14px 0 4px;}
+  .pg-group:first-child{border-top:0; padding-top:2px;}
+  .pg-head{display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; margin-bottom:4px;}
+  .pg-name{font-weight:600; font-size:14px;}
+  .pg-meta{font-size:12px; color:var(--text-muted);}
+  .pg-meta b{font-family:'JetBrains Mono',monospace; font-weight:500; color:var(--text);}
+  .pg-head .ghost-btn{margin-left:auto;}
+  .pg-split{margin:8px 0 12px; background:var(--panel-2); border:1px solid var(--border); border-radius:var(--radius); padding:14px; display:grid; gap:12px;}
+  .pg-split-top{display:flex; flex-wrap:wrap; gap:10px 20px; align-items:flex-end;}
+  .pg-split-top .field{margin:0;}
+  .pg-split-top .unit-suffix{width:190px;}
+  .pg-split-top input{font-family:'JetBrains Mono',monospace; font-size:15px;}
+  .pg-factor{font-size:12.5px; color:var(--text-muted);}
+  .pg-factor b{font-family:'JetBrains Mono',monospace; color:var(--readout); font-weight:600;}
+  .pg-split .hist-wrap{margin:0; padding:0;}
+  .pg-split table.hist-table{min-width:720px;}
+  .pg-split table.hist-table td{padding:8px 10px;}
+  .pg-bar{display:flex; align-items:center; gap:8px; min-width:110px;}
+  .pg-bar .b{flex:1; height:6px; border-radius:3px; background:var(--border-soft); overflow:hidden;}
+  .pg-bar .b i{display:block; height:100%; background:var(--readout);}
+  .pg-up{color:var(--danger);} .pg-down{color:#1ea672;}
+  .pg-actions{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
+  .pg-actions .hint{font-size:12px; color:var(--text-muted);}
+  .pg-off{color:var(--text-dim); font-size:12px;}
 </style>
 </head>
 <body>
@@ -58,7 +83,7 @@
           <h1>Produção</h1>
         </div>
       </div>
-      <p class="top-note">Só o que está em curso — abra uma encomenda para registar o tempo real e fechá-la.</p>
+      <p class="top-note">Só o que está em curso — abra uma encomenda para registar o tempo real e fechá-la, ou registe o tempo de um lote inteiro da mesma espessura em "Registar tempo do grupo".</p>
     </div>
   </header>
 
@@ -84,11 +109,34 @@
 <script>
 (function(){
   "use strict";
-  const { fmtEUR, escapeHtml, stateBadgeHTML, loadOrders, loadRemoteConfig,
-    remoteLoadOrders, registerServiceWorker } = window.LC;
+  const { fmtEUR, fmtNum, escapeHtml, stateBadgeHTML, loadOrders, saveOrders, loadRemoteConfig,
+    remoteLoadOrders, remoteLoadOrderById, remoteUpdateFullOrder, recomputeFinalCost, registerServiceWorker } = window.LC;
 
   const $ = id => document.getElementById(id);
   const state = { orders: [], remote: { configured:false, url:'', key:'' } };
+  // Painel "Tempo do grupo" aberto (no máximo um): { key, checked:Set(ids), real:'texto' }
+  let split = null;
+  const fmtMin = v => fmtNum(v, 1) + ' min';
+  const parseMin = s => { const v = parseFloat(String(s||'').replace(',', '.')); return Number.isFinite(v) && v >= 0 ? v : null; };
+
+  // Tempo sugerido da encomenda: a estimativa original; nas antigas sem esse campo, o tempo gravado
+  // enquanto ainda é estimativa. null = sem estimativa (tubo, ou não dá para dividir).
+  function suggestedMin(o){
+    if(o.pieceType === 'tube') return null;
+    const cs = o.costSnapshot || {};
+    if(cs.estimadoCuttingTimeMin != null && isFinite(cs.estimadoCuttingTimeMin) && cs.estimadoCuttingTimeMin > 0) return cs.estimadoCuttingTimeMin;
+    if(!cs.isFinal && isFinite(cs.cuttingTimeMin) && cs.cuttingTimeMin > 0) return cs.cuttingTimeMin;
+    return null;
+  }
+  // Lote = mesmo material e espessura (a velocidade de corte é a mesma). Tubos à parte.
+  function groupKey(o){
+    const ms = o.materialSnapshot;
+    if(o.pieceType === 'tube') return 'Tubos e perfis';
+    if(!ms) return 'Material desconhecido';
+    return ms.name + ' ' + String(ms.thickness).replace('.', ',') + ' mm';
+  }
+  const hasRealTime = o => !!(o.costSnapshot && o.costSnapshot.isFinal);
+  const canSplit = o => suggestedMin(o) != null && !!o.costSnapshot;
 
   function updateConnBadge(){
     const badge = $('connBadge');
@@ -96,40 +144,205 @@
     else { badge.textContent = '● só este aparelho'; badge.className = 'conn-badge conn-local'; }
   }
 
-  function renderList(){
-    const rows = state.orders
+  function productionRows(){
+    return state.orders
       .filter(o => (o.orderState||'production') === 'production')
       .sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  }
+  function groupedRows(){
+    const groups = {};
+    productionRows().forEach(o=>{ const k = groupKey(o); (groups[k] = groups[k] || []).push(o); });
+    // Chapas por ordem alfabética; tubos no fim.
+    return Object.keys(groups).sort((a,b)=> (a==='Tubos e perfis') - (b==='Tubos e perfis') || a.localeCompare(b, 'pt'))
+      .map(k=>({ key:k, list:groups[k] }));
+  }
 
+  function renderList(){
+    const rows = productionRows();
     $('prodCount').textContent = rows.length;
 
     if(!rows.length){
+      split = null;
       $('productionList').innerHTML = '<p class="prod-empty-icon">Nada em produção neste momento.</p>';
       return;
     }
 
-    let html = '<div class="hist-wrap"><table class="hist-table"><thead><tr>' +
-      '<th>Nº</th><th>Cliente</th><th>Peça</th><th>Tipo</th><th>Material</th>' +
-      '<th class="num">Qt.</th><th class="num">Total</th><th>Estado</th><th></th>' +
-      '</tr></thead><tbody>';
-    rows.forEach(o=>{
-      const cs = o.costSnapshot, ms = o.materialSnapshot;
-      const isTube = o.pieceType === 'tube';
-      const mat = ms ? (escapeHtml(ms.name) + (isTube ? '' : ' ' + ms.thickness + 'mm')) : '—';
-      html += '<tr>' +
-        '<td class="hist-num">' + escapeHtml(o.orderNumber||'—') + '</td>' +
-        '<td>' + escapeHtml(o.client||'—') + '</td>' +
-        '<td>' + escapeHtml(o.orderName||'—') + '</td>' +
-        '<td class="hist-dim">' + (isTube ? 'Tubo' : 'Chapa') + '</td>' +
-        '<td class="hist-dim">' + mat + '</td>' +
-        '<td class="num">' + (o.quantity||1) + '</td>' +
-        '<td class="num hist-mono hist-price">' + (cs ? fmtEUR(cs.totalCost) : '—') + '</td>' +
-        '<td>' + stateBadgeHTML(o.orderState) + '</td>' +
-        '<td class="hist-actions"><a class="ghost-btn sm" style="text-decoration:none;" href="producao-item.html?id=' + encodeURIComponent(o.id) + '">Abrir</a></td>' +
-      '</tr>';
+    let html = '';
+    groupedRows().forEach(({ key, list })=>{
+      const isTube = key === 'Tubos e perfis';
+      const splittable = list.filter(canSplit);
+      const sumEst = list.filter(o=>!hasRealTime(o)).reduce((s,o)=>s + (suggestedMin(o)||0), 0);
+      const isOpen = split && split.key === key;
+      html += '<div class="pg-group"><div class="pg-head"><span class="pg-name">' + escapeHtml(key) + '</span>' +
+        '<span class="pg-meta">' + list.length + (list.length===1 ? ' encomenda' : ' encomendas') +
+          (isTube || !sumEst ? '' : ' · sugerido por cortar <b>' + fmtMin(sumEst) + '</b>') + '</span>' +
+        (!isTube && splittable.length > 1
+          ? '<button class="ghost-btn sm' + (isOpen ? ' accent' : '') + '" type="button" data-group="' + escapeHtml(key) + '">' + (isOpen ? 'Fechar' : 'Registar tempo do grupo') + '</button>'
+          : '') +
+        '</div>';
+      if(isOpen) html += '<div class="pg-split" id="splitPanel"></div>';
+      html += '<div class="hist-wrap"><table class="hist-table"><thead><tr>' +
+        '<th>Nº</th><th>Cliente</th><th>Peça</th><th>Material</th>' +
+        '<th class="num">Qt.</th><th class="num">Sugerido</th><th class="num">Total</th><th>Estado</th><th></th>' +
+        '</tr></thead><tbody>';
+      list.forEach(o=>{
+        const cs = o.costSnapshot, ms = o.materialSnapshot;
+        const mat = ms ? (escapeHtml(ms.name) + (isTube ? '' : ' ' + ms.thickness + 'mm')) : '—';
+        const est = suggestedMin(o);
+        html += '<tr>' +
+          '<td class="hist-num">' + escapeHtml(o.orderNumber||'—') + '</td>' +
+          '<td>' + escapeHtml(o.client||'—') + '</td>' +
+          '<td>' + escapeHtml(o.orderName||'—') + '</td>' +
+          '<td class="hist-dim">' + mat + '</td>' +
+          '<td class="num">' + (o.quantity||1) + '</td>' +
+          '<td class="num hist-mono">' + (est != null ? fmtMin(est) : '—') + (hasRealTime(o) ? ' <span class="hist-final" title="Já tem tempo real registado: ' + escapeHtml(fmtMin(cs.cuttingTimeMin)) + '">✓</span>' : '') + '</td>' +
+          '<td class="num hist-mono hist-price">' + (cs ? fmtEUR(cs.totalCost) : '—') + '</td>' +
+          '<td>' + stateBadgeHTML(o.orderState) + '</td>' +
+          '<td class="hist-actions"><a class="ghost-btn sm" style="text-decoration:none;" href="producao-item.html?id=' + encodeURIComponent(o.id) + '">Abrir</a></td>' +
+        '</tr>';
+      });
+      html += '</tbody></table></div></div>';
     });
-    html += '</tbody></table></div>';
     $('productionList').innerHTML = html;
+
+    $('productionList').querySelectorAll('[data-group]').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        const key = b.getAttribute('data-group');
+        if(split && split.key === key){ split = null; renderList(); return; }
+        const list = groupedRows().find(g=>g.key===key).list;
+        // Por omissão entram todas as que ainda não têm tempo real e têm tempo sugerido.
+        split = { key, checked: new Set(list.filter(o=>canSplit(o) && !hasRealTime(o)).map(o=>o.id)), real:'' };
+        renderList();
+        const inp = $('splitReal'); if(inp) inp.focus();
+      });
+    });
+    if(split) renderSplitPanel();
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* TEMPO DO GRUPO — o colega devolve o tempo de todas as peças de uma */
+  /* espessura; divide-se pelas encomendas à proporção do tempo         */
+  /* sugerido de cada uma (perímetro × qt. ÷ velocidade + perfurações). */
+  /* ---------------------------------------------------------------- */
+  function splitCalc(){
+    const list = (groupedRows().find(g=>g.key===split.key) || { list:[] }).list.filter(canSplit);
+    const chosen = list.filter(o=>split.checked.has(o.id));
+    const sumEst = chosen.reduce((s,o)=>s + suggestedMin(o), 0);
+    const real = parseMin(split.real);
+    const ok = real != null && sumEst > 0 && chosen.length > 0;
+    return { list, chosen, sumEst, real, ok, factor: ok ? real/sumEst : null };
+  }
+  function shareOf(o, c){ return c.ok && split.checked.has(o.id) ? suggestedMin(o) * c.factor : null; }
+
+  function renderSplitPanel(){
+    const panel = $('splitPanel');
+    if(!panel) return;
+    const c = splitCalc();
+    panel.innerHTML =
+      '<div class="pg-split-top">' +
+        '<div class="field"><label for="splitReal">Tempo real do lote — todas as peças marcadas (min)</label>' +
+          '<div class="unit-suffix"><input type="text" inputmode="decimal" id="splitReal" autocomplete="off" placeholder="' + escapeHtml(fmtNum(c.sumEst,1)) + '" value="' + escapeHtml(split.real) + '"><span>min</span></div></div>' +
+        '<div class="pg-factor" id="splitFactor"></div>' +
+      '</div>' +
+      '<div class="hist-wrap"><table class="hist-table"><thead><tr>' +
+        '<th></th><th>Nº</th><th>Peça</th><th class="num">Sugerido</th><th>Parte</th><th class="num">Tempo real</th><th class="num">Preço agora</th><th class="num">Preço final</th>' +
+      '</tr></thead><tbody id="splitBody"></tbody></table></div>' +
+      '<div class="pg-actions">' +
+        '<button class="ghost-btn sm" type="button" id="splitSave">Gravar tempos</button>' +
+        '<button class="ghost-btn sm accent" type="button" id="splitDone">Gravar e concluir</button>' +
+        '<span class="hint" id="splitHint">Só o custo de corte muda; material, preparação e ajustes ficam como no orçamento.</span>' +
+      '</div>';
+    $('splitReal').addEventListener('input', e=>{ split.real = e.target.value; updateSplitPreview(); });
+    $('splitReal').addEventListener('keydown', e=>{ if(e.key === 'Escape'){ split = null; renderList(); } });
+    $('splitSave').addEventListener('click', ()=>saveSplit(false));
+    $('splitDone').addEventListener('click', ()=>saveSplit(true));
+    updateSplitPreview();
+  }
+
+  let previewSeq = 0;
+  async function updateSplitPreview(){
+    const c = splitCalc();
+    const seq = ++previewSeq;
+    $('splitFactor').innerHTML = c.ok
+      ? 'Real ÷ sugerido = <b>' + fmtNum(c.factor, 2) + '</b> · ' + (Math.abs(c.factor-1) < 0.005 ? 'igual ao sugerido'
+          : (c.factor > 1 ? 'demorou mais ' + Math.round((c.factor-1)*100) + '%' : 'demorou menos ' + Math.round((1-c.factor)*100) + '%') + ' do que o sugerido')
+      : 'Sugerido para as marcadas: <b>' + fmtMin(c.sumEst) + '</b>' + (c.chosen.length ? '' : ' — marque pelo menos uma encomenda');
+    // Preço final = mesmo cálculo do fecho individual (recomputeFinalCost), só muda o corte.
+    const finals = await Promise.all(c.list.map(o=>{
+      const m = shareOf(o, c);
+      return m == null ? null : recomputeFinalCost(o, m).catch(()=>null);
+    }));
+    if(seq !== previewSeq || !$('splitBody')) return; // já há outra atualização a caminho
+    $('splitBody').innerHTML = c.list.map((o, i)=>{
+      const on = split.checked.has(o.id);
+      const est = suggestedMin(o), m = shareOf(o, c), f = finals[i];
+      const pct = on && c.sumEst ? est / c.sumEst : 0;
+      const now = o.costSnapshot.totalCost;
+      const d = f && isFinite(f.totalCost) && isFinite(now) ? f.totalCost - now : 0;
+      return '<tr>' +
+        '<td><input type="checkbox" data-chk="' + escapeHtml(o.id) + '"' + (on ? ' checked' : '') + ' aria-label="Incluir ' + escapeHtml(o.orderNumber||'') + ' neste lote"></td>' +
+        '<td class="hist-num">' + escapeHtml(o.orderNumber||'—') + '</td>' +
+        '<td>' + escapeHtml(o.orderName||'—') + ' <span class="hist-dim">× ' + (o.quantity||1) + '</span>' + (hasRealTime(o) ? ' <span class="pg-off">(já tem ' + escapeHtml(fmtMin(o.costSnapshot.cuttingTimeMin)) + ' registados)</span>' : '') + '</td>' +
+        '<td class="num hist-mono">' + fmtMin(est) + '</td>' +
+        '<td>' + (on ? '<div class="pg-bar"><span class="b"><i style="width:' + (pct*100).toFixed(1) + '%"></i></span><span class="hist-mono hist-dim">' + Math.round(pct*100) + '%</span></div>' : '<span class="pg-off">fora deste lote</span>') + '</td>' +
+        '<td class="num hist-mono">' + (m != null ? fmtMin(m) : '—') + '</td>' +
+        '<td class="num hist-mono hist-dim">' + (isFinite(now) ? fmtEUR(now) : '—') + '</td>' +
+        '<td class="num hist-mono">' + (f && isFinite(f.totalCost) ? fmtEUR(f.totalCost) + (Math.abs(d) >= 0.005 ? ' <span class="' + (d > 0 ? 'pg-up' : 'pg-down') + '">' + (d > 0 ? '+' : '−') + fmtEUR(Math.abs(d)) + '</span>' : '') : '—') + '</td>' +
+      '</tr>';
+    }).join('');
+    $('splitBody').querySelectorAll('[data-chk]').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        const id = cb.getAttribute('data-chk');
+        if(cb.checked) split.checked.add(id); else split.checked.delete(id);
+        updateSplitPreview();
+      });
+    });
+    $('splitSave').disabled = $('splitDone').disabled = !c.ok;
+  }
+
+  async function saveSplit(markDone){
+    const c = splitCalc();
+    if(!c.ok) return;
+    const verb = markDone ? 'gravar o tempo e concluir' : 'gravar o tempo de';
+    if(!(await window.LC.showConfirm('Dividir ' + fmtMin(c.real) + ' por ' + c.chosen.length + ' encomendas de ' + split.key + ' e ' + verb + ' ' + (c.chosen.length===1 ? 'essa encomenda' : 'todas') + '?\n\n' +
+        c.chosen.map(o=>(o.orderNumber||'') + ' — ' + fmtMin(shareOf(o, c))).join('\n'),
+        { okLabel: markDone ? 'Gravar e concluir' : 'Gravar tempos' }))) return;
+    const hint = $('splitHint');
+    $('splitSave').disabled = $('splitDone').disabled = true;
+    hint.style.color = '';
+    let done = 0;
+    try{
+      for(const o of c.chosen){
+        hint.textContent = 'A gravar ' + (done+1) + ' de ' + c.chosen.length + ' (' + (o.orderNumber||'') + ')…';
+        // A lista vem sem o ficheiro DXF (modo "light") — grava-se sempre a partir do registo completo,
+        // senão o PATCH apagava o desenho.
+        const full = state.remote.configured ? await remoteLoadOrderById(state.remote, o.id) : o;
+        if(!full) throw new Error('a encomenda ' + (o.orderNumber||'') + ' já não existe');
+        const cs = await recomputeFinalCost(full, shareOf(o, c));
+        cs.batchTime = { totalMin: c.real, orders: c.chosen.length, factor: c.factor, at: new Date().toISOString() };
+        full.costSnapshot = cs;
+        if(markDone){
+          full.orderState = 'done';
+          if(!cs.completedAt) cs.completedAt = new Date().toISOString();
+        }
+        if(state.remote.configured) await remoteUpdateFullOrder(state.remote, full.id, full);
+        // Atualiza a lista com o resultado (sem o DXF, para não pesar).
+        const idx = state.orders.findIndex(x=>x.id===o.id);
+        if(idx >= 0) state.orders[idx] = Object.assign({}, state.orders[idx], { costSnapshot: cs, orderState: full.orderState });
+        done++;
+      }
+      if(!state.remote.configured) await saveOrders(state.orders);
+    }catch(err){
+      if(!state.remote.configured && done) await saveOrders(state.orders);
+      hint.style.color = 'var(--danger)';
+      hint.textContent = 'Gravadas ' + done + ' de ' + c.chosen.length + '. Não foi possível gravar a seguinte: ' + err.message;
+      updateSplitPreview();
+      return;
+    }
+    const key = split.key;
+    split = null;
+    renderList();
+    await window.LC.showAlert('✓ Tempo de ' + key + ' registado em ' + done + (done===1 ? ' encomenda' : ' encomendas') + (markDone ? ', já concluídas.' : '. Continuam em produção.'));
   }
 
   async function init(){
