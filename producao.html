@@ -23,7 +23,11 @@
   .pg-group{border-top:1px solid var(--border-soft); padding:14px 0 4px;}
   .pg-group:first-child{border-top:0; padding-top:2px;}
   .pg-head{display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; margin-bottom:4px;}
-  .pg-name{font-weight:600; font-size:14px;}
+  /* Material e espessura do grupo a azul, para se destacarem do resto do texto (azul mais claro no
+     escuro, mais escuro no claro — no modo claro a cor de destaque da app é laranja). */
+  .pg-name{font-weight:600; font-size:15px; color:#60a5fa;}
+  :root[data-theme="light"] .pg-name{color:#1d4ed8;}
+  .pg-name .pg-thk{font-family:'JetBrains Mono',monospace; font-weight:600;}
   .pg-meta{font-size:12px; color:var(--text-muted);}
   .pg-meta b{font-family:'JetBrains Mono',monospace; font-weight:500; color:var(--text);}
   .pg-head .ghost-btn{margin-left:auto;}
@@ -177,7 +181,9 @@
       const splittable = list.filter(canSplit);
       const sumEst = list.filter(o=>!hasRealTime(o)).reduce((s,o)=>s + (suggestedMin(o)||0), 0);
       const isOpen = split && split.key === key;
-      html += '<div class="pg-group"><div class="pg-head"><span class="pg-name">' + escapeHtml(key) + '</span>' +
+      const km = /^(.*) (\d+(?:,\d+)? mm)$/.exec(key);
+      const nameHTML = km ? escapeHtml(km[1]) + ' <span class="pg-thk">' + escapeHtml(km[2]) + '</span>' : escapeHtml(key);
+      html += '<div class="pg-group"><div class="pg-head"><span class="pg-name">' + nameHTML + '</span>' +
         '<span class="pg-meta">' + list.length + (list.length===1 ? ' encomenda' : ' encomendas') +
           (isTube || !sumEst ? '' : ' · sugerido por cortar <b>' + fmtMin(sumEst) + '</b>') + '</span>' +
         (!isTube && splittable.length > 1
