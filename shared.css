@@ -417,6 +417,16 @@
   :root[data-theme="light"] .nav-theme-toggle .icon-moon,
   :root:not([data-theme="light"]) .nav-theme-toggle .icon-sun{display:none;}
   @media (max-width:900px){ .nav-theme-toggle{margin-top:0;} }
+  /* "Esconder preços" — desfoca todos os valores em € (para quando o cliente está a ver o ecrã).
+     Fica por cima do botão do modo claro; as fichas impressas não são afetadas. */
+  .nav-theme-toggle.nav-price-toggle + .nav-theme-toggle{margin-top:6px;}
+  @media (max-width:900px){ .nav-theme-toggle.nav-price-toggle + .nav-theme-toggle{margin-top:0;} }
+  .nav-price-toggle .icon-eye-off{display:none;}
+  .lc-hide-prices .nav-price-toggle .icon-eye{display:none;}
+  .lc-hide-prices .nav-price-toggle .icon-eye-off{display:block;}
+  .lc-hide-prices .nav-price-toggle{color:var(--accent); border-color:var(--accent);}
+  .lc-hide-prices .lc-money{filter:blur(6px); user-select:none;}
+  @media print{ .lc-hide-prices .lc-money{filter:none;} }
 
 
 

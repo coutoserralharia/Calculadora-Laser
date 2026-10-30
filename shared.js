@@ -1843,6 +1843,74 @@
     });
   })();
 
+  /* ---------------------------------------------------------------- */
+  /* ESCONDER PREÇOS — para quando o cliente está ao lado a ver o ecrã. */
+  /* Marca (classe lc-money) cada elemento cujo texto tem um valor em €, */
+  /* também o que as páginas desenham depois (MutationObserver), e o     */
+  /* CSS desfoca-os enquanto o botão estiver ligado. Fica ligado de      */
+  /* página para página. As fichas impressas (#printSheet) não contam.   */
+  /* ---------------------------------------------------------------- */
+  (function initHidePrices(){
+    const KEY = 'laser_hide_prices';
+    const root = document.documentElement;
+    let on = false;
+    try{ on = localStorage.getItem(KEY) === '1'; }catch(e){}
+    root.classList.toggle('lc-hide-prices', on);
+
+    const SKIP = 'script,style,#printSheet,.print-sheet,.nav-price-toggle';
+    function tagText(t){
+      if(!t.nodeValue || t.nodeValue.indexOf('€') < 0) return;
+      const el = t.parentElement;
+      if(!el || el.closest(SKIP)) return;
+      // Num <option> o filtro não tem efeito — desfoca-se a lista inteira.
+      const target = el.tagName === 'OPTION' ? el.closest('select') : el;
+      if(target) target.classList.add('lc-money');
+    }
+    function scan(node){
+      if(node.nodeType === 3){ tagText(node); return; }
+      if(node.nodeType !== 1 || node.closest && node.closest(SKIP)) return;
+      const w = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+      let t; while((t = w.nextNode())) tagText(t);
+      // Campos com o sufixo "€" (ex.: ajuste comercial): o valor está no input, não no texto.
+      node.querySelectorAll && node.querySelectorAll('.unit-suffix').forEach(u=>{
+        const s = u.querySelector('span'), inp = u.querySelector('input');
+        if(s && inp && s.textContent.indexOf('€') >= 0 && !u.closest(SKIP)) inp.classList.add('lc-money');
+      });
+    }
+    scan(document.body);
+    new MutationObserver(list=>{
+      list.forEach(m=>{
+        if(m.type === 'characterData') tagText(m.target);
+        else m.addedNodes.forEach(scan);
+      });
+    }).observe(document.body, { childList:true, subtree:true, characterData:true });
+
+    // Botão no menu lateral, por cima do "Modo claro".
+    const themeBtn = document.getElementById('themeToggleBtn');
+    if(!themeBtn) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'nav-theme-toggle nav-price-toggle';
+    btn.innerHTML =
+      '<svg class="icon-eye" width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg>' +
+      '<svg class="icon-eye-off" width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 13.5l11-11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>' +
+      '<span></span>';
+    const label = btn.querySelector('span');
+    function sync(){
+      label.textContent = on ? 'Mostrar preços' : 'Esconder preços';
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.title = on ? 'Os valores em € estão escondidos — carregue para os voltar a mostrar' : 'Esconder todos os valores em € (ex.: com o cliente a ver o ecrã)';
+    }
+    sync();
+    themeBtn.parentNode.insertBefore(btn, themeBtn);
+    btn.addEventListener('click', ()=>{
+      on = !on;
+      root.classList.toggle('lc-hide-prices', on);
+      try{ localStorage.setItem(KEY, on ? '1' : '0'); }catch(e){}
+      sync();
+    });
+  })();
+
   // Telemóvel: o menu de páginas passa a uma faixa com scroll horizontal — centra a página
   // atual, senão ficava escondida no fim (ex.: Histórico, Definições).
   (function scrollActiveNavIntoView(){
