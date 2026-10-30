@@ -1897,9 +1897,10 @@
       '<span></span>';
     const label = btn.querySelector('span');
     function sync(){
-      label.textContent = on ? 'Mostrar preços' : 'Esconder preços';
+      // "Modo trabalho" nos dois estados — ligado fica destacado (cor + ícone do olho riscado).
+      label.textContent = 'Modo trabalho';
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-      btn.title = on ? 'Os valores em € estão escondidos — carregue para os voltar a mostrar' : 'Esconder todos os valores em € (ex.: com o cliente a ver o ecrã)';
+      btn.title = on ? 'Modo trabalho ligado: os valores em € estão escondidos — carregue para os voltar a mostrar' : 'Modo trabalho: esconde todos os valores em € (ex.: com o cliente a ver o ecrã)';
     }
     sync();
     themeBtn.parentNode.insertBefore(btn, themeBtn);
