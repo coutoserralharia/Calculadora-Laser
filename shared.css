@@ -225,6 +225,7 @@
     display:flex; justify-content:space-between; align-items:baseline; padding:6px 0;
     border-bottom:1px solid var(--border-soft); font-size:13px;
   }
+  .breakdown-row[hidden]{display:none;}
   .breakdown-row:last-child{border-bottom:none;}
   .breakdown-row .lbl{color:var(--text-muted);}
   .breakdown-row .lbl small{display:block; color:var(--text-dim); font-size:10.5px; margin-top:1px;}

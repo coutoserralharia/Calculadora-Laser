@@ -50,6 +50,8 @@
   .pg-dlg-actions{display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; align-items:center;}
   .pg-dlg-actions .hint{font-size:12px; color:var(--text-muted); margin-right:auto;}
   .pg-veil[hidden], .pg-selbar[hidden]{display:none;}
+  /* Coluna "Cobrado" só aparece com o arredondamento ao minuto ligado nas Definições. */
+  .pg-dlg.no-round .pg-col-bill{display:none;}
   /* Telemóvel: a janela cabe sem deslizar para o lado (o sugerido total já está no topo). */
   @media (max-width:560px){
     .pg-dlg{padding:16px 14px;}
@@ -137,7 +139,7 @@
     <span class="pg-factor" id="grpFactor"></span>
   </div>
   <div class="hist-wrap"><table class="hist-table">
-    <thead><tr><th>Nº</th><th>Peça</th><th class="num pg-col-sug">Sugerido</th><th class="num">Real</th><th class="num">Preço final</th></tr></thead>
+    <thead><tr><th>Nº</th><th>Peça</th><th class="num pg-col-sug">Sugerido</th><th class="num">Real</th><th class="num pg-col-bill">Cobrado</th><th class="num">Preço final</th></tr></thead>
     <tbody id="grpRows"></tbody>
   </table></div>
   <div class="pg-dlg-actions">
@@ -158,7 +160,7 @@
     remoteLoadOrders, remoteLoadOrderById, remoteUpdateFullOrder, recomputeFinalCost, registerServiceWorker } = window.LC;
 
   const $ = id => document.getElementById(id);
-  const state = { orders: [], remote: { configured:false, url:'', key:'' } };
+  const state = { orders: [], remote: { configured:false, url:'', key:'' }, roundOn: true };
   const fmtMin = v => fmtNum(v, 1) + ' min';
   const parseMin = s => { const v = parseFloat(String(s||'').replace(',', '.')); return Number.isFinite(v) && v >= 0 ? v : null; };
   const selected = new Set(); // ids marcados na lista (caixas de seleção)
@@ -272,13 +274,20 @@
     const sumEst = dlgList.reduce((s,o)=>s + suggestedMin(o), 0);
     const real = parseMin($('grpReal').value);
     const ok = real != null && sumEst > 0 && dlgList.length > 0;
-    return { chosen: dlgList, sumEst, real, ok, factor: ok ? real/sumEst : null };
+    const factor = ok ? real/sumEst : null;
+    // Minutos cobrados: o total do lote arredondado para cima, repartido em minutos inteiros que
+    // somam esse total (mín. 1 min cada). O tempo exato de cada uma fica para as estimativas.
+    const billed = ok ? window.LC.splitBilledMinutes(dlgList.map(o=>suggestedMin(o) * factor), state.roundOn) : null;
+    return { chosen: dlgList, sumEst, real, ok, factor, billed };
   }
   function shareOf(o, c){ return c.ok ? suggestedMin(o) * c.factor : null; }
+  function billedOf(o, c){ return c.ok ? c.billed[c.chosen.indexOf(o)] : null; }
 
-  function openGroupDialog(){
+  async function openGroupDialog(){
     dlgList = chosenOrders();
     if(!dlgList.length) return;
+    try{ state.roundOn = window.LC.roundCutEnabled(await window.LC.loadMachine()); }catch(e){}
+    document.querySelector('.pg-dlg').classList.toggle('no-round', !state.roundOn);
     const mats = Array.from(new Set(dlgList.map(thicknessKey)));
     const sumEst = dlgList.reduce((s,o)=>s + suggestedMin(o), 0);
     $('grpSub').textContent = dlgList.length + (dlgList.length===1 ? ' encomenda' : ' encomendas') + ' · ' +
@@ -306,10 +315,14 @@
     $('grpFactor').innerHTML = c.ok
       ? (Math.abs(c.factor-1) < 0.005 ? '<b>igual</b> ao sugerido' : '<b>' + (c.factor > 1 ? '+' : '−') + Math.round(Math.abs(c.factor-1)*100) + '%</b> do que o sugerido')
       : 'Tempo que o colega disse para todas';
+    if(c.ok && state.roundOn){
+      const billedTotal = c.billed.reduce((s,v)=>s+v, 0);
+      if(Math.abs(billedTotal - c.real) > 0.005) $('grpFactor').innerHTML += ' · cobra-se <b>' + fmtNum(billedTotal, 0) + ' min</b>';
+    }
     // Preço final = mesmo cálculo do fecho individual (recomputeFinalCost), só muda o corte.
     const finals = await Promise.all(c.chosen.map(o=>{
       const m = shareOf(o, c);
-      return m == null ? null : recomputeFinalCost(o, m).catch(()=>null);
+      return m == null ? null : recomputeFinalCost(o, m, billedOf(o, c)).catch(()=>null);
     }));
     if(seq !== previewSeq) return; // já há outra atualização a caminho
     $('grpRows').innerHTML = c.chosen.map((o, i)=>{
@@ -320,6 +333,7 @@
         '<td>' + escapeHtml(o.orderName||'—') + '</td>' +
         '<td class="num hist-mono hist-dim pg-col-sug">' + fmtMin(suggestedMin(o)) + '</td>' +
         '<td class="num hist-mono">' + (m != null ? fmtMin(m) : '—') + '</td>' +
+        '<td class="num hist-mono pg-col-bill">' + (m != null ? fmtNum(billedOf(o, c), 0) + ' min' : '—') + '</td>' +
         '<td class="num hist-mono">' + (f && isFinite(f.totalCost) ? fmtEUR(f.totalCost) + (Math.abs(d) >= 0.005 ? ' <span class="' + (d > 0 ? 'pg-up' : 'pg-down') + '">' + (d > 0 ? '+' : '−') + fmtEUR(Math.abs(d)).replace('€','') + '</span>' : '') : (isFinite(now) ? fmtEUR(now) : '—')) + '</td>' +
       '</tr>';
     }).join('');
@@ -343,8 +357,8 @@
         // senão o PATCH apagava o desenho.
         const full = state.remote.configured ? await remoteLoadOrderById(state.remote, o.id) : o;
         if(!full) throw new Error('a encomenda ' + (o.orderNumber||'') + ' já não existe');
-        const cs = await recomputeFinalCost(full, shareOf(o, c));
-        cs.batchTime = { totalMin: c.real, orders: c.chosen.length, factor: c.factor, at: new Date().toISOString() };
+        const cs = await recomputeFinalCost(full, shareOf(o, c), billedOf(o, c));
+        cs.batchTime = { totalMin: c.real, billedTotalMin: c.billed.reduce((s,v)=>s+v, 0), orders: c.chosen.length, factor: c.factor, at: new Date().toISOString() };
         full.costSnapshot = cs;
         if(markDone){
           full.orderState = 'done';
@@ -367,6 +381,9 @@
       // As que já ficaram gravadas saem da janela; as restantes ficam para tentar outra vez.
       const savedIds = new Set(closed.map(r=>r.id));
       dlgList = dlgList.filter(o=>!savedIds.has(o.id)).map(o=>state.orders.find(x=>x.id===o.id) || o);
+      // O tempo que fica na caixa passa a ser só o das que faltam (senão levavam o tempo do lote todo).
+      const savedReal = c.chosen.filter(o=>savedIds.has(o.id)).reduce((s,o)=>s + shareOf(o, c), 0);
+      $('grpReal').value = Math.max(0, c.real - savedReal).toFixed(2).replace('.', ',');
       renderList();
       updateGroupPreview();
       return;

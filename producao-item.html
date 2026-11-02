@@ -131,7 +131,7 @@
         <div class="unit-suffix"><input type="number" id="realTimeInput" min="0" step="0.1" placeholder="deixe vazio para manter a estimativa"><span>min</span></div>
       </div>
 
-      <div class="pi-price-row pi-price-final"><span class="lbl">Preço final corrigido</span><span class="val" id="finalTotal">—</span></div>
+      <div class="pi-price-row pi-price-final"><span class="lbl">Preço final corrigido <small id="finalBilledNote" style="color:var(--text-dim);"></small></span><span class="val" id="finalTotal">—</span></div>
     </div>
 
     <div class="pi-close-btns">
@@ -311,10 +311,14 @@
     const val = parseFloat($('realTimeInput').value);
     const cs = state.rec.costSnapshot || {};
     const hasRealInput = Number.isFinite(val) && val >= 0;
+    $('finalBilledNote').textContent = '';
     if(!hasRealInput){ $('finalTotal').textContent = isFinite(cs.totalCost) ? fmtEUR(cs.totalCost) : '—'; return; }
     $('finalTotal').textContent = 'a calcular…';
     recomputeFinalCost(state.rec, val).then(newCs=>{
       $('finalTotal').textContent = isFinite(newCs.totalCost) ? fmtEUR(newCs.totalCost) : '—';
+      // Ex.: "(1,2 min · cobrado 2 min)" — o tempo exato fica para as estimativas.
+      const note = window.LC.billedNote(newCs.cuttingTimeMin, newCs.billedCuttingMin);
+      $('finalBilledNote').textContent = note ? '(' + fmtNum(newCs.cuttingTimeMin, 1) + ' min' + note + ')' : '';
     }).catch(()=>{ $('finalTotal').textContent = '—'; });
   }
   let debounceT;

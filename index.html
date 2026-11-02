@@ -301,6 +301,7 @@
 
         <div class="breakdown-row" style="border-top:1.5px solid var(--border); margin-top:4px; padding-top:12px;"><span class="lbl" style="font-weight:600; color:var(--text);">Custo total da encomenda <small>(sem IVA)<span id="totalQtyTag"></span></small></span><span class="val" id="totalValue" style="font-size:16px; color:var(--readout);">€0,00</span></div>
         <div class="breakdown-row"><span class="lbl">Custo total ÷ nº peças <small>(sem IVA)</small></span><span class="val" id="avgPerPieceValue">€0,00</span></div>
+        <div class="breakdown-row" id="unroundedRow" hidden><span class="lbl">Sem arredondar seria<small>corte ao tempo exato, sem arredondar ao minuto</small></span><span class="val" id="unroundedValue" style="color:var(--text-dim);">€0,00</span></div>
         <div class="total-sub" id="totalTimeSub" hidden style="margin-top:10px; padding-top:10px;"></div>
 
         <div class="print-btns" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border-soft);">
@@ -941,7 +942,7 @@
       html += pRow('　· Desenho', drawLabel + (result.designTimeMin ? ' — '+result.designTimeMin+' min ('+fmtEUR(result.designCost)+')' : ' — sem custo'));
       html += pRow('　· Setup', result.setupTimeMin+' min ('+fmtEUR(result.setupCost)+')');
     }
-    html += pRow('Custo total do corte', result.valid ? (fmtEUR(result.corteCost)+' ('+fmtNum(result.cuttingTimeMin,1)+' min no total'+(result.isFinalDisplay?', real':', estimado')+')') : '—');
+    html += pRow('Custo total do corte', result.valid ? (fmtEUR(result.corteCost)+' ('+fmtNum(result.cuttingTimeMin,2)+' min no total'+(result.isFinalDisplay?', real':', estimado')+window.LC.billedNote(result.cuttingTimeMin, result.billedCuttingMin)+')') : '—');
     if(result.valid && result.adjustmentValue){
       html += pRow('Subtotal', fmtEUR(result.subtotal));
       html += pRow('Ajuste comercial' + (result.adjustmentReason ? ' ('+escapeHtml(result.adjustmentReason)+')' : ''), (result.adjustmentValue>0?'+':'') + fmtEUR(result.adjustmentValue));
@@ -1141,6 +1142,7 @@
 
     if(!result.valid){
       ['costMaterial','costPreCorte','costCorte','totalValue','avgPerPieceValue','subtotalValue','abTotal'].forEach(id=>$(id).textContent = fmtEUR(0));
+      $('unroundedRow').hidden = true;
       $('adjustmentRow').hidden = true;
       ['valWeightUnit','valWeightTotal'].forEach(id=>$(id).textContent = '—');
       $('matInfoSub').textContent = '—'; $('preCorteSub').textContent = '—'; $('cutTimeSub').textContent = '—'; $('weightTotalSub').textContent = '—';
@@ -1167,6 +1169,7 @@
     $('cutTimeSub').textContent = result.isFinalDisplay
       ? (fmtNum(result.cuttingTimeMin,1)+' min no total (tempo real, todas as peças)')
       : (fmtNum(result.cuttingTimeMin,2)+' min no total (estimado, '+result.qty+(result.qty===1?' peça':' peças')+' · '+result.geo.pierces+' perfuração(ões)/peça)');
+    $('cutTimeSub').textContent += window.LC.billedNote(result.cuttingTimeMin, result.billedCuttingMin);
     $('costCorte').textContent = fmtEUR(result.corteCost);
 
     $('subtotalValue').textContent = fmtEUR(result.subtotal);
@@ -1183,6 +1186,9 @@
     $('abOrderNum').textContent = ($('orderNumberPreview').value || '—') + (orderNameInp.value.trim() ? ' · ' + orderNameInp.value.trim() : '');
     $('totalQtyTag').textContent = ' — '+result.qty+(result.qty===1 ? ' peça' : ' peças');
     $('avgPerPieceValue').textContent = fmtEUR(result.avgPerPiece);
+    const unrounded = result.totalCost - result.corteCost + result.corteCostExact;
+    $('unroundedRow').hidden = !(Math.abs(unrounded - result.totalCost) >= 0.005);
+    $('unroundedValue').textContent = fmtEUR(unrounded);
 
     if(result.isFinalDisplay){
       $('costFinalBadge').textContent = '(FINAL — tempo de corte real registado)';
@@ -1470,7 +1476,7 @@
         machineSnapshot: Object.assign({}, state.machine),
         costSnapshot: result.valid ? {
           totalCost: result.totalCost, avgPerPiece: result.avgPerPiece,
-          cuttingTimeMin: result.cuttingTimeMin, pierces: result.geo.pierces,
+          cuttingTimeMin: result.cuttingTimeMin, billedCuttingMin: result.billedCuttingMin, pierces: result.geo.pierces,
           corteCost: result.corteCost,
           materialCost: result.materialCostPerPiece, weightPerPiece: result.weightPerPiece, weightTotal: result.weightTotal,
           designCost: result.designCost, setupCost: result.setupCost, preCorteCost: result.preCorteCost,

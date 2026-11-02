@@ -350,6 +350,45 @@
     };
   };
 
+  /* TEMPO COBRADO — o corte cobra-se ao minuto inteiro (1,2 min → 2 min), mas o tempo exato     */
+  /* continua a ser o que se grava em cuttingTimeMin e o que alimenta as estimativas/estatísticas. */
+  LC.roundCutEnabled = function(machine){ return !machine || machine.roundCutMinutes !== false; };
+  LC.billedCutMinutes = function(min, roundOn){
+    if(!Number.isFinite(min) || min <= 0) return 0;
+    // Arredonda primeiro às décimas de milésimo para 2,0000001 (erro de vírgula flutuante) não dar 3.
+    return roundOn ? Math.ceil(Math.round(min*1e4)/1e4) : min;
+  };
+  // Tempo de grupo: reparte o total cobrado (arredondado para cima) em minutos inteiros que somam
+  // exatamente esse total — maiores restos primeiro; cada encomenda leva pelo menos 1 min quando o
+  // lote tem minutos que cheguem. Sem arredondamento devolve as partes exatas tal como estão.
+  // " · cobrado 2 min" quando o tempo cobrado difere do exato (vazio caso contrário).
+  LC.billedNote = function(exactMin, billedMin){
+    if(!Number.isFinite(billedMin) || !Number.isFinite(exactMin)) return '';
+    return Math.abs(billedMin - exactMin) > 0.005 ? ' · cobrado ' + LC.fmtNum(billedMin, Number.isInteger(billedMin)?0:2) + ' min' : '';
+  };
+  LC.splitBilledMinutes = function(shares, roundOn){
+    if(!roundOn) return shares.slice();
+    const sum = shares.reduce((s,v)=> s + (v>0 ? v : 0), 0);
+    const total = LC.billedCutMinutes(sum, true);
+    if(!sum) return shares.map(()=>0);
+    const exact = shares.map(v=> (v>0 ? v : 0) / sum * total);
+    const out = exact.map(Math.floor);
+    let left = total - out.reduce((s,v)=>s+v, 0);
+    exact.map((v,i)=>({ i, rest: v - out[i] })).sort((a,b)=> b.rest - a.rest || a.i - b.i)
+      .forEach(x=>{ if(left > 0){ out[x.i]++; left--; } });
+    const needy = shares.map((v,i)=> v>0 ? i : -1).filter(i=> i>=0);
+    if(total >= needy.length){
+      needy.forEach(i=>{
+        if(out[i] > 0) return;
+        // O minuto sai da que ficou mais arredondada para cima (menor injustiça).
+        let k = -1;
+        out.forEach((v,j)=>{ if(v > 1 && (k < 0 || v - exact[j] > out[k] - exact[k])) k = j; });
+        if(k >= 0){ out[k]--; out[i]++; }
+      });
+    }
+    return out;
+  };
+
   // p = { geo, material, qty, machine, isBatch, realTimeMin (null = estimado), drawingType,
   //       designTimeMin, setupTimeMin, adjustmentValue, adjustmentReason,
   //       clientMaterial (true = material fornecido pelo cliente: não entra no preço) }
@@ -377,7 +416,11 @@
     // O "Tempo de corte real" introduzido é sempre o TOTAL para todas as peças da encomenda
     // (já inclui as perfurações de todas elas) — nunca é multiplicado pela quantidade.
     const cuttingTimeMin = isFinalTime ? p.realTimeMin : estimatedTotalTimeMin;
-    const corteCost = cuttingTimeMin * (machine.hourlyRate/60);
+    // Cobra-se o tempo arredondado ao minuto (para cima) — as estimativas e estatísticas ficam
+    // sempre com o tempo exato (cuttingTimeMin). Pode desligar-se nas Definições.
+    const billedCuttingMin = LC.billedCutMinutes(cuttingTimeMin, LC.roundCutEnabled(machine));
+    const corteCost = billedCuttingMin * (machine.hourlyRate/60);
+    const corteCostExact = cuttingTimeMin * (machine.hourlyRate/60);
 
     // Waste margin: adds to the bounding-box width/height before computing area, to reflect the
     // sheet space around each part that isn't reused (parts aren't nested together). Only applies
@@ -427,6 +470,7 @@
     return {
       valid:true, geo, material, qty,
       cuttingTimeMin, estimatedCuttingTimeMin: estimatedTotalTimeMin, corteCost,
+      billedCuttingMin, corteCostExact,
       materialCostTotal, materialCostPerPiece, materialCostBaseTotal, weightPerPiece, weightTotal, isBatchGeometry,
       realCost, marginValue, marginPct,
       drawingType, designTimeMin, setupTimeMin, designCost,
@@ -776,7 +820,7 @@
     html += '<div class="p-costs-title">Custo da encomenda</div>';
     html += pRow('Custo total do material', isFinite(cs.materialCost) ? fmtEUR(cs.materialCost*(rec.quantity||1)) : '—');
     html += pRow('Custo pré-corte', isFinite(cs.preCorteCost) ? fmtEUR(cs.preCorteCost) : '—');
-    html += pRow('Custo total do corte', isFinite(cs.corteCost) ? (fmtEUR(cs.corteCost)+' ('+fmtNum(cs.cuttingTimeMin,1)+' min, '+(cs.isFinal?'real':'estimado')+')') : '—');
+    html += pRow('Custo total do corte', isFinite(cs.corteCost) ? (fmtEUR(cs.corteCost)+' ('+fmtNum(cs.cuttingTimeMin,cs.billedCuttingMin!=null?2:1)+' min, '+(cs.isFinal?'real':'estimado')+LC.billedNote(cs.cuttingTimeMin, cs.billedCuttingMin)+')') : '—');
     if(cs.adjustmentValue){
       html += pRow('Subtotal', fmtEUR(cs.subtotal));
       html += pRow('Ajuste comercial' + (cs.adjustmentReason?' ('+escapeHtml(cs.adjustmentReason)+')':''), (cs.adjustmentValue>0?'+':'')+fmtEUR(cs.adjustmentValue));
@@ -825,7 +869,7 @@
     {id:'m19', name:'Alumínio',    thickness:5,  speed:1400, density:2.70, pricePerKg:3.8, markupPct:0},
     {id:'m20', name:'Alumínio',    thickness:6,  speed:1000, density:2.70, pricePerKg:3.8, markupPct:0},
   ];
-  LC.DEFAULT_MACHINE = { hourlyRate:45, designRate:30, setupRate:30, pierceTime:0.8, areaBasis:'bbox', defaultSetupMin:5, wasteMarginMm:5, alertQuoteDays:7, alertRealTimeDays:2, angleCutFactor:1.4, tubeMarkup:1.5, tubeBarLengthMm:6000, tubeClampMm:400 };
+  LC.DEFAULT_MACHINE = { hourlyRate:45, roundCutMinutes:true, designRate:30, setupRate:30, pierceTime:0.8, areaBasis:'bbox', defaultSetupMin:5, wasteMarginMm:5, alertQuoteDays:7, alertRealTimeDays:2, angleCutFactor:1.4, tubeMarkup:1.5, tubeBarLengthMm:6000, tubeClampMm:400 };
 
   LC.DEFAULT_TUBE_PROFILES = [
     {id:'preto-redondo-3_8_s_rie_ligeira', material:'preto', shape:'redondo', name:'3/8" série ligeira', w:17.2, h:17.2, t:2, inch:true, costPerM:1.47},
@@ -1420,7 +1464,9 @@
   /* exatamente como no orçamento aceite (mesmo que os preços tenham     */
   /* mudado entretanto). O corte usa o custo/hora gravado na encomenda.  */
   /* ---------------------------------------------------------------- */
-  LC.recomputeFinalCost = async function(rec, realCuttingTimeMin){
+  // billedMin (opcional) = minutos a cobrar já decididos fora (tempo de grupo); sem ele, cobra-se o
+  // tempo real arredondado ao minuto conforme a opção atual das Definições.
+  LC.recomputeFinalCost = async function(rec, realCuttingTimeMin, billedMin){
     const cs = rec.costSnapshot || {};
     const qty = rec.quantity || 1;
 
@@ -1430,14 +1476,17 @@
       return Object.assign({}, cs, { cuttingTimeMin: realCuttingTimeMin, isFinal: true });
     }
 
+    let machine = null;
+    try{ machine = await LC.loadMachine(); }catch(e){}
     let hourlyRate = rec.machineSnapshot && rec.machineSnapshot.hourlyRate;
-    if(!isFinite(hourlyRate)){
-      try{ hourlyRate = (await LC.loadMachine()).hourlyRate; }catch(e){}
-    }
+    if(!isFinite(hourlyRate)) hourlyRate = machine && machine.hourlyRate;
     hourlyRate = hourlyRate || 0;
     // O tempo real introduzido é sempre o TOTAL da encomenda (todas as peças, já inclui
     // perfurações) — não se soma nem se multiplica mais nada a este tempo.
-    const corteCost = (realCuttingTimeMin/60) * hourlyRate;
+    const billedCuttingMin = Number.isFinite(billedMin)
+      ? billedMin
+      : LC.billedCutMinutes(realCuttingTimeMin, LC.roundCutEnabled(machine));
+    const corteCost = (billedCuttingMin/60) * hourlyRate;
     const delta = corteCost - (isFinite(cs.corteCost) ? cs.corteCost : 0);
 
     // Tudo o resto acompanha só a diferença do corte (delta) — o material nunca é recalculado,
@@ -1446,7 +1495,7 @@
       ? cs.totalCost + delta
       : corteCost + (cs.materialCost||0)*qty + (cs.preCorteCost||0) + (cs.adjustmentValue||0);
     const out = {
-      cuttingTimeMin: realCuttingTimeMin,
+      cuttingTimeMin: realCuttingTimeMin, billedCuttingMin,
       corteCost, totalCost, avgPerPiece: totalCost / qty,
       isFinal: true,
     };
@@ -1544,7 +1593,7 @@
         lines.push('    · Desenho: ' + drawLabel + (si.designTimeMin ? ' — ' + si.designTimeMin + ' min (' + fmtEUR(rec.costSnapshot.designCost) + ')' : ''));
         lines.push('    · Setup: ' + si.setupTimeMin + ' min (' + fmtEUR(rec.costSnapshot.setupCost) + ')');
       }
-      lines.push('  Custo total do corte: ' + fmtEUR(rec.costSnapshot.corteCost) + ' (' + fmtNum(rec.costSnapshot.cuttingTimeMin,1) + ' min no total, todas as peças, inclui perfurações)');
+      lines.push('  Custo total do corte: ' + fmtEUR(rec.costSnapshot.corteCost) + ' (' + fmtNum(rec.costSnapshot.cuttingTimeMin,1) + ' min no total, todas as peças, inclui perfurações' + LC.billedNote(rec.costSnapshot.cuttingTimeMin, rec.costSnapshot.billedCuttingMin) + ')');
       lines.push('  TOTAL da encomenda (sem IVA): ' + fmtEUR(rec.costSnapshot.totalCost));
       lines.push('  TOTAL ÷ nº peças (sem IVA): ' + fmtEUR(rec.costSnapshot.avgPerPiece));
     }

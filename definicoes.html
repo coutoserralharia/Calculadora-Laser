@@ -69,6 +69,7 @@
         <div class="field"><label>Custo de desenho</label><div class="unit-suffix"><input type="number" id="designRate" step="0.5" min="0"><span>€/h</span></div></div>
         <div class="field"><label>Tempo/perfuração</label><div class="unit-suffix"><input type="number" id="pierceTime" step="0.1" min="0"><span>s</span></div></div>
       </div>
+      <label class="client-mat-opt" for="roundCutMinutes" style="margin:-4px 0 14px;"><input type="checkbox" id="roundCutMinutes"><span>Arredondar o tempo de corte cobrado ao minuto (para cima)<small>Ex.: 1,2 min cobra-se como 2 min. As estimativas e a precisão das velocidades continuam a usar o tempo exato.</small></span></label>
       <p class="save-hint" style="margin:-6px 0 12px;">O custo de setup é calculado automaticamente em cada encomenda: tempo de setup × custo de setup abaixo.</p>
       <div class="field-row">
         <div class="field"><label>Custo de setup</label><div class="unit-suffix"><input type="number" id="setupRate" step="0.5" min="0"><span>€/h</span></div></div>
@@ -346,6 +347,7 @@ create policy "só utilizadores autenticados"
   const areaBasisSel = $('areaBasis');
   const alertQuoteDaysInp = $('alertQuoteDays'), alertRealTimeDaysInp = $('alertRealTimeDays'), alertBackupDaysInp = $('alertBackupDays');
   const tubeMarkupInp = $('tubeMarkup'), tubeBarLengthMmInp = $('tubeBarLengthMm'), tubeClampMmInp = $('tubeClampMm');
+  const roundCutChk = $('roundCutMinutes');
 
   function applyMachineToInputs(){
     hourlyRateInp.value = state.machine.hourlyRate;
@@ -361,6 +363,7 @@ create policy "só utilizadores autenticados"
     tubeMarkupInp.value = state.machine.tubeMarkup ?? 1.5;
     tubeBarLengthMmInp.value = state.machine.tubeBarLengthMm ?? 6000;
     tubeClampMmInp.value = state.machine.tubeClampMm ?? 400;
+    roundCutChk.checked = state.machine.roundCutMinutes !== false;
   }
   [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, setupRateInp, defaultSetupMinInp, wasteMarginMmInp, alertQuoteDaysInp, alertRealTimeDaysInp, alertBackupDaysInp, tubeMarkupInp, tubeBarLengthMmInp, tubeClampMmInp].forEach(inp=>{
     inp.addEventListener('input', ()=>{
@@ -380,6 +383,10 @@ create policy "só utilizadores autenticados"
       renderTubeProfilesTable();
       saveMachine(state.machine);
     });
+  });
+  roundCutChk.addEventListener('change', ()=>{
+    state.machine.roundCutMinutes = roundCutChk.checked;
+    saveMachine(state.machine);
   });
 
   /* ---------------------------------------------------------------- */
