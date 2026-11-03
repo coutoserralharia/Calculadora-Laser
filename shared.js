@@ -366,6 +366,15 @@
     if(!Number.isFinite(billedMin) || !Number.isFinite(exactMin)) return '';
     return Math.abs(billedMin - exactMin) > 0.005 ? ' · cobrado ' + LC.fmtNum(billedMin, Number.isInteger(billedMin)?0:2) + ' min' : '';
   };
+  // "2,5 min (orçado 10 min · setup do grupo 10 min ÷ 4)" — ou só "10 min" se o setup nunca mudou.
+  LC.setupTimeLabel = function(si){
+    const f = v => LC.fmtNum(v, Number.isInteger(+v) ? 0 : 2);
+    let s = f(si.setupTimeMin||0) + ' min';
+    if(si.groupSetupMin != null && si.quotedSetupMin != null){
+      s += ' (orçado ' + f(si.quotedSetupMin) + ' min · setup do grupo ' + f(si.groupSetupMin) + ' min ÷ ' + si.groupSetupOrders + ')';
+    }
+    return s;
+  };
   LC.splitBilledMinutes = function(shares, roundOn){
     if(!roundOn) return shares.slice();
     const sum = shares.reduce((s,v)=> s + (v>0 ? v : 0), 0);
@@ -820,6 +829,12 @@
     html += '<div class="p-costs-title">Custo da encomenda</div>';
     html += pRow('Custo total do material', isFinite(cs.materialCost) ? fmtEUR(cs.materialCost*(rec.quantity||1)) : '—');
     html += pRow('Custo pré-corte', isFinite(cs.preCorteCost) ? fmtEUR(cs.preCorteCost) : '—');
+    if(cs.setupInputs && !isTube){
+      const si = cs.setupInputs;
+      const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[si.drawingType] || si.drawingType || '—';
+      html += pRow('　· Desenho', escapeHtml(drawLabel) + (si.designTimeMin ? ' — '+fmtNum(si.designTimeMin,0)+' min ('+fmtEUR(cs.designCost||0)+')' : ' — sem custo'));
+      html += pRow('　· Setup', LC.setupTimeLabel(si) + (isFinite(cs.setupCost) ? ' ('+fmtEUR(cs.setupCost)+')' : ''));
+    }
     html += pRow('Custo total do corte', isFinite(cs.corteCost) ? (fmtEUR(cs.corteCost)+' ('+fmtNum(cs.cuttingTimeMin,cs.billedCuttingMin!=null?2:1)+' min, '+(cs.isFinal?'real':'estimado')+LC.billedNote(cs.cuttingTimeMin, cs.billedCuttingMin)+')') : '—');
     if(cs.adjustmentValue){
       html += pRow('Subtotal', fmtEUR(cs.subtotal));
@@ -1466,7 +1481,9 @@
   /* ---------------------------------------------------------------- */
   // billedMin (opcional) = minutos a cobrar já decididos fora (tempo de grupo); sem ele, cobra-se o
   // tempo real arredondado ao minuto conforme a opção atual das Definições.
-  LC.recomputeFinalCost = async function(rec, realCuttingTimeMin, billedMin){
+  // setup (opcional, tempo de grupo) = { min, groupMin, orders }: o setup desta encomenda passa a
+  // ser "min" (a sua parte do setup do grupo) e o preço acompanha. Sem ele, o setup fica como estava.
+  LC.recomputeFinalCost = async function(rec, realCuttingTimeMin, billedMin, setup){
     const cs = rec.costSnapshot || {};
     const qty = rec.quantity || 1;
 
@@ -1487,18 +1504,42 @@
       ? billedMin
       : LC.billedCutMinutes(realCuttingTimeMin, LC.roundCutEnabled(machine));
     const corteCost = (billedCuttingMin/60) * hourlyRate;
-    const delta = corteCost - (isFinite(cs.corteCost) ? cs.corteCost : 0);
+    let delta = corteCost - (isFinite(cs.corteCost) ? cs.corteCost : 0);
 
-    // Tudo o resto acompanha só a diferença do corte (delta) — o material nunca é recalculado,
+    // Setup do grupo: muda só o custo de setup (ao custo/hora de setup gravado na encomenda).
+    let setupOut = null;
+    if(setup && Number.isFinite(setup.min) && setup.min >= 0){
+      let setupRate = rec.machineSnapshot && rec.machineSnapshot.setupRate;
+      if(!isFinite(setupRate)) setupRate = machine && machine.setupRate;
+      setupRate = setupRate || 0;
+      const si = cs.setupInputs || {};
+      const oldSetupCost = isFinite(cs.setupCost) ? cs.setupCost
+        : (isFinite(si.setupTimeMin) ? si.setupTimeMin/60 * setupRate : 0);
+      const setupCost = setup.min/60 * setupRate;
+      const setupDelta = setupCost - oldSetupCost;
+      delta += setupDelta;
+      setupOut = {
+        setupCost,
+        preCorteCost: (cs.preCorteCost||0) + setupDelta,
+        // O setup do orçamento fica guardado (só da 1ª vez) para a ficha interna mostrar os dois.
+        setupInputs: Object.assign({}, si, {
+          setupTimeMin: setup.min,
+          quotedSetupMin: si.quotedSetupMin != null ? si.quotedSetupMin : (si.setupTimeMin != null ? si.setupTimeMin : null),
+          groupSetupMin: setup.groupMin, groupSetupOrders: setup.orders,
+        }),
+      };
+    }
+
+    // Tudo o resto acompanha só a diferença do corte (e do setup, se mudou) — o material nunca é recalculado,
     // por isso também não importa se o ficheiro era de 1 peça ou de todas as peças aninhadas.
     const totalCost = isFinite(cs.totalCost)
       ? cs.totalCost + delta
-      : corteCost + (cs.materialCost||0)*qty + (cs.preCorteCost||0) + (cs.adjustmentValue||0);
-    const out = {
+      : corteCost + (cs.materialCost||0)*qty + (setupOut ? setupOut.preCorteCost : (cs.preCorteCost||0)) + (cs.adjustmentValue||0);
+    const out = Object.assign({
       cuttingTimeMin: realCuttingTimeMin, billedCuttingMin,
       corteCost, totalCost, avgPerPiece: totalCost / qty,
       isFinal: true,
-    };
+    }, setupOut);
     if(isFinite(cs.subtotal)) out.subtotal = cs.subtotal + delta;
     if(isFinite(cs.realCost)){
       out.realCost = cs.realCost + delta;
@@ -1591,7 +1632,7 @@
         const si = rec.costSnapshot.setupInputs;
         const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[si.drawingType] || si.drawingType;
         lines.push('    · Desenho: ' + drawLabel + (si.designTimeMin ? ' — ' + si.designTimeMin + ' min (' + fmtEUR(rec.costSnapshot.designCost) + ')' : ''));
-        lines.push('    · Setup: ' + si.setupTimeMin + ' min (' + fmtEUR(rec.costSnapshot.setupCost) + ')');
+        lines.push('    · Setup: ' + LC.setupTimeLabel(si) + ' (' + fmtEUR(rec.costSnapshot.setupCost) + ')');
       }
       lines.push('  Custo total do corte: ' + fmtEUR(rec.costSnapshot.corteCost) + ' (' + fmtNum(rec.costSnapshot.cuttingTimeMin,1) + ' min no total, todas as peças, inclui perfurações' + LC.billedNote(rec.costSnapshot.cuttingTimeMin, rec.costSnapshot.billedCuttingMin) + ')');
       lines.push('  TOTAL da encomenda (sem IVA): ' + fmtEUR(rec.costSnapshot.totalCost));

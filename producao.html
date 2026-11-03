@@ -35,12 +35,15 @@
   :root[data-theme="light"] .pg-warn{color:#a15c00;}
   body.pg-has-bar{padding-bottom:84px;}
   .pg-veil{position:fixed; inset:0; z-index:250; background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center; padding:16px;}
-  .pg-dlg{background:var(--panel); border:1px solid var(--border); border-radius:12px; width:100%; max-width:600px; max-height:100%; overflow:auto; padding:18px; display:grid; gap:14px;}
+  .pg-dlg{background:var(--panel); border:1px solid var(--border); border-radius:12px; width:100%; max-width:680px; max-height:100%; overflow:auto; padding:18px; display:grid; gap:14px;}
   .pg-dlg h2{font-family:'Space Grotesk',sans-serif; font-size:16px; margin:0;}
   .pg-dlg .sub{font-size:12.5px; color:var(--text-muted); margin:3px 0 0;}
-  .pg-time{display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px;}
+  .pg-time{display:flex; flex-wrap:wrap; align-items:flex-start; gap:12px 22px;}
+  .pg-tf{display:grid; gap:5px; min-width:0;}
+  .pg-tf label{font-size:12px; color:var(--text-muted);}
   .pg-time .unit-suffix{width:170px;}
   .pg-time input{font-family:'JetBrains Mono',monospace; font-size:17px;}
+  .pg-time input::placeholder{font-size:13px;}
   .pg-factor{font-size:12.5px; color:var(--text-muted);}
   .pg-factor b{font-family:'JetBrains Mono',monospace; color:var(--readout); font-weight:600;}
   .pg-dlg .hist-wrap{margin:0; padding:0;}
@@ -58,6 +61,7 @@
     .pg-dlg table.hist-table{min-width:0;}
     .pg-dlg table.hist-table td, .pg-dlg table.hist-table th{padding:8px 6px;}
     .pg-dlg .pg-col-sug{display:none;}
+    .pg-dlg .pg-col-setup{display:none;} /* a parte de cada uma já aparece debaixo do campo */
   }
   /* Fichas internas seguidas — cada uma começa numa folha nova. */
   .print-sheet .pg-sheet + .pg-sheet{page-break-before:always; break-before:page;}
@@ -135,11 +139,19 @@
 <div class="pg-veil" id="grpVeil" hidden><div class="pg-dlg" role="dialog" aria-modal="true" aria-labelledby="grpTitle">
   <div><h2 id="grpTitle">Tempo do grupo</h2><p class="sub" id="grpSub"></p></div>
   <div class="pg-time">
-    <div class="unit-suffix"><input type="text" inputmode="decimal" id="grpReal" autocomplete="off" aria-label="Tempo real do grupo, em minutos"><span>min</span></div>
-    <span class="pg-factor" id="grpFactor"></span>
+    <div class="pg-tf">
+      <label for="grpReal">Tempo de corte do grupo</label>
+      <div class="unit-suffix"><input type="text" inputmode="decimal" id="grpReal" autocomplete="off"><span>min</span></div>
+      <span class="pg-factor" id="grpFactor"></span>
+    </div>
+    <div class="pg-tf">
+      <label for="grpSetup">Tempo de setup do grupo</label>
+      <div class="unit-suffix"><input type="text" inputmode="decimal" id="grpSetup" autocomplete="off" placeholder="igual ao orçado"><span>min</span></div>
+      <span class="pg-factor" id="grpSetupNote"></span>
+    </div>
   </div>
   <div class="hist-wrap"><table class="hist-table">
-    <thead><tr><th>Nº</th><th>Peça</th><th class="num pg-col-sug">Sugerido</th><th class="num">Real</th><th class="num pg-col-bill">Cobrado</th><th class="num">Preço final</th></tr></thead>
+    <thead><tr><th>Nº</th><th>Peça</th><th class="num pg-col-sug">Sugerido</th><th class="num">Real</th><th class="num pg-col-bill">Cobrado</th><th class="num pg-col-setup">Setup</th><th class="num">Preço final</th></tr></thead>
     <tbody id="grpRows"></tbody>
   </table></div>
   <div class="pg-dlg-actions">
@@ -278,10 +290,16 @@
     // Minutos cobrados: o total do lote arredondado para cima, repartido em minutos inteiros que
     // somam esse total (mín. 1 min cada). O tempo exato de cada uma fica para as estimativas.
     const billed = ok ? window.LC.splitBilledMinutes(dlgList.map(o=>suggestedMin(o) * factor), state.roundOn) : null;
-    return { chosen: dlgList, sumEst, real, ok, factor, billed };
+    // Setup do grupo (opcional): partes iguais por todas, sem arredondar. Vazio = cada uma fica com o seu.
+    const setupTotal = parseMin($('grpSetup').value);
+    const setupEach = setupTotal != null && dlgList.length ? setupTotal / dlgList.length : null;
+    return { chosen: dlgList, sumEst, real, ok, factor, billed, setupTotal, setupEach };
   }
   function shareOf(o, c){ return c.ok ? suggestedMin(o) * c.factor : null; }
   function billedOf(o, c){ return c.ok ? c.billed[c.chosen.indexOf(o)] : null; }
+  function setupOf(c){ return c.setupEach != null ? { min: c.setupEach, groupMin: c.setupTotal, orders: c.chosen.length } : null; }
+  const quotedSetupOf = o => { const si = (o.costSnapshot || {}).setupInputs; return si && isFinite(si.setupTimeMin) ? si.setupTimeMin : null; };
+  const fmtSetup = v => fmtNum(v, Number.isInteger(+v) ? 0 : 2) + ' min';
 
   async function openGroupDialog(){
     dlgList = chosenOrders();
@@ -294,6 +312,7 @@
       (mats.length === 1 ? mats[0] : mats.length + ' materiais/espessuras') + ' · sugerido ' + fmtMin(sumEst);
     $('grpReal').value = '';
     $('grpReal').placeholder = fmtNum(sumEst, 1);
+    $('grpSetup').value = '';
     $('grpHint').textContent = ''; $('grpHint').style.color = '';
     $('grpVeil').hidden = false;
     updateGroupPreview();
@@ -305,6 +324,7 @@
   $('grpVeil').addEventListener('click', e=>{ if(e.target === $('grpVeil') && !saving) closeGroupDialog(); });
   document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && !$('grpVeil').hidden && !saving) closeGroupDialog(); });
   $('grpReal').addEventListener('input', updateGroupPreview);
+  $('grpSetup').addEventListener('input', updateGroupPreview);
   $('grpSave').addEventListener('click', ()=>saveSplit(false));
   $('grpDone').addEventListener('click', ()=>saveSplit(true));
 
@@ -319,10 +339,15 @@
       const billedTotal = c.billed.reduce((s,v)=>s+v, 0);
       if(Math.abs(billedTotal - c.real) > 0.005) $('grpFactor').innerHTML += ' · cobra-se <b>' + fmtNum(billedTotal, 0) + ' min</b>';
     }
-    // Preço final = mesmo cálculo do fecho individual (recomputeFinalCost), só muda o corte.
+    const quoted = Array.from(new Set(c.chosen.map(quotedSetupOf).filter(v=>v != null)));
+    $('grpSetupNote').innerHTML = c.setupEach != null
+      ? '<b>' + fmtSetup(c.setupEach) + '</b> a cada uma' + (quoted.length === 1 ? ' (antes ' + fmtSetup(quoted[0]) + ' cada)' : '')
+      : 'Vazio: fica o setup orçado de cada uma';
+    // Preço final = mesmo cálculo do fecho individual (recomputeFinalCost): muda o corte e, se
+    // preenchido, o setup.
     const finals = await Promise.all(c.chosen.map(o=>{
       const m = shareOf(o, c);
-      return m == null ? null : recomputeFinalCost(o, m, billedOf(o, c)).catch(()=>null);
+      return m == null ? null : recomputeFinalCost(o, m, billedOf(o, c), setupOf(c)).catch(()=>null);
     }));
     if(seq !== previewSeq) return; // já há outra atualização a caminho
     $('grpRows').innerHTML = c.chosen.map((o, i)=>{
@@ -334,6 +359,7 @@
         '<td class="num hist-mono hist-dim pg-col-sug">' + fmtMin(suggestedMin(o)) + '</td>' +
         '<td class="num hist-mono">' + (m != null ? fmtMin(m) : '—') + '</td>' +
         '<td class="num hist-mono pg-col-bill">' + (m != null ? fmtNum(billedOf(o, c), 0) + ' min' : '—') + '</td>' +
+        '<td class="num hist-mono pg-col-setup' + (c.setupEach != null ? '' : ' hist-dim') + '">' + (c.setupEach != null ? fmtSetup(c.setupEach) : (quotedSetupOf(o) != null ? fmtSetup(quotedSetupOf(o)) : '—')) + '</td>' +
         '<td class="num hist-mono">' + (f && isFinite(f.totalCost) ? fmtEUR(f.totalCost) + (Math.abs(d) >= 0.005 ? ' <span class="' + (d > 0 ? 'pg-up' : 'pg-down') + '">' + (d > 0 ? '+' : '−') + fmtEUR(Math.abs(d)).replace('€','') + '</span>' : '') : (isFinite(now) ? fmtEUR(now) : '—')) + '</td>' +
       '</tr>';
     }).join('');
@@ -357,8 +383,8 @@
         // senão o PATCH apagava o desenho.
         const full = state.remote.configured ? await remoteLoadOrderById(state.remote, o.id) : o;
         if(!full) throw new Error('a encomenda ' + (o.orderNumber||'') + ' já não existe');
-        const cs = await recomputeFinalCost(full, shareOf(o, c), billedOf(o, c));
-        cs.batchTime = { totalMin: c.real, billedTotalMin: c.billed.reduce((s,v)=>s+v, 0), orders: c.chosen.length, factor: c.factor, at: new Date().toISOString() };
+        const cs = await recomputeFinalCost(full, shareOf(o, c), billedOf(o, c), setupOf(c));
+        cs.batchTime = { totalMin: c.real, billedTotalMin: c.billed.reduce((s,v)=>s+v, 0), setupTotalMin: c.setupTotal, orders: c.chosen.length, factor: c.factor, at: new Date().toISOString() };
         full.costSnapshot = cs;
         if(markDone){
           full.orderState = 'done';
@@ -384,6 +410,8 @@
       // O tempo que fica na caixa passa a ser só o das que faltam (senão levavam o tempo do lote todo).
       const savedReal = c.chosen.filter(o=>savedIds.has(o.id)).reduce((s,o)=>s + shareOf(o, c), 0);
       $('grpReal').value = Math.max(0, c.real - savedReal).toFixed(2).replace('.', ',');
+      // O setup também: as que faltam mantêm a mesma parte cada uma.
+      if(c.setupEach != null) $('grpSetup').value = (c.setupEach * dlgList.length).toFixed(2).replace('.', ',');
       renderList();
       updateGroupPreview();
       return;

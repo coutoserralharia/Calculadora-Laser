@@ -940,7 +940,7 @@
     if(result.valid){
       const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[result.drawingType] || result.drawingType;
       html += pRow('　· Desenho', drawLabel + (result.designTimeMin ? ' — '+result.designTimeMin+' min ('+fmtEUR(result.designCost)+')' : ' — sem custo'));
-      html += pRow('　· Setup', result.setupTimeMin+' min ('+fmtEUR(result.setupCost)+')');
+      html += pRow('　· Setup', fmtNum(result.setupTimeMin,Number.isInteger(result.setupTimeMin)?0:2)+' min ('+fmtEUR(result.setupCost)+')');
     }
     html += pRow('Custo total do corte', result.valid ? (fmtEUR(result.corteCost)+' ('+fmtNum(result.cuttingTimeMin,2)+' min no total'+(result.isFinalDisplay?', real':', estimado')+window.LC.billedNote(result.cuttingTimeMin, result.billedCuttingMin)+')') : '—');
     if(result.valid && result.adjustmentValue){
@@ -1163,7 +1163,7 @@
       : result.material.name+' '+result.material.thickness+'mm · €/kg'+(result.isBatchGeometry ? ' · já é o total' : (result.qty>1 ? ' · '+fmtEUR(result.materialCostPerPiece)+'/peça' : ''));
     $('costMaterial').textContent = fmtEUR(result.materialCostTotal);
 
-    $('preCorteSub').textContent = 'Desenho '+fmtNum(result.designTimeMin,0)+'min ('+fmtEUR(result.designCost)+') + Setup '+fmtNum(result.setupTimeMin,0)+'min ('+fmtEUR(result.setupCost)+')';
+    $('preCorteSub').textContent = 'Desenho '+fmtNum(result.designTimeMin,0)+'min ('+fmtEUR(result.designCost)+') + Setup '+fmtNum(result.setupTimeMin,Number.isInteger(result.setupTimeMin)?0:1)+'min ('+fmtEUR(result.setupCost)+')';
     $('costPreCorte').textContent = fmtEUR(result.preCorteCost);
 
     $('cutTimeSub').textContent = result.isFinalDisplay
@@ -1398,6 +1398,15 @@
     setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
   }
 
+  // Setup repartido no "Tempo do grupo" (Produção): ao regravar a encomenda aberta sem mexer no
+  // setup, mantém-se a nota "orçado X min · setup do grupo Y ÷ N" para a ficha interna.
+  function keptGroupSetup(){
+    const si = state.loadedOrderId && state.loadedCostSnapshot && state.loadedCostSnapshot.setupInputs;
+    if(!si || si.groupSetupMin == null) return {};
+    if(Math.abs((parseFloat(setupTimeInput.value)||0) - (si.setupTimeMin||0)) > 0.001) return {};
+    return { quotedSetupMin: si.quotedSetupMin, groupSetupMin: si.groupSetupMin, groupSetupOrders: si.groupSetupOrders };
+  }
+
   async function loadOrderAsDuplicate(o){
     state.loadedOrderId = null;
     state.loadedOrderNumber = null;
@@ -1497,11 +1506,11 @@
             // reabrir do servidor uma encomenda "todas as peças" voltava a "1 peça".
             batch: result.isBatchGeometry,
           },
-          setupInputs: {
+          setupInputs: Object.assign({
             drawingType: drawingTypeSel.value,
             designTimeMin: parseFloat(designTimeInput.value)||0,
             setupTimeMin: parseFloat(setupTimeInput.value)||0,
-          },
+          }, keptGroupSetup()),
           // Data de conclusão — só a 1ª vez que fica "Concluído"; alimenta o "Resumo do dia".
           completedAt: state.orderState === 'done'
             ? ((state.loadedCostSnapshot && state.loadedCostSnapshot.completedAt) || new Date().toISOString())
