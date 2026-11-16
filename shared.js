@@ -884,7 +884,7 @@
     {id:'m19', name:'Alumínio',    thickness:5,  speed:1400, density:2.70, pricePerKg:3.8, markupPct:0},
     {id:'m20', name:'Alumínio',    thickness:6,  speed:1000, density:2.70, pricePerKg:3.8, markupPct:0},
   ];
-  LC.DEFAULT_MACHINE = { hourlyRate:45, roundCutMinutes:true, designRate:30, setupRate:30, pierceTime:0.8, areaBasis:'bbox', defaultSetupMin:5, wasteMarginMm:5, alertQuoteDays:7, alertRealTimeDays:2, angleCutFactor:1.4, tubeMarkup:1.5, tubeBarLengthMm:6000, tubeClampMm:400 };
+  LC.DEFAULT_MACHINE = { hourlyRate:45, roundCutMinutes:true, autoBackup:true, designRate:30, setupRate:30, pierceTime:0.8, areaBasis:'bbox', defaultSetupMin:5, wasteMarginMm:5, alertQuoteDays:7, alertRealTimeDays:2, angleCutFactor:1.4, tubeMarkup:1.5, tubeBarLengthMm:6000, tubeClampMm:400 };
 
   LC.DEFAULT_TUBE_PROFILES = [
     {id:'preto-redondo-3_8_s_rie_ligeira', material:'preto', shape:'redondo', name:'3/8" série ligeira', w:17.2, h:17.2, t:2, inch:true, costPerM:1.47},
@@ -1818,6 +1818,17 @@
         });
       }
     }
+    // Cópia automática parada porque o Chrome voltou a pedir autorização da pasta — o botão
+    // (run:'backup') pede a autorização e faz a cópia logo a seguir.
+    let autoState = null, autoFolder = '';
+    try{ autoState = localStorage.getItem('laser_auto_backup_state'); autoFolder = localStorage.getItem('laser_auto_backup_folder') || ''; }catch(e){}
+    if(autoState === 'needs-permission' && machine.autoBackup !== false){
+      alerts.push({
+        kind:'warning', title:'Cópia automática parada',
+        detail:'A pasta' + (autoFolder ? ' "' + autoFolder + '"' : '') + ' precisa de ser autorizada outra vez',
+        action:'Autorizar e copiar', run:'backup',
+      });
+    }
 
     (accuracy||[]).forEach(row=>{
       if(row.count >= 5 && Math.abs(row.avgDeviationPct) >= 3 && row.materialId){
@@ -1931,6 +1942,130 @@
       try{ localStorage.setItem('laser_theme', next); }catch(e){}
       sync();
     });
+  })();
+
+  /* ---------------------------------------------------------------- */
+  /* CÓPIAS DE SEGURANÇA — um só ficheiro com as encomendas (com DXF) e */
+  /* as definições (materiais, máquina, perfis de tubo). Os dados de    */
+  /* ligação ao servidor ficam de fora. Cópia automática diária na pasta */
+  /* ligada nas Definições (Chrome/Edge no computador).                 */
+  /* ---------------------------------------------------------------- */
+  const BACKUP_DIR = '_copias-de-seguranca', BACKUP_KEEP = 30;
+  const BACKUP_RE = /^laser-copia-\d{4}-\d{2}-\d{2}\.json$/;
+  const dayKey = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const lsGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
+  const lsSet = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
+  LC.BACKUP_DIR = BACKUP_DIR;
+  LC.backupFileName = function(d){ return 'laser-copia-' + dayKey(d || new Date()) + '.json'; };
+
+  LC.buildFullBackup = async function(){
+    const remote = await LC.loadRemoteConfig();
+    // Do servidor vem tudo de novo, com os DXF (as listas das páginas vêm sem eles).
+    const orders = remote.configured ? await LC.remoteLoadOrders(remote) : await LC.loadOrders();
+    return {
+      app:'JGPVCLASER', kind:'full-backup', version:1, createdAt:new Date().toISOString(),
+      orders,
+      settings:{ materials: await LC.loadMaterials(), machine: await LC.loadMachine(), tubeProfiles: await LC.loadTubeProfiles() },
+    };
+  };
+  LC.downloadJSON = function(obj, fileName){
+    const blob = new Blob([JSON.stringify(obj)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  // Data da última cópia feita neste aparelho (manual ou automática) — alimenta o lembrete.
+  LC.markBackupDone = function(auto){
+    const now = new Date().toISOString();
+    lsSet('laser_last_backup', now);
+    lsSet('laser_last_backup_kind', auto ? 'auto' : 'manual');
+    if(auto){ lsSet('laser_auto_backup_at', now); lsSet('laser_auto_backup_day', dayKey(new Date())); }
+  };
+  LC.lastBackupInfo = function(){
+    const at = lsGet('laser_last_backup');
+    return at ? { at, auto: lsGet('laser_last_backup_kind') === 'auto' } : null;
+  };
+  LC.lastAutoBackupAt = () => lsGet('laser_auto_backup_at');
+  // Aceita a cópia completa e também os ficheiros antigos ("Exportar encomendas" = lista de
+  // encomendas; "Exportar definições" = { materials, tubeProfiles, machine }).
+  LC.parseBackup = function(payload){
+    if(Array.isArray(payload)) return { orders: payload, settings: null, createdAt: null };
+    if(payload && payload.kind === 'full-backup'){
+      return { orders: Array.isArray(payload.orders) ? payload.orders : [], settings: payload.settings || null, createdAt: payload.createdAt || null };
+    }
+    if(payload && (Array.isArray(payload.materials) || (payload.machine && typeof payload.machine === 'object'))){
+      return { orders: [], settings: payload, createdAt: null };
+    }
+    throw new Error('formato inesperado');
+  };
+  LC.applyBackupSettings = async function(s){
+    if(Array.isArray(s.materials) && s.materials.length) await LC.saveMaterials(s.materials);
+    if(Array.isArray(s.tubeProfiles) && s.tubeProfiles.length && s.tubeProfiles[0].shape) await LC.saveTubeProfiles(s.tubeProfiles);
+    if(s.machine && typeof s.machine === 'object') await LC.saveMachine(Object.assign({}, LC.DEFAULT_MACHINE, s.machine));
+  };
+
+  // Cópia para a pasta ligada nas Definições, na subpasta _copias-de-seguranca (fica com as últimas 30).
+  // opts.force = faz mesmo que já haja a de hoje (substitui-a); opts.interactive = pode pedir
+  // autorização da pasta (só dentro de um clique). Devolve { status, file, folder, orders, error }:
+  // status = done | exists | off | unsupported | no-folder | needs-permission | busy | error.
+  LC.runFolderBackup = async function(opts){
+    opts = opts || {};
+    if(!('showDirectoryPicker' in window) || !window.indexedDB) return { status:'unsupported' };
+    if(!opts.force && lsGet('laser_auto_backup_day') === dayKey(new Date())) return { status:'exists' };
+    const machine = await LC.loadMachine();
+    if(!opts.force && machine.autoBackup === false) return { status:'off' };
+    let root = null;
+    try{ root = await LC.idbGet('rootDir'); }catch(e){}
+    if(!root) return { status:'no-folder' };
+    lsSet('laser_auto_backup_folder', root.name);
+    let perm = await root.queryPermission({mode:'readwrite'});
+    if(perm !== 'granted' && opts.interactive) perm = await root.requestPermission({mode:'readwrite'});
+    if(perm !== 'granted'){
+      lsSet('laser_auto_backup_state', 'needs-permission');
+      return { status:'needs-permission', folder: root.name };
+    }
+    // Com vários separadores abertos, só um faz a cópia de cada vez.
+    const lock = parseInt(lsGet('laser_backup_lock'), 10);
+    if(!opts.force && lock && Date.now() - lock < 3*60*1000) return { status:'busy' };
+    lsSet('laser_backup_lock', String(Date.now()));
+    try{
+      const dir = await root.getDirectoryHandle(BACKUP_DIR, {create:true});
+      const name = LC.backupFileName();
+      if(!opts.force){
+        let exists = false;
+        try{ await dir.getFileHandle(name); exists = true; }catch(e){ /* ainda não há a de hoje */ }
+        if(exists){
+          lsSet('laser_auto_backup_day', dayKey(new Date()));
+          lsSet('laser_auto_backup_state', 'ok');
+          return { status:'exists', file:name, folder:root.name };
+        }
+      }
+      const data = await LC.buildFullBackup();
+      const fh = await dir.getFileHandle(name, {create:true});
+      const w = await fh.createWritable();
+      await w.write(JSON.stringify(data));
+      await w.close();
+      // Apaga as mais antigas (os nomes têm a data, por isso a ordem alfabética é a cronológica).
+      const names = [];
+      for await (const [n, h] of dir.entries()){ if(h.kind === 'file' && BACKUP_RE.test(n)) names.push(n); }
+      for(const n of names.sort().reverse().slice(BACKUP_KEEP)){ try{ await dir.removeEntry(n); }catch(e){} }
+      LC.markBackupDone(true);
+      lsSet('laser_auto_backup_state', 'ok');
+      return { status:'done', file:name, folder:root.name, orders: data.orders.length };
+    }catch(err){
+      return { status:'error', error: err.message, folder: root.name };
+    }finally{
+      try{ localStorage.removeItem('laser_backup_lock'); }catch(e){}
+    }
+  };
+  // Ao abrir qualquer página (no computador, com pasta ligada): faz a cópia do dia se ainda não
+  // houver. Espera uns segundos para não atrasar o arranque da página.
+  (function scheduleAutoBackup(){
+    if(!('showDirectoryPicker' in window) || !window.indexedDB) return;
+    if(lsGet('laser_auto_backup_day') === dayKey(new Date())) return;
+    setTimeout(()=>{ LC.runFolderBackup().catch(()=>{}); }, 5000);
   })();
 
   /* ---------------------------------------------------------------- */

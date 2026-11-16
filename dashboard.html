@@ -370,10 +370,24 @@
       '<div class="alert-item alert-' + a.kind + '">' +
         '<p class="alert-title">' + escapeHtml(a.title) + '</p>' +
         '<p class="alert-detail">' + escapeHtml(a.detail) + '</p>' +
-        '<a class="ghost-btn sm" href="' + a.href + '">' + escapeHtml(a.action) + '</a>' +
+        (a.run
+          ? '<button class="ghost-btn sm" type="button" data-run="' + a.run + '">' + escapeHtml(a.action) + '</button>'
+          : '<a class="ghost-btn sm" href="' + a.href + '">' + escapeHtml(a.action) + '</a>') +
       '</div>'
     ).join('');
   }
+  // "Autorizar e copiar": tem de ser dentro do clique, senão o Chrome não mostra o pedido de autorização.
+  $('alertsList').addEventListener('click', async e=>{
+    const btn = e.target.closest('[data-run="backup"]');
+    if(!btn) return;
+    btn.disabled = true;
+    btn.textContent = 'A fazer a cópia…';
+    const r = await window.LC.runFolderBackup({ force:true, interactive:true }).catch(err=>({ status:'error', error:err.message }));
+    if(r.status === 'done') await window.LC.showAlert('Cópia de segurança feita: ' + window.LC.BACKUP_DIR + '\\' + r.file + ' (' + r.orders + ' encomendas).');
+    else if(r.status === 'needs-permission') await window.LC.showAlert('A pasta não foi autorizada — a cópia automática continua parada.');
+    else if(r.status === 'error') await window.LC.showAlert('Não foi possível fazer a cópia: ' + r.error);
+    renderAlerts();
+  });
 
   function renderWeek(){
     const w = summarizeWeek(state.orders);

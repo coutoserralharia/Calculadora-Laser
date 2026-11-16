@@ -298,6 +298,11 @@ create policy "só utilizadores autenticados"
             <button class="ghost-btn" id="forgetFolderBtn" type="button" hidden>Desligar pasta</button>
           </div>
           <p class="save-hint" id="folderStatus"></p>
+          <div id="autoBackupBox" hidden>
+            <label class="client-mat-opt" for="autoBackupChk"><input type="checkbox" id="autoBackupChk"><span>Fazer uma cópia completa automática por dia nesta pasta<small>Ao abrir a app no computador, se ainda não houver a cópia de hoje. Fica na subpasta "_copias-de-seguranca", com as encomendas (e os DXF) e as definições; guardam-se as últimas 30 e as mais antigas são apagadas.</small></span></label>
+            <div class="mat-actions" style="margin-top:10px;"><button class="ghost-btn" id="backupNowBtn" type="button">Fazer cópia agora</button></div>
+            <p class="save-hint" id="backupStatus"></p>
+          </div>
         </div>
       </div>
     </details>
@@ -364,6 +369,7 @@ create policy "só utilizadores autenticados"
     tubeBarLengthMmInp.value = state.machine.tubeBarLengthMm ?? 6000;
     tubeClampMmInp.value = state.machine.tubeClampMm ?? 400;
     roundCutChk.checked = state.machine.roundCutMinutes !== false;
+    autoBackupChk.checked = state.machine.autoBackup !== false;
   }
   [hourlyRateInp, designRateInp, pierceTimeInp, areaBasisSel, setupRateInp, defaultSetupMinInp, wasteMarginMmInp, alertQuoteDaysInp, alertRealTimeDaysInp, alertBackupDaysInp, tubeMarkupInp, tubeBarLengthMmInp, tubeClampMmInp].forEach(inp=>{
     inp.addEventListener('input', ()=>{
@@ -547,7 +553,9 @@ create policy "só utilizadores autenticados"
     const reader = new FileReader();
     reader.onload = async ev => {
       try{
-        const payload = JSON.parse(ev.target.result);
+        // Aceita o ficheiro de definições e também a cópia completa (usa só a parte das definições).
+        const payload = window.LC.parseBackup(JSON.parse(ev.target.result)).settings;
+        if(!payload) throw new Error('sem definições');
         if(Array.isArray(payload.materials) && payload.materials.length) state.materials = payload.materials;
         if(Array.isArray(payload.tubeProfiles) && payload.tubeProfiles.length && payload.tubeProfiles[0].shape) state.tubeProfiles = payload.tubeProfiles;
         if(payload.machine && typeof payload.machine==='object') state.machine = Object.assign({}, DEFAULT_MACHINE, payload.machine);
@@ -673,7 +681,46 @@ create policy "só utilizadores autenticados"
   const chooseFolderBtn = $('chooseFolderBtn'), forgetFolderBtn = $('forgetFolderBtn'), folderStatusEl = $('folderStatus');
   const localFolderControlsEl = $('localFolderControls'), localFolderUnsupportedEl = $('localFolderUnsupported');
 
+  /* Cópia automática diária — usa a mesma pasta (LC.runFolderBackup, em shared.js). */
+  const autoBackupBox = $('autoBackupBox'), autoBackupChk = $('autoBackupChk'), backupStatusEl = $('backupStatus');
+  function renderBackupStatus(){
+    const at = window.LC.lastAutoBackupAt();
+    backupStatusEl.style.color = at ? 'var(--readout)' : '';
+    if(!at){ backupStatusEl.textContent = 'Ainda não foi feita nenhuma cópia automática neste computador.'; return; }
+    const d = new Date(at);
+    const when = d.toDateString() === new Date().toDateString() ? 'hoje' : d.toLocaleDateString('pt-PT');
+    backupStatusEl.textContent = 'Última cópia automática: ' + when + ' às ' + d.toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'}) + '.';
+  }
+  autoBackupChk.addEventListener('change', ()=>{
+    state.machine.autoBackup = autoBackupChk.checked;
+    saveMachine(state.machine);
+  });
+  $('backupNowBtn').addEventListener('click', async ()=>{
+    const btn = $('backupNowBtn');
+    btn.disabled = true;
+    backupStatusEl.style.color = '';
+    backupStatusEl.textContent = 'A fazer a cópia (com os ficheiros DXF)…';
+    const r = await window.LC.runFolderBackup({ force:true, interactive:true }).catch(err=>({ status:'error', error:err.message }));
+    btn.disabled = false;
+    if(r.status === 'done'){
+      backupStatusEl.style.color = 'var(--readout)';
+      backupStatusEl.textContent = 'Cópia feita: ' + window.LC.BACKUP_DIR + '\\' + r.file + ' (' + r.orders + ' encomendas e as definições).';
+      if(!state.localFolder.ready){ state.localFolder.ready = true; chooseFolderBtn.textContent = 'Escolher pasta'; updateFolderUI(); }
+    } else {
+      backupStatusEl.style.color = 'var(--danger)';
+      backupStatusEl.textContent = r.status === 'needs-permission' ? 'A pasta não foi autorizada — a cópia não foi feita.'
+        : 'Não foi possível fazer a cópia' + (r.error ? ': ' + r.error : '') + '.';
+    }
+  });
+
+  // Pasta acabada de ligar/autorizar: faz logo a cópia do dia (se ainda não houver e a opção estiver ligada).
+  function autoBackupAfterLink(){
+    window.LC.runFolderBackup().then(r=>{ if(r.status === 'done') renderBackupStatus(); }).catch(()=>{});
+  }
+
   function updateFolderUI(){
+    autoBackupBox.hidden = !state.localFolder.handle;
+    renderBackupStatus();
     chooseFolderBtn.hidden = state.localFolder.ready;
     forgetFolderBtn.hidden = !state.localFolder.ready;
     if(state.localFolder.ready){
@@ -690,6 +737,7 @@ create policy "só utilizadores autenticados"
           state.localFolder.ready = true;
           chooseFolderBtn.textContent = 'Escolher pasta';
           updateFolderUI();
+          autoBackupAfterLink();
         } else {
           folderStatusEl.style.color = 'var(--danger)';
           folderStatusEl.textContent = 'Permissão não concedida.';
@@ -701,6 +749,7 @@ create policy "só utilizadores autenticados"
       state.localFolder = { supported:true, handle, ready:true, name:handle.name };
       chooseFolderBtn.textContent = 'Escolher pasta';
       updateFolderUI();
+      autoBackupAfterLink();
     }catch(err){
       if(err && err.name==='AbortError') return;
       folderStatusEl.style.color = 'var(--danger)';
@@ -710,6 +759,8 @@ create policy "só utilizadores autenticados"
 
   forgetFolderBtn.addEventListener('click', async ()=>{
     try{ await idbDelete('rootDir'); }catch(e){}
+    // Sem pasta deixa de haver cópia automática — e o aviso "Cópia automática parada" sai do Dashboard.
+    try{ localStorage.removeItem('laser_auto_backup_state'); }catch(e){}
     state.localFolder = { supported:true, handle:null, ready:false, name:'' };
     chooseFolderBtn.textContent = 'Escolher pasta';
     updateFolderUI();

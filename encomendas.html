@@ -126,14 +126,16 @@
     </div>
 
     <div class="card">
-      <h2 class="card-title"><span class="dot"></span>Exportar / Importar</h2>
+      <h2 class="card-title"><span class="dot"></span>Cópias de segurança</h2>
+      <p class="save-hint" style="margin:0 0 10px;">Um só ficheiro com as encomendas (com os ficheiros DXF) e as definições: materiais e preços, parâmetros da máquina e perfis de tubo. Os dados de ligação ao servidor não vão no ficheiro.</p>
       <div class="mat-actions">
-        <button class="ghost-btn" id="exportOrdersBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Exportar encomendas</button>
-        <label class="ghost-btn" for="importOrdersInput"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 10V2m0 0l-3 3m3-3l3 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Importar encomendas</label>
+        <button class="ghost-btn accent" id="exportOrdersBtn" type="button"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Fazer cópia completa</button>
+        <label class="ghost-btn" for="importOrdersInput"><svg class="btn-icon" viewBox="0 0 16 16"><path d="M8 10V2m0 0l-3 3m3-3l3 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Repor a partir de uma cópia</label>
         <input type="file" id="importOrdersInput" accept="application/json" style="display:none;">
       </div>
+      <p class="save-hint" id="lastBackupNote"></p>
       <p class="save-hint" id="saveOrderHint"></p>
-      <p class="save-hint" id="localStorageNote">As encomendas ficam guardadas neste navegador/dispositivo. Exporte periodicamente para ter uma cópia de segurança ou para levar para outro PC/telemóvel. Para ligação automática entre aparelhos, vá a <a href="definicoes.html" style="color:var(--readout);">Definições avançadas</a>.</p>
+      <p class="save-hint" id="localStorageNote">As encomendas ficam guardadas neste navegador/dispositivo. Faça cópias completas com regularidade — também servem para levar tudo para outro PC/telemóvel. Para ligação automática entre aparelhos, vá a <a href="definicoes.html" style="color:var(--readout);">Definições avançadas</a>.</p>
     </div>
 
     <div class="card">
@@ -445,34 +447,40 @@
     onFilterChange();
   });
 
+  function renderLastBackup(){
+    const info = window.LC.lastBackupInfo();
+    const el = $('lastBackupNote');
+    if(!info){ el.style.color = ''; el.textContent = 'Ainda não foi feita nenhuma cópia neste aparelho.'; return; }
+    const d = new Date(info.at), today = new Date();
+    const when = d.toDateString() === today.toDateString()
+      ? 'hoje às ' + d.toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'})
+      : d.toLocaleDateString('pt-PT') + ' às ' + d.toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'});
+    el.style.color = 'var(--readout)';
+    el.textContent = 'Última cópia neste aparelho: ' + when + (info.auto ? ' (automática, na pasta do computador)' : '');
+  }
+
   $('exportOrdersBtn').addEventListener('click', async ()=>{
-    // A lista desta página vem sem os ficheiros DXF (modo "light") — para a cópia de segurança
-    // vai buscar tudo de novo ao servidor, com os DXF, senão a cópia não servia para repor.
-    let toExport = state.orders;
-    if(state.remote.configured){
-      const btn = $('exportOrdersBtn');
-      btn.disabled = true;
-      saveOrderHint.style.color = '';
-      saveOrderHint.textContent = 'A preparar a cópia completa (com os ficheiros DXF)…';
-      try{ toExport = await remoteLoadOrders(state.remote); }
-      catch(err){
-        btn.disabled = false;
-        saveOrderHint.textContent = '';
-        await window.LC.showAlert('Não foi possível ir buscar as encomendas completas ao servidor: ' + err.message + '\n\nA cópia não foi feita.');
-        return;
-      }
+    // A lista desta página vem sem os ficheiros DXF (modo "light") — a cópia vai buscar tudo de
+    // novo ao servidor, com os DXF, senão não servia para repor.
+    const btn = $('exportOrdersBtn');
+    btn.disabled = true;
+    saveOrderHint.style.color = '';
+    saveOrderHint.textContent = 'A preparar a cópia completa (com os ficheiros DXF)…';
+    let data;
+    try{ data = await window.LC.buildFullBackup(); }
+    catch(err){
       btn.disabled = false;
-      saveOrderHint.style.color = 'var(--readout)';
-      saveOrderHint.textContent = 'Cópia de segurança feita: ' + toExport.length + ' encomenda(s).';
-      setTimeout(()=>{ saveOrderHint.textContent=''; }, 5000);
+      saveOrderHint.textContent = '';
+      await window.LC.showAlert('Não foi possível ir buscar as encomendas completas ao servidor: ' + err.message + '\n\nA cópia não foi feita.');
+      return;
     }
-    try{ localStorage.setItem('laser_last_backup', new Date().toISOString()); }catch(e){}
-    const blob = new Blob([JSON.stringify(toExport, null, 2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'laser-cost-encomendas.json';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    btn.disabled = false;
+    window.LC.downloadJSON(data, window.LC.backupFileName());
+    window.LC.markBackupDone(false);
+    renderLastBackup();
+    saveOrderHint.style.color = 'var(--readout)';
+    saveOrderHint.textContent = 'Cópia completa feita: ' + data.orders.length + ' encomenda(s) e as definições.';
+    setTimeout(()=>{ saveOrderHint.textContent=''; }, 5000);
   });
 
   $('importOrdersInput').addEventListener('change', e=>{
@@ -480,12 +488,35 @@
     if(!file) return;
     const reader = new FileReader();
     reader.onload = async ev => {
+      let backup;
+      try{ backup = window.LC.parseBackup(JSON.parse(ev.target.result)); }
+      catch(err){
+        await window.LC.showAlert('Não foi possível ler este ficheiro. Verifique se é uma cópia feita por esta aplicação.');
+        e.target.value = '';
+        return;
+      }
+      e.target.value = '';
+      const existingIds = new Set(state.orders.map(o=>o.id));
+      const newOnes = backup.orders.filter(o => o && o.id && !existingIds.has(o.id));
+      const skipped = backup.orders.length - newOnes.length;
+      // Pergunta antes de mexer em nada: o que tem o ficheiro e o que vai acontecer.
+      const when = backup.createdAt ? ' de ' + new Date(backup.createdAt).toLocaleString('pt-PT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+      let msg = 'Repor cópia' + when + '\n\n';
+      if(backup.orders.length){
+        msg += 'O ficheiro tem ' + backup.orders.length + ' encomenda(s)' + (backup.settings ? ' e as definições' : '') + '.\n' +
+          '• ' + newOnes.length + (newOnes.length===1 ? ' não existe e vai ser acrescentada.' : ' não existem e vão ser acrescentadas.') + '\n' +
+          '• ' + skipped + (skipped===1 ? ' já existe e fica como está' : ' já existem e ficam como estão') + ' (nada é apagado nem substituído).';
+      } else {
+        msg += 'O ficheiro só tem as definições.';
+      }
+      if(backup.settings) msg += '\n\nRepor as definições substitui os materiais, preços e parâmetros da máquina atuais pelos da cópia.';
+      const items = [{ label:'Cancelar', value:null }];
+      if(backup.orders.length) items.push({ label: backup.settings ? 'Só as encomendas' : 'Repor encomendas', value:'orders', accent: !backup.settings });
+      if(backup.settings) items.push({ label: backup.orders.length ? 'Encomendas e definições' : 'Repor definições', value:'all', accent:true });
+      const choice = await window.LC.showChoice(msg, items);
+      if(!choice) return;
       try{
-        const payload = JSON.parse(ev.target.result);
-        if(!Array.isArray(payload)) throw new Error('formato inesperado');
-        const existingIds = new Set(state.orders.map(o=>o.id));
-        const newOnes = payload.filter(o => o && o.id && !existingIds.has(o.id));
-        const skipped = payload.length - newOnes.length;
+        if(choice === 'all') await window.LC.applyBackupSettings(backup.settings);
         let imported = 0, failed = 0, lastErr = '';
         if(state.remote.configured){
           for(let i=0;i<newOnes.length;i++){
@@ -502,19 +533,20 @@
         populateFilterOptions();
         renderOrdersList();
         saveOrderHint.style.color = failed ? 'var(--danger)' : 'var(--readout)';
-        saveOrderHint.textContent = imported + ' encomenda(s) importada(s).' +
-          (skipped ? ' ' + skipped + (skipped===1 ? ' já existia e foi ignorada.' : ' já existiam e foram ignoradas.') : '') +
-          (failed ? ' ' + failed + (failed===1 ? ' falhou' : ' falharam') + ' (' + lastErr + ').' : '');
-        if(!failed) setTimeout(()=>{ saveOrderHint.textContent=''; }, 6000);
+        saveOrderHint.textContent = (backup.orders.length ? imported + ' encomenda(s) reposta(s).' : '') +
+          (skipped ? ' ' + skipped + (skipped===1 ? ' já existia e ficou como estava.' : ' já existiam e ficaram como estavam.') : '') +
+          (failed ? ' ' + failed + (failed===1 ? ' falhou' : ' falharam') + ' (' + lastErr + ').' : '') +
+          (choice === 'all' ? ' Definições repostas.' : '');
+        if(!failed) setTimeout(()=>{ saveOrderHint.textContent=''; }, 8000);
       }catch(err){
-        await window.LC.showAlert('Não foi possível importar este ficheiro de encomendas.');
+        await window.LC.showAlert('Não foi possível repor a cópia: ' + err.message);
       }
-      e.target.value = '';
     };
     reader.readAsText(file);
   });
 
   async function init(){
+    renderLastBackup();
     state.remote = await loadRemoteConfig();
     updateConnBadge();
     if(state.remote.configured){
