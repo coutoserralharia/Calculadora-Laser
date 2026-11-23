@@ -372,6 +372,8 @@
     let s = f(si.setupTimeMin||0) + ' min';
     if(si.groupSetupMin != null && si.quotedSetupMin != null){
       s += ' (orçado ' + f(si.quotedSetupMin) + ' min · setup do grupo ' + f(si.groupSetupMin) + ' min ÷ ' + si.groupSetupOrders + ')';
+    } else if(si.quotedSetupMin != null && Math.abs(si.quotedSetupMin - (si.setupTimeMin||0)) > 0.001){
+      s += ' (orçado ' + f(si.quotedSetupMin) + ' min)';  // setup corrigido no fecho de uma encomenda (tubo)
     }
     return s;
   };
@@ -829,13 +831,16 @@
     html += '<div class="p-costs-title">Custo da encomenda</div>';
     html += pRow('Custo total do material', isFinite(cs.materialCost) ? fmtEUR(cs.materialCost*(rec.quantity||1)) : '—');
     html += pRow('Custo pré-corte', isFinite(cs.preCorteCost) ? fmtEUR(cs.preCorteCost) : '—');
-    if(cs.setupInputs && !isTube){
+    // Tubos antigos (só material, sem preparação nem corte) não têm estas linhas.
+    const legacyTube = isTube && cs.noCuttingCharge;
+    if(cs.setupInputs && !legacyTube){
       const si = cs.setupInputs;
-      const drawLabel = {client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[si.drawingType] || si.drawingType || '—';
-      html += pRow('　· Desenho', escapeHtml(drawLabel) + (si.designTimeMin ? ' — '+fmtNum(si.designTimeMin,0)+' min ('+fmtEUR(cs.designCost||0)+')' : ' — sem custo'));
+      const drawLabel = isTube ? '' : ({client_direct:'Desenho do cliente', client_convert:'Conversão de desenho', from_scratch:'Desenho de raiz'}[si.drawingType] || si.drawingType || '—') + ' — ';
+      html += pRow('　· Desenho', escapeHtml(drawLabel) + (si.designTimeMin ? fmtNum(si.designTimeMin, Number.isInteger(si.designTimeMin)?0:1)+' min ('+fmtEUR(cs.designCost||0)+')' : 'sem custo'));
       html += pRow('　· Setup', LC.setupTimeLabel(si) + (isFinite(cs.setupCost) ? ' ('+fmtEUR(cs.setupCost)+')' : ''));
     }
-    html += pRow('Custo total do corte', isFinite(cs.corteCost) ? (fmtEUR(cs.corteCost)+' ('+fmtNum(cs.cuttingTimeMin,cs.billedCuttingMin!=null?2:1)+' min, '+(cs.isFinal?'real':'estimado')+LC.billedNote(cs.cuttingTimeMin, cs.billedCuttingMin)+')') : '—');
+    html += pRow('Custo total do corte', isTube && !cs.isFinal ? 'por registar (entra com o tempo real)'
+      : isFinite(cs.corteCost) ? (fmtEUR(cs.corteCost)+' ('+fmtNum(cs.cuttingTimeMin,cs.billedCuttingMin!=null?2:1)+' min, '+(cs.isFinal?'real':'estimado')+LC.billedNote(cs.cuttingTimeMin, cs.billedCuttingMin)+')') : '—');
     if(cs.adjustmentValue){
       html += pRow('Subtotal', fmtEUR(cs.subtotal));
       html += pRow('Ajuste comercial' + (cs.adjustmentReason?' ('+escapeHtml(cs.adjustmentReason)+')':''), (cs.adjustmentValue>0?'+':'')+fmtEUR(cs.adjustmentValue));
@@ -1486,12 +1491,10 @@
   LC.recomputeFinalCost = async function(rec, realCuttingTimeMin, billedMin, setup){
     const cs = rec.costSnapshot || {};
     const qty = rec.quantity || 1;
-
-    // Encomendas de tubo (novo método): o corte não se cobra, o tempo real é só registo — o preço
-    // fica exatamente como estava; só passa a "final" com o tempo registado.
-    if(cs.noCuttingCharge){
-      return Object.assign({}, cs, { cuttingTimeMin: realCuttingTimeMin, isFinal: true });
-    }
+    // Os tubos passaram a cobrar o corte como a chapa (as encomendas antigas de tubo ainda trazem
+    // noCuttingCharge com corteCost 0 — o delta abaixo acrescenta o corte na mesma).
+    // realCuttingTimeMin null = só muda o setup; o corte fica como estava.
+    const keepCut = realCuttingTimeMin == null;
 
     let machine = null;
     try{ machine = await LC.loadMachine(); }catch(e){}
@@ -1500,10 +1503,10 @@
     hourlyRate = hourlyRate || 0;
     // O tempo real introduzido é sempre o TOTAL da encomenda (todas as peças, já inclui
     // perfurações) — não se soma nem se multiplica mais nada a este tempo.
-    const billedCuttingMin = Number.isFinite(billedMin)
-      ? billedMin
+    const billedCuttingMin = keepCut ? cs.billedCuttingMin
+      : Number.isFinite(billedMin) ? billedMin
       : LC.billedCutMinutes(realCuttingTimeMin, LC.roundCutEnabled(machine));
-    const corteCost = (billedCuttingMin/60) * hourlyRate;
+    const corteCost = keepCut ? (isFinite(cs.corteCost) ? cs.corteCost : 0) : (billedCuttingMin/60) * hourlyRate;
     let delta = corteCost - (isFinite(cs.corteCost) ? cs.corteCost : 0);
 
     // Setup do grupo: muda só o custo de setup (ao custo/hora de setup gravado na encomenda).
@@ -1535,11 +1538,9 @@
     const totalCost = isFinite(cs.totalCost)
       ? cs.totalCost + delta
       : corteCost + (cs.materialCost||0)*qty + (setupOut ? setupOut.preCorteCost : (cs.preCorteCost||0)) + (cs.adjustmentValue||0);
-    const out = Object.assign({
-      cuttingTimeMin: realCuttingTimeMin, billedCuttingMin,
-      corteCost, totalCost, avgPerPiece: totalCost / qty,
-      isFinal: true,
-    }, setupOut);
+    const out = Object.assign(keepCut ? {} : {
+      cuttingTimeMin: realCuttingTimeMin, billedCuttingMin, isFinal: true, noCuttingCharge: false,
+    }, { corteCost, totalCost, avgPerPiece: totalCost / qty }, setupOut);
     if(isFinite(cs.subtotal)) out.subtotal = cs.subtotal + delta;
     if(isFinite(cs.realCost)){
       out.realCost = cs.realCost + delta;

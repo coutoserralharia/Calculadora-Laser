@@ -228,8 +228,11 @@
         <div class="breakdown-row"><span class="lbl">Metros cortados<small id="cutMetresSub">—</small></span><span class="val" id="valCutMetres">—</span></div>
         <div class="breakdown-row"><span class="lbl">Barras usadas<small id="barsSub">—</small></span><span class="val" id="valBarMetres">—</span></div>
         <div class="breakdown-row"><span class="lbl">Custo de material (compra, barras usadas)<small id="costSub">—</small></span><span class="val" id="costMaterial">€0,00</span></div>
-        <div class="breakdown-row"><span class="lbl">Margem</span><span class="val" id="marginValueShown">€0,00</span></div>
-        <div class="breakdown-row"><span class="lbl">Valor de venda <small>(antes de ajuste)</small></span><span class="val" id="subtotalValue">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Margem<small>só no material — preparação e corte já estão ao custo/hora</small></span><span class="val" id="marginValueShown">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Venda do material<small id="saleMaterialSub">—</small></span><span class="val" id="saleMaterialValue">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo pré-corte<small id="preCorteSub">—</small></span><span class="val" id="costPreCorte">€0,00</span></div>
+        <div class="breakdown-row"><span class="lbl">Custo do corte<small id="cutTimeSub">—</small></span><span class="val" id="costCorte">—</span></div>
+        <div class="breakdown-row"><span class="lbl">Subtotal <small>(antes de ajuste)</small></span><span class="val" id="subtotalValue">€0,00</span></div>
 
         <button class="ghost-btn sm" id="showAdjustmentBtn" type="button" style="margin:10px 0 4px;">+ Ajuste comercial</button>
         <div class="field" id="adjustmentFields" hidden style="margin:12px 0 4px;">
@@ -260,6 +263,15 @@
       </div>
 
       <div class="card">
+        <h2 class="card-title"><span class="dot"></span>Preparação</h2>
+        <div class="field-row" style="margin-bottom:0;">
+          <div class="field" style="margin-bottom:0;"><label for="designTimeInput">Tempo de desenho</label><div class="unit-suffix"><input type="number" id="designTimeInput" min="0" step="1" placeholder="0"><span>min</span></div></div>
+          <div class="field" style="margin-bottom:0;"><label for="setupTimeInput">Tempo de setup</label><div class="unit-suffix"><input type="number" id="setupTimeInput" min="0" step="1" placeholder="0"><span>min</span></div></div>
+        </div>
+        <p class="save-hint" style="margin-top:10px;">Preenchidos à mão em cada encomenda (vazio = 0). Entram logo no orçamento, ao custo/hora de desenho e de setup das Definições.</p>
+      </div>
+
+      <div class="card">
         <h2 class="card-title"><span class="dot"></span>Depois de cortado</h2>
         <div class="field" style="margin-bottom:0;">
           <label for="realCuttingTimeInput">Tempo de corte real — total da encomenda, todas as peças (min)</label>
@@ -268,7 +280,7 @@
             <button class="ghost-btn sm" id="clearRealTimeBtn" type="button">Limpar</button>
           </div>
         </div>
-        <p class="save-hint" style="margin-top:10px;">Por agora é só registo — não entra no preço. Também pode ser registado em Produção, como na chapa.</p>
+        <p class="save-hint" style="margin-top:10px;">Entra no preço ao custo/hora de corte das Definições (arredondado ao minuto, como na chapa). Também pode ser registado em Produção.</p>
       </div>
 
       <div class="card">
@@ -358,6 +370,7 @@
   const barLengthInput = $('barLengthInput'), clampInput = $('clampInput'), barsInput = $('barsInput');
   const manualCostInput = $('manualCostInput'), manualSaleInput = $('manualSaleInput');
   const realCuttingTimeInput = $('realCuttingTimeInput'), clearRealTimeBtn = $('clearRealTimeBtn');
+  const designTimeInput = $('designTimeInput'), setupTimeInput = $('setupTimeInput');
   const adjustmentValueInput = $('adjustmentValueInput'), adjustmentReasonSelect = $('adjustmentReasonSelect');
   const showAdjustmentBtn = $('showAdjustmentBtn'), adjustmentFields = $('adjustmentFields');
   function revealAdjustment(){ adjustmentFields.hidden = false; showAdjustmentBtn.hidden = true; }
@@ -478,10 +491,21 @@
     const realTimeVal = parseFloat(realTimeRaw);
     const isFinalTime = realTimeRaw !== '' && Number.isFinite(realTimeVal) && realTimeVal >= 0;
 
-    const subtotal = saleVal;
+    // Preparação (à mão) e corte (tempo real, arredondado ao minuto como na chapa) — ao custo/hora
+    // das Definições, iguais no preço e no custo real (a margem fica só no material).
+    const m = state.machine;
+    const designTimeMin = Math.max(0, parseFloat(designTimeInput.value) || 0);
+    const setupTimeMin = Math.max(0, parseFloat(setupTimeInput.value) || 0);
+    const designCost = designTimeMin/60 * (m.designRate || 0);
+    const setupCost = setupTimeMin/60 * (m.setupRate || 0);
+    const preCorteCost = designCost + setupCost;
+    const billedCuttingMin = isFinalTime ? window.LC.billedCutMinutes(realTimeVal, window.LC.roundCutEnabled(m)) : 0;
+    const corteCost = billedCuttingMin/60 * (m.hourlyRate || 0);
+
+    const subtotal = saleVal + preCorteCost + corteCost;
     const adjustmentValue = parseFloat(adjustmentValueInput.value) || 0;
     const totalCost = subtotal + adjustmentValue;
-    const realCost = costVal;
+    const realCost = costVal + preCorteCost + corteCost;
     const marginValue = totalCost - realCost;
     const marginPct = realCost > 0 ? (marginValue/realCost)*100 : null;
     const avgPerPiece = totalCost / qty;
@@ -489,7 +513,8 @@
     return {
       valid:true, profile, qty, lenMm, priced, markup, salePerM,
       barLenMm, clampMm, usableMm, ppb, suggestedBars, bars, cutMm, barMm, capacity,
-      cuttingTimeMin: isFinalTime ? realTimeVal : 0,
+      cuttingTimeMin: isFinalTime ? realTimeVal : 0, billedCuttingMin, corteCost,
+      designTimeMin, setupTimeMin, designCost, setupCost, preCorteCost,
       materialCostPerPiece: saleVal / qty,
       subtotal, adjustmentValue, adjustmentReason: adjustmentReasonSelect.value,
       totalCost, realCost, marginValue, marginPct, avgPerPiece, saleVal, costVal,
@@ -683,9 +708,9 @@
       : 'Sobra/desperdício: —';
 
     if(!r.valid){
-      ['costMaterial','marginValueShown','subtotalValue','totalValue','avgPerPieceValue'].forEach(id=>$(id).textContent = fmtEUR(0));
-      ['valCutMetres','valBarMetres'].forEach(id=>$(id).textContent = '—');
-      ['cutMetresSub','barsSub','costSub'].forEach(id=>$(id).textContent = '—');
+      ['costMaterial','marginValueShown','subtotalValue','totalValue','avgPerPieceValue','saleMaterialValue','costPreCorte'].forEach(id=>$(id).textContent = fmtEUR(0));
+      ['valCutMetres','valBarMetres','costCorte'].forEach(id=>$(id).textContent = '—');
+      ['cutMetresSub','barsSub','costSub','saleMaterialSub','preCorteSub','cutTimeSub'].forEach(id=>$(id).textContent = '—');
       $('adjustmentRow').hidden = true;
       $('totalQtyTag').textContent = '';
       $('costFinalBadge').textContent = '';
@@ -701,6 +726,15 @@
     $('costMaterial').textContent = fmtEUR(r.costVal);
     $('costSub').textContent = r.priced ? (fmtEUR(r.profile.costPerM) + '/m') : 'indicado à mão';
     $('marginValueShown').textContent = fmtEUR(r.marginValue) + (r.marginPct!=null ? ' · ' + fmtNum(r.marginPct,0) + '%' : '');
+    $('saleMaterialValue').textContent = fmtEUR(r.saleVal);
+    $('saleMaterialSub').textContent = r.priced ? 'compra × ' + fmtC(r.markup) : 'indicado à mão';
+    const fmtMinShort = v => fmtNum(v, Number.isInteger(v) ? 0 : 1);
+    $('preCorteSub').textContent = 'Desenho ' + fmtMinShort(r.designTimeMin) + ' min (' + fmtEUR(r.designCost) + ') + Setup ' + fmtMinShort(r.setupTimeMin) + ' min (' + fmtEUR(r.setupCost) + ')';
+    $('costPreCorte').textContent = fmtEUR(r.preCorteCost);
+    $('cutTimeSub').textContent = r.isFinalDisplay
+      ? fmtNum(r.cuttingTimeMin, 1) + ' min no total (tempo real)' + window.LC.billedNote(r.cuttingTimeMin, r.billedCuttingMin)
+      : 'por registar — entra quando houver tempo real';
+    $('costCorte').textContent = r.isFinalDisplay ? fmtEUR(r.corteCost) : '—';
     $('subtotalValue').textContent = fmtEUR(r.subtotal);
 
     if(r.adjustmentValue){
@@ -719,7 +753,7 @@
     $('avgPerPieceValue').textContent = fmtEUR(r.avgPerPiece);
 
     if(r.isFinalDisplay){
-      $('costFinalBadge').textContent = '(tempo de corte real registado)';
+      $('costFinalBadge').textContent = '(FINAL — tempo de corte real registado)';
       $('costFinalBadge').style.color = 'var(--readout)';
     } else {
       $('costFinalBadge').textContent = '';
@@ -825,7 +859,7 @@
   /* ---------------------------------------------------------------- */
   [adjustmentReasonSelect].forEach(el=> el.addEventListener('change', recalcAndRender));
   [qtyInput, lengthInput, customW, customH, customT, barLengthInput, clampInput, barsInput,
-   manualCostInput, manualSaleInput, realCuttingTimeInput, adjustmentValueInput, orderNameInp].forEach(el=> el.addEventListener('input', recalcAndRender));
+   manualCostInput, manualSaleInput, realCuttingTimeInput, designTimeInput, setupTimeInput, adjustmentValueInput, orderNameInp].forEach(el=> el.addEventListener('input', recalcAndRender));
   clearRealTimeBtn.addEventListener('click', ()=>{ realCuttingTimeInput.value=''; recalcAndRender(); markDirty(); });
   $('resetBarsBtn').addEventListener('click', ()=>{ barsInput.value=''; recalcAndRender(); markDirty(); });
 
@@ -913,7 +947,17 @@
     html += pRow('Metros cortados', r.valid ? fmtNum(r.cutMm/1000,2) + ' m' : '—');
     html += pRow('Custo de material (compra, barras usadas)', r.valid ? fmtEUR(r.costVal) : '—');
     if(r.valid && r.priced) html += pRow('Venda calculada sobre', state.basis==='bars' ? 'barras inteiras (inclui sobra)' : 'só o que se corta');
-    html += pRow('Valor de venda (antes de ajuste)', r.valid ? fmtEUR(r.subtotal) : '—');
+    html += pRow('Venda do material', r.valid ? fmtEUR(r.saleVal) : '—');
+    if(r.valid){
+      const fm = v => fmtNum(v, Number.isInteger(v) ? 0 : 1);
+      html += pRow('Custo pré-corte', fmtEUR(r.preCorteCost));
+      html += pRow('　· Desenho', r.designTimeMin ? fm(r.designTimeMin) + ' min (' + fmtEUR(r.designCost) + ')' : 'sem custo');
+      html += pRow('　· Setup', fm(r.setupTimeMin) + ' min (' + fmtEUR(r.setupCost) + ')');
+      html += pRow('Custo do corte', r.isFinalDisplay
+        ? fmtEUR(r.corteCost) + ' (' + fmtNum(r.cuttingTimeMin,1) + ' min, real' + window.LC.billedNote(r.cuttingTimeMin, r.billedCuttingMin) + ')'
+        : 'por registar (entra com o tempo real)');
+    }
+    html += pRow('Subtotal (antes de ajuste)', r.valid ? fmtEUR(r.subtotal) : '—');
     if(r.valid && r.adjustmentValue){
       html += pRow('Ajuste comercial' + (r.adjustmentReason ? ' ('+escapeHtml(r.adjustmentReason)+')' : ''), (r.adjustmentValue>0?'+':'') + fmtEUR(r.adjustmentValue));
     }
@@ -1000,6 +1044,7 @@
     customW.value = ''; customH.value = ''; customT.value = '';
     manualCostInput.value = ''; manualSaleInput.value = '';
     realCuttingTimeInput.value = '';
+    designTimeInput.value = ''; setupTimeInput.value = '';
     state.iges = null; $('igesFileInput').value = '';
     adjustmentValueInput.value = ''; adjustmentReasonSelect.value = '';
     adjustmentFields.hidden = true; showAdjustmentBtn.hidden = false;
@@ -1053,6 +1098,9 @@
 
     const cs = o.costSnapshot;
     realCuttingTimeInput.value = (cs && cs.isFinal && isFinite(cs.cuttingTimeMin)) ? cs.cuttingTimeMin : '';
+    const si = (cs && cs.setupInputs) || {};
+    designTimeInput.value = si.designTimeMin ? si.designTimeMin : '';
+    setupTimeInput.value = si.setupTimeMin ? si.setupTimeMin : '';
     adjustmentValueInput.value = (cs && cs.adjustmentValue) ? cs.adjustmentValue : '';
     if(adjustmentValueInput.value) revealAdjustment(); else hideAdjustmentIfEmpty();
     adjustmentReasonSelect.value = (cs && cs.adjustmentReason) || '';
@@ -1090,6 +1138,14 @@
       ? 'Encomenda ' + (o.orderNumber||'') + ' reposta — gravar atualiza esta mesma encomenda.'
       : 'Encomenda ' + (o.orderNumber||'') + ' criada com o método antigo — escolha o perfil e o comprimento; ao gravar passa a usar o novo método (o preço pode mudar).';
     setTimeout(()=>{ saveOrderHint.textContent=''; }, 12000);
+  }
+
+  // Setup corrigido na Produção: ao regravar a encomenda aberta sem mexer no setup, mantém-se
+  // o "orçado X min" para a ficha interna.
+  function keptQuotedSetup(setupMin){
+    const si = state.loadedOrderId && state.loadedCostSnapshot && state.loadedCostSnapshot.setupInputs;
+    if(!si || si.quotedSetupMin == null || Math.abs((si.setupTimeMin||0) - setupMin) > 0.001) return {};
+    return { quotedSetupMin: si.quotedSetupMin };
   }
 
   async function loadOrderAsDuplicate(o){
@@ -1180,16 +1236,15 @@
         },
         costSnapshot: {
           totalCost: r.totalCost, avgPerPiece: r.avgPerPiece,
-          cuttingTimeMin: r.cuttingTimeMin, corteCost: 0,
+          cuttingTimeMin: r.cuttingTimeMin, billedCuttingMin: r.isFinalDisplay ? r.billedCuttingMin : null, corteCost: r.corteCost,
           materialCost: r.materialCostPerPiece, lengthPerPieceM: r.lenMm/1000, lengthTotalM: r.cutMm/1000,
           barsUsed: r.bars, barMetres: r.barMm/1000,
-          designCost: 0, setupCost: 0, preCorteCost: 0,
+          designCost: r.designCost, setupCost: r.setupCost, preCorteCost: r.preCorteCost,
           subtotal: r.subtotal, adjustmentValue: r.adjustmentValue, adjustmentReason: r.adjustmentReason,
           realCost: r.realCost, marginValue: r.marginValue, marginPct: r.marginPct,
           isFinal: r.isFinalDisplay,
-          noCuttingCharge: true,
           estimadoCuttingTimeMin: null,
-          setupInputs: { drawingType: 'client_direct', designTimeMin: 0, setupTimeMin: 0 },
+          setupInputs: Object.assign({ drawingType: 'tube', designTimeMin: r.designTimeMin, setupTimeMin: r.setupTimeMin }, keptQuotedSetup(r.setupTimeMin)),
           // Data de conclusão — só a 1ª vez que fica "Concluído"; alimenta o "Resumo do dia".
           completedAt: state.orderState === 'done'
             ? ((state.loadedCostSnapshot && state.loadedCostSnapshot.completedAt) || new Date().toISOString())

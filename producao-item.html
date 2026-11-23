@@ -130,6 +130,11 @@
         <label for="realTimeInput">Tempo de corte real — total, todas as peças (min)</label>
         <div class="unit-suffix"><input type="number" id="realTimeInput" min="0" step="0.1" placeholder="deixe vazio para manter a estimativa"><span>min</span></div>
       </div>
+      <!-- Só nos tubos: o setup pode ser corrigido no fecho (vazio = fica o orçado). -->
+      <div class="pi-real-input" id="setupBox" style="display:none; border-top:0; padding-top:0; margin-top:4px;">
+        <label for="setupInput">Tempo de setup (min)</label>
+        <div class="unit-suffix"><input type="number" id="setupInput" min="0" step="1"><span>min</span></div>
+      </div>
 
       <div class="pi-price-row pi-price-final"><span class="lbl">Preço final corrigido <small id="finalBilledNote" style="color:var(--text-dim);"></small></span><span class="val" id="finalTotal">—</span></div>
     </div>
@@ -301,31 +306,57 @@
       $('estTime').textContent = fmtNum(estMin, 1) + ' min' + (h ? ' (' + h + ' h ' + String(m).padStart(2,'0') + ')' : '');
     }
     if(cs.isFinal && isFinite(cs.cuttingTimeMin)) $('realTimeInput').value = cs.cuttingTimeMin.toFixed(1);
+    // Tubos: não há tempo estimado, e o setup pode ser corrigido aqui.
+    $('setupBox').style.display = isTube ? '' : 'none';
+    if(isTube){
+      const si = cs.setupInputs || {};
+      $('realTimeInput').placeholder = 'vem da ordem de fabrico devolvida';
+      $('setupInput').placeholder = fmtNum(si.setupTimeMin || 0, Number.isInteger(si.setupTimeMin || 0) ? 0 : 1) + ' (orçado) — vazio = fica este';
+    }
     adjustmentValueInput.value = cs.adjustmentValue ? cs.adjustmentValue : '';
     adjustmentReasonSelect.value = cs.adjustmentReason || '';
     if(adjustmentValueInput.value || adjustmentReasonSelect.value) revealAdjustment(); else hideAdjustmentIfEmpty();
     updateFinalPreview();
   }
 
-  function updateFinalPreview(){
+  // Tempo real (null = não preenchido) e setup corrigido (só tubos; null = fica o orçado).
+  function closeInputs(){
     const val = parseFloat($('realTimeInput').value);
+    const isTube = state.rec.pieceType === 'tube';
+    const sv = isTube ? parseFloat($('setupInput').value) : NaN;
+    return {
+      real: Number.isFinite(val) && val >= 0 ? val : null,
+      setup: Number.isFinite(sv) && sv >= 0 ? { min: sv } : null,
+    };
+  }
+  function computeClose(){
+    const ci = closeInputs();
+    if(ci.real == null && !ci.setup) return Promise.resolve(null);
+    return recomputeFinalCost(state.rec, ci.real, undefined, ci.setup);
+  }
+  function updateFinalPreview(){
     const cs = state.rec.costSnapshot || {};
-    const hasRealInput = Number.isFinite(val) && val >= 0;
+    const ci = closeInputs();
     $('finalBilledNote').textContent = '';
-    if(!hasRealInput){ $('finalTotal').textContent = isFinite(cs.totalCost) ? fmtEUR(cs.totalCost) : '—'; return; }
+    if(ci.real == null && !ci.setup){ $('finalTotal').textContent = isFinite(cs.totalCost) ? fmtEUR(cs.totalCost) : '—'; return; }
     $('finalTotal').textContent = 'a calcular…';
-    recomputeFinalCost(state.rec, val).then(newCs=>{
+    computeClose().then(newCs=>{
       $('finalTotal').textContent = isFinite(newCs.totalCost) ? fmtEUR(newCs.totalCost) : '—';
-      // Ex.: "(1,2 min · cobrado 2 min)" — o tempo exato fica para as estimativas.
-      const note = window.LC.billedNote(newCs.cuttingTimeMin, newCs.billedCuttingMin);
-      $('finalBilledNote').textContent = note ? '(' + fmtNum(newCs.cuttingTimeMin, 1) + ' min' + note + ')' : '';
+      // Ex.: "(1,2 min · cobrado 2 min · setup 8 min)" — o tempo exato fica para as estimativas.
+      const parts = [];
+      if(ci.real != null){
+        const note = window.LC.billedNote(newCs.cuttingTimeMin, newCs.billedCuttingMin);
+        if(note || ci.setup) parts.push(fmtNum(newCs.cuttingTimeMin, 1) + ' min' + note);
+      }
+      if(ci.setup) parts.push('setup ' + fmtNum(ci.setup.min, Number.isInteger(ci.setup.min) ? 0 : 1) + ' min');
+      $('finalBilledNote').textContent = parts.length ? '(' + parts.join(' · ') + ')' : '';
     }).catch(()=>{ $('finalTotal').textContent = '—'; });
   }
   let debounceT;
-  $('realTimeInput').addEventListener('input', ()=>{
+  ['realTimeInput','setupInput'].forEach(id=> $(id).addEventListener('input', ()=>{
     clearTimeout(debounceT);
     debounceT = setTimeout(updateFinalPreview, 300);
-  });
+  }));
 
   async function persist(newCostSnapshot, newState){
     const rec = state.rec;
@@ -385,15 +416,10 @@
       if(!(await window.LC.showConfirm('Ainda não registaste o tempo de corte real.\n\nSe concluíres assim, o preço fica com o valor estimado e este indicador nunca mais desaparece do Dashboard. Continuar mesmo sem tempo real?'))) return;
     }
     const btn = $('btnDone'), hint = $('closeHint');
-    const raw = $('realTimeInput').value.trim();
-    const val = parseFloat(raw);
     btn.disabled = true; $('btnCancel').disabled = true;
     hint.style.color = ''; hint.textContent = 'A gravar…';
     try{
-      let newCs = null;
-      if(raw !== '' && Number.isFinite(val) && val >= 0){
-        newCs = await recomputeFinalCost(state.rec, val);
-      }
+      const newCs = await computeClose();
       await persist(newCs, 'done');
       hint.textContent = '';
       showPrintPrompt();
