@@ -1636,7 +1636,7 @@
     if('showDirectoryPicker' in window){
       try{
         const handle = await idbGet('rootDir');
-        if(handle && (await handle.queryPermission({mode:'readwrite'}))==='granted') app.localFolder = { ready:true, handle };
+        if(handle && (await window.LC.folderPermission(handle))==='granted') app.localFolder = { ready:true, handle };
       }catch(e){ /* sem pasta ligada */ }
     }
 

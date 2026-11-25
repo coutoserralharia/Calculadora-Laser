@@ -786,7 +786,7 @@ create policy "só utilizadores autenticados"
       try{
         const handle = await idbGet('rootDir');
         if(handle){
-          const perm = await handle.queryPermission({mode:'readwrite'});
+          const perm = await window.LC.folderPermission(handle);
           if(perm==='granted'){
             state.localFolder = { supported:true, handle, ready:true, name:handle.name };
           } else {

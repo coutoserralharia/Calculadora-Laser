@@ -1353,7 +1353,7 @@
     if('showDirectoryPicker' in window){
       try{
         const handle = await window.LC.idbGet('rootDir');
-        if(handle && (await handle.queryPermission({mode:'readwrite'})) === 'granted') state.localFolder = { ready:true, handle };
+        if(handle && (await window.LC.folderPermission(handle)) === 'granted') state.localFolder = { ready:true, handle };
       }catch(e){ /* sem pasta ligada, ou acesso já não é válido */ }
     }
 

@@ -1564,13 +1564,27 @@
   /* LOCAL FOLDER (File System Access API — Chrome/Edge desktop only)  */
   /* ---------------------------------------------------------------- */
   const HANDLE_DB_NAME = 'laser_calc_handles', HANDLE_STORE = 'handles';
+  // Limite de tempo para o que depende do navegador/pasta: se a base local ou a pasta ligada não
+  // responderem (pasta de rede, OneDrive, navegador preso), a página segue sem a pasta em vez de
+  // ficar parada em "A carregar…".
+  LC.withTimeout = function(promise, ms, what){
+    let timer;
+    return Promise.race([
+      promise,
+      new Promise((_, reject)=>{ timer = setTimeout(()=>reject(new Error((what || 'operação') + ' não respondeu')), ms); }),
+    ]).finally(()=>clearTimeout(timer));
+  };
+  LC.folderPermission = function(handle){
+    return LC.withTimeout(handle.queryPermission({mode:'readwrite'}), 4000, 'a pasta ligada');
+  };
   function openHandleDB(){
-    return new Promise((resolve, reject)=>{
+    return LC.withTimeout(new Promise((resolve, reject)=>{
       const req = indexedDB.open(HANDLE_DB_NAME, 1);
       req.onupgradeneeded = () => { req.result.createObjectStore(HANDLE_STORE); };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
-    });
+      req.onblocked = () => reject(new Error('a base de dados local do navegador está bloqueada'));
+    }), 4000, 'a base de dados local do navegador');
   }
   LC.idbSet = async function(key, value){
     const db = await openHandleDB();
@@ -1583,12 +1597,12 @@
   };
   LC.idbGet = async function(key){
     const db = await openHandleDB();
-    return new Promise((resolve, reject)=>{
+    return LC.withTimeout(new Promise((resolve, reject)=>{
       const tx = db.transaction(HANDLE_STORE, 'readonly');
       const req = tx.objectStore(HANDLE_STORE).get(key);
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
-    });
+    }), 4000, 'a base de dados local do navegador');
   };
   LC.idbDelete = async function(key){
     const db = await openHandleDB();
@@ -2038,7 +2052,7 @@
     try{ root = await LC.idbGet('rootDir'); }catch(e){}
     if(!root) return { status:'no-folder' };
     lsSet('laser_auto_backup_folder', root.name);
-    let perm = await root.queryPermission({mode:'readwrite'});
+    let perm = await window.LC.folderPermission(root);
     if(perm !== 'granted' && opts.interactive) perm = await root.requestPermission({mode:'readwrite'});
     if(perm !== 'granted'){
       lsSet('laser_auto_backup_state', 'needs-permission');
@@ -2158,6 +2172,10 @@
 
   // Se a página não acabar de arrancar (erro, ou servidor sem resposta), o véu "A carregar…" não
   // fica para sempre: mostra o erro e deixa tentar outra vez ou seguir sem esperar.
+  // As páginas marcam o passo do arranque em que estão (LC.bootStep) — se ficarem presas, o aviso
+  // diz onde, em vez de adivinhar.
+  let bootStepLabel = '';
+  LC.bootStep = function(label){ bootStepLabel = label || ''; };
   (function veilWatchdog(){
     const veil = document.getElementById('loadingVeil');
     if(!veil) return;
@@ -2178,7 +2196,9 @@
       p.textContent = 'A página não conseguiu acabar de carregar.';
       const d = document.createElement('p');
       d.className = 'lv-fail-detail';
-      d.textContent = lastErr ? 'Erro: ' + lastErr : 'O servidor está a demorar a responder (verifique a internet).';
+      d.textContent = lastErr ? 'Erro: ' + lastErr
+        : bootStepLabel ? 'Ficou à espera de: ' + bootStepLabel + '.'
+        : 'Algo está a demorar a responder (o servidor ou a pasta ligada ao computador).';
       const row = document.createElement('div');
       row.className = 'lv-fail-actions';
       const again = document.createElement('button');

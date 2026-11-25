@@ -1601,6 +1601,7 @@
   /* INIT                                                              */
   /* ---------------------------------------------------------------- */
   async function init(){
+    window.LC.bootStep('materiais e definições guardados no navegador');
     state.materials = await loadMaterials();
     state.machine = await loadMachine();
     state.remote = await loadRemoteConfig();
@@ -1614,25 +1615,29 @@
     // vem à parte, já abaixo. Antes descarregava todos os DXF de sempre a cada abertura da página.
     let ordersLoadError = null;
     if(state.remote.configured){
+      window.LC.bootStep('servidor (lista de encomendas)');
       try{ state.orders = await remoteLoadOrders(state.remote, {light:true}); }
       catch(e){ state.orders = []; ordersLoadError = e; }
     } else {
       state.orders = await loadOrders();
     }
 
+    window.LC.bootStep('pasta ligada ao computador');
     if('showDirectoryPicker' in window){
       try{
         const handle = await idbGet('rootDir');
         if(handle){
-          const perm = await handle.queryPermission({mode:'readwrite'});
+          const perm = await window.LC.folderPermission(handle);
           if(perm==='granted') state.localFolder = { ready:true, handle };
         }
       }catch(e){ /* no folder linked yet, or handle no longer valid */ }
     }
 
+    window.LC.bootStep('servidor (número da próxima encomenda)');
     await refreshOrderNumberPreview();
 
     const params = new URLSearchParams(location.search);
+    window.LC.bootStep('a preparar a página');
     const loadId = params.get('loadOrder');
     const dupId = params.get('duplicateOrder');
     let autoPrintOperator = false, openFailMsg = null;
