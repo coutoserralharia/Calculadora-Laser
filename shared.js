@@ -1254,6 +1254,16 @@
   /* SESSÃO REMOTA (Supabase Auth) — opcional: se não houver sessão,    */
   /* os pedidos continuam a usar só a anon key, como sempre.           */
   /* ---------------------------------------------------------------- */
+  // Pedidos ao servidor com limite de tempo — sem isto, uma ligação pendurada deixava a página
+  // presa em "A carregar…" para sempre, sem dizer nada. (Cópias completas com os DXF demoram mais.)
+  function remoteFetch(url, opts){
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 60000);
+    return fetch(url, Object.assign({}, opts, { signal: ctrl.signal }))
+      .catch(err=>{ throw (err && err.name === 'AbortError') ? new Error('o servidor não respondeu (60 s)') : err; })
+      .finally(()=>clearTimeout(timer));
+  }
+
   LC.loadRemoteSession = async function(){
     const raw = await storageGet('laser_remote_session_v1');
     if(raw){ try{ return JSON.parse(raw); }catch(e){} }
@@ -1266,7 +1276,7 @@
     await storageSet('laser_remote_session_v1', '');
   };
   LC.remoteSignIn = async function(remoteCfg, email, password){
-    const res = await fetch(remoteBase(remoteCfg) + '/auth/v1/token?grant_type=password', {
+    const res = await remoteFetch(remoteBase(remoteCfg) + '/auth/v1/token?grant_type=password', {
       method: 'POST',
       headers: { apikey: remoteCfg.key, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -1285,7 +1295,7 @@
   };
   async function remoteRefreshSession(remoteCfg, session){
     try{
-      const res = await fetch(remoteBase(remoteCfg) + '/auth/v1/token?grant_type=refresh_token', {
+      const res = await remoteFetch(remoteBase(remoteCfg) + '/auth/v1/token?grant_type=refresh_token', {
         method: 'POST',
         headers: { apikey: remoteCfg.key, 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: session.refresh_token }),
@@ -1364,7 +1374,7 @@
   async function remoteFetchAll(remoteCfg, query){
     const all = [];
     for(let offset = 0; ; offset += REMOTE_PAGE_SIZE){
-      const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?' + query + '&limit=' + REMOTE_PAGE_SIZE + '&offset=' + offset, { headers: await remoteHeaders(remoteCfg) });
+      const res = await remoteFetch(remoteBase(remoteCfg) + '/rest/v1/orders?' + query + '&limit=' + REMOTE_PAGE_SIZE + '&offset=' + offset, { headers: await remoteHeaders(remoteCfg) });
       if(!res.ok) throw await remoteRequestError(res);
       const rows = await res.json();
       all.push(...rows);
@@ -1377,13 +1387,13 @@
     return rows.map(rowToOrder);
   };
   LC.remoteLoadOrderById = async function(remoteCfg, id){
-    const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?select=*&id=eq.' + encodeURIComponent(id), { headers: await remoteHeaders(remoteCfg) });
+    const res = await remoteFetch(remoteBase(remoteCfg) + '/rest/v1/orders?select=*&id=eq.' + encodeURIComponent(id), { headers: await remoteHeaders(remoteCfg) });
     if(!res.ok) throw await remoteRequestError(res);
     const rows = await res.json();
     return rows.length ? rowToOrder(rows[0]) : null;
   };
   LC.remoteInsertOrder = async function(remoteCfg, rec){
-    const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders', {
+    const res = await remoteFetch(remoteBase(remoteCfg) + '/rest/v1/orders', {
       method: 'POST',
       headers: await remoteHeaders(remoteCfg, { 'Content-Type':'application/json', Prefer:'return=minimal' }),
       body: JSON.stringify(orderToRow(rec)),
@@ -1393,7 +1403,7 @@
   LC.remoteUpdateFullOrder = async function(remoteCfg, id, rec){
     const row = orderToRow(rec);
     delete row.id;
-    const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?id=eq.' + encodeURIComponent(id), {
+    const res = await remoteFetch(remoteBase(remoteCfg) + '/rest/v1/orders?id=eq.' + encodeURIComponent(id), {
       method: 'PATCH',
       headers: await remoteHeaders(remoteCfg, { 'Content-Type':'application/json', Prefer:'return=minimal' }),
       body: JSON.stringify(row),
@@ -1401,14 +1411,14 @@
     if(!res.ok) throw await remoteRequestError(res);
   };
   LC.remoteDeleteOrder = async function(remoteCfg, id){
-    const res = await fetch(remoteBase(remoteCfg) + '/rest/v1/orders?id=eq.' + encodeURIComponent(id), {
+    const res = await remoteFetch(remoteBase(remoteCfg) + '/rest/v1/orders?id=eq.' + encodeURIComponent(id), {
       method: 'DELETE', headers: await remoteHeaders(remoteCfg),
     });
     if(!res.ok) throw await remoteRequestError(res);
   };
   LC.testRemoteConnection = async function(url, key){
     const base = url.replace(/\/$/, '');
-    const res = await fetch(base + '/rest/v1/orders?select=id&limit=1', {
+    const res = await remoteFetch(base + '/rest/v1/orders?select=id&limit=1', {
       headers: { apikey: key, Authorization: 'Bearer ' + key },
     });
     if(!res.ok) throw await remoteRequestError(res);
@@ -1982,7 +1992,10 @@
     const now = new Date().toISOString();
     lsSet('laser_last_backup', now);
     lsSet('laser_last_backup_kind', auto ? 'auto' : 'manual');
-    if(auto){ lsSet('laser_auto_backup_at', now); lsSet('laser_auto_backup_day', dayKey(new Date())); }
+    if(auto){
+      lsSet('laser_auto_backup_at', now); lsSet('laser_auto_backup_day', dayKey(new Date()));
+      try{ localStorage.removeItem('laser_auto_backup_failed_at'); }catch(e){}
+    }
   };
   LC.lastBackupInfo = function(){
     const at = lsGet('laser_last_backup');
@@ -2015,6 +2028,10 @@
     opts = opts || {};
     if(!('showDirectoryPicker' in window) || !window.indexedDB) return { status:'unsupported' };
     if(!opts.force && lsGet('laser_auto_backup_day') === dayKey(new Date())) return { status:'exists' };
+    // Depois de uma falha, a automática só tenta outra vez passada 1 hora — senão cada página
+    // aberta voltava a descarregar todas as encomendas (com os DXF) do servidor.
+    const failedAt = parseInt(lsGet('laser_auto_backup_failed_at'), 10);
+    if(!opts.force && failedAt && Date.now() - failedAt < 60*60*1000) return { status:'busy' };
     const machine = await LC.loadMachine();
     if(!opts.force && machine.autoBackup === false) return { status:'off' };
     let root = null;
@@ -2056,6 +2073,7 @@
       lsSet('laser_auto_backup_state', 'ok');
       return { status:'done', file:name, folder:root.name, orders: data.orders.length };
     }catch(err){
+      lsSet('laser_auto_backup_failed_at', String(Date.now()));
       return { status:'error', error: err.message, folder: root.name };
     }finally{
       try{ localStorage.removeItem('laser_backup_lock'); }catch(e){}
@@ -2136,6 +2154,45 @@
       try{ localStorage.setItem(KEY, on ? '1' : '0'); }catch(e){}
       sync();
     });
+  })();
+
+  // Se a página não acabar de arrancar (erro, ou servidor sem resposta), o véu "A carregar…" não
+  // fica para sempre: mostra o erro e deixa tentar outra vez ou seguir sem esperar.
+  (function veilWatchdog(){
+    const veil = document.getElementById('loadingVeil');
+    if(!veil) return;
+    let lastErr = '';
+    function note(e){
+      const r = e && (e.reason || e.error);
+      lastErr = (r && r.message) || (e && e.message) || (r ? String(r) : '');
+      setTimeout(show, 1500); // dá tempo à página para acabar na mesma, se o erro não for fatal
+    }
+    window.addEventListener('error', note);
+    window.addEventListener('unhandledrejection', note);
+    function show(){
+      if(veil.classList.contains('done') || veil.dataset.failed) return;
+      veil.dataset.failed = '1';
+      const box = document.createElement('div');
+      box.className = 'lv-fail';
+      const p = document.createElement('p');
+      p.textContent = 'A página não conseguiu acabar de carregar.';
+      const d = document.createElement('p');
+      d.className = 'lv-fail-detail';
+      d.textContent = lastErr ? 'Erro: ' + lastErr : 'O servidor está a demorar a responder (verifique a internet).';
+      const row = document.createElement('div');
+      row.className = 'lv-fail-actions';
+      const again = document.createElement('button');
+      again.type = 'button'; again.className = 'ghost-btn accent'; again.textContent = 'Tentar outra vez';
+      again.addEventListener('click', ()=>location.reload());
+      const go = document.createElement('button');
+      go.type = 'button'; go.className = 'ghost-btn'; go.textContent = 'Continuar sem esperar';
+      go.addEventListener('click', ()=>veil.classList.add('done'));
+      row.append(again, go);
+      box.append(p, d, row);
+      veil.innerHTML = '';
+      veil.appendChild(box);
+    }
+    setTimeout(show, 30000);
   })();
 
   // Telemóvel: o menu de páginas passa a uma faixa com scroll horizontal — centra a página
