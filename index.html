@@ -352,6 +352,9 @@
     loadMaterials, saveMachine, loadMachine, loadOrders, loadRemoteConfig,
     remoteLoadOrders, remoteInsertOrder, remoteUpdateFullOrder, computeNextOrderNumber,
     idbGet, writeOrderToLocalFolder, registerServiceWorker } = window.LC;
+  // Com cache do navegador o shared.js pode vir ainda da versão anterior durante uns minutos —
+  // as funções novas usam-se com recurso, para a página nunca deixar de arrancar por isso.
+  const bootStep = window.LC.bootStep || function(){};
 
   /* ---------------------------------------------------------------- */
   /* STATE                                                             */
@@ -1601,7 +1604,7 @@
   /* INIT                                                              */
   /* ---------------------------------------------------------------- */
   async function init(){
-    window.LC.bootStep('materiais e definições guardados no navegador');
+    bootStep('materiais e definições guardados no navegador');
     state.materials = await loadMaterials();
     state.machine = await loadMachine();
     state.remote = await loadRemoteConfig();
@@ -1615,14 +1618,14 @@
     // vem à parte, já abaixo. Antes descarregava todos os DXF de sempre a cada abertura da página.
     let ordersLoadError = null;
     if(state.remote.configured){
-      window.LC.bootStep('servidor (lista de encomendas)');
+      bootStep('servidor (lista de encomendas)');
       try{ state.orders = await remoteLoadOrders(state.remote, {light:true}); }
       catch(e){ state.orders = []; ordersLoadError = e; }
     } else {
       state.orders = await loadOrders();
     }
 
-    window.LC.bootStep('pasta ligada ao computador');
+    bootStep('pasta ligada ao computador');
     if('showDirectoryPicker' in window){
       try{
         const handle = await idbGet('rootDir');
@@ -1633,11 +1636,11 @@
       }catch(e){ /* no folder linked yet, or handle no longer valid */ }
     }
 
-    window.LC.bootStep('servidor (número da próxima encomenda)');
+    bootStep('servidor (número da próxima encomenda)');
     await refreshOrderNumberPreview();
 
     const params = new URLSearchParams(location.search);
-    window.LC.bootStep('a preparar a página');
+    bootStep('a preparar a página');
     const loadId = params.get('loadOrder');
     const dupId = params.get('duplicateOrder');
     let autoPrintOperator = false, openFailMsg = null;

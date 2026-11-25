@@ -1,4 +1,4 @@
-const CACHE_NAME = 'laser-calc-v19';
+const CACHE_NAME = 'laser-calc-v20';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -51,8 +51,11 @@ self.addEventListener('fetch', (event) => {
   const isGoogleFont = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
 
   if (isSameOrigin) {
+    // cache:'no-cache' = confirma sempre com o servidor (o GitHub Pages deixa o navegador guardar
+    // cada ficheiro 10 min — sem isto, uma página nova podia vir com o shared.js antigo).
+    // Pelo URL e não pelo pedido: um pedido de navegação não aceita opções extra.
     event.respondWith(
-      fetch(req).then((resp) => {
+      fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }).then((resp) => {
         const clone = resp.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
         return resp;
