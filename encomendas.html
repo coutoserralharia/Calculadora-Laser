@@ -417,6 +417,16 @@
     try{ tubeProfiles = await window.LC.loadTubeProfiles(); }catch(e){}
     const weights = new Map(chosen.map(o=>[o.id, orderWeight(o, tubeProfiles)]));
     const fmtKg = w => (w.approx ? '≈ ' : '') + fmtNum(w.kg, 2) + ' kg';
+    // Tempo de corte: o real, se já foi registado; senão o estimado (chapa), marcado com *.
+    const cutTime = o => {
+      const cs = o.costSnapshot || {};
+      if(cs.isFinal && isFinite(cs.cuttingTimeMin)) return { min: cs.cuttingTimeMin, real:true };
+      if(o.pieceType === 'tube') return null;
+      const est = isFinite(cs.estimadoCuttingTimeMin) && cs.estimadoCuttingTimeMin > 0 ? cs.estimadoCuttingTimeMin : cs.cuttingTimeMin;
+      return isFinite(est) && est > 0 ? { min: est, real:false } : null;
+    };
+    const fmtMin = t => fmtNum(t.min, 1) + ' min' + (t.real ? '' : ' *');
+    const fmtHours = m => { const r = Math.round(m), h = Math.floor(r/60); return h ? ' (' + h + ' h ' + String(r%60).padStart(2,'0') + ')' : ''; };
 
     const STATE_LABEL = { quote:'Orçamentado', production:'Em produção', done:'Concluído', cancelled:'Cancelada' };
     const clientNames = window.LC.knownClients(chosen); // "Silva" e "SILVA" contam como um só cliente
@@ -432,22 +442,29 @@
 
     html += '<table class="p-group-table"><thead><tr>' +
       '<th>Nº</th><th>Data</th><th>Peça</th><th>Material</th>' +
-      '<th class="num">Qt.</th><th class="num">Peso</th><th>Estado</th><th class="num">Total s/ IVA</th>' +
+      '<th class="num">Qt.</th><th class="num">Peso</th><th class="num">Tempo de corte</th><th>Estado</th><th class="num">Total s/ IVA</th>' +
       '</tr></thead><tbody>';
     // Peso total e por material (sem as canceladas, como o valor).
-    let kgTotal = 0, anyApprox = false, anyClientMat = false;
-    const byMat = new Map(); // material → { kg, approx, metres, client }
+    let kgTotal = 0, anyApprox = false, anyClientMat = false, minTotal = 0, anyEstTime = false, anyTime = false;
+    const byMat = new Map(); // material → { kg, approx, metres, min, estTime }
     chosen.forEach(o=>{
       const cs = o.costSnapshot;
       const mat = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + (o.pieceType==='tube' ? '' : ' ' + o.materialSnapshot.thickness + 'mm')) : '—';
       const w = weights.get(o.id);
       const clientMat = !!(o.materialSnapshot && o.materialSnapshot.clientSupplied);
-      if(w && o.orderState !== 'cancelled'){
-        kgTotal += w.kg; anyApprox = anyApprox || w.approx; anyClientMat = anyClientMat || clientMat;
+      const t = cutTime(o);
+      if((w || t) && o.orderState !== 'cancelled'){
         const key = mat + (clientMat ? ' <b>c</b>' : '');
-        const g = byMat.get(key) || { kg:0, approx:false, metres:null };
-        g.kg += w.kg; g.approx = g.approx || w.approx;
-        if(w.metres != null) g.metres = (g.metres || 0) + w.metres;
+        const g = byMat.get(key) || { kg:0, hasKg:false, approx:false, metres:null, min:0, hasMin:false, estTime:false };
+        if(w){
+          kgTotal += w.kg; anyApprox = anyApprox || w.approx; anyClientMat = anyClientMat || clientMat;
+          g.kg += w.kg; g.hasKg = true; g.approx = g.approx || w.approx;
+          if(w.metres != null) g.metres = (g.metres || 0) + w.metres;
+        }
+        if(t){
+          minTotal += t.min; anyTime = true; anyEstTime = anyEstTime || !t.real;
+          g.min += t.min; g.hasMin = true; g.estTime = g.estTime || !t.real;
+        }
         byMat.set(key, g);
       }
       const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
@@ -459,6 +476,7 @@
         '<td>' + mat + '</td>' +
         '<td class="num">' + (o.quantity||1) + '</td>' +
         '<td class="num" style="white-space:nowrap;">' + (w ? fmtKg(w) + (clientMat ? ' <b>c</b>' : '') : '—') + '</td>' +
+        '<td class="num" style="white-space:nowrap;">' + (t ? fmtMin(t) : '—') + '</td>' +
         '<td>' + (STATE_LABEL[o.orderState||'production']||'') + (isFinal ? '' : ' *') + '</td>' +
         '<td class="num">' + (cs ? fmtEUR(cs.totalCost) : '—') + '</td>' +
       '</tr>';
@@ -466,26 +484,29 @@
     html += '</tbody></table>';
 
     html += '<div class="p-totals">';
-    if(byMat.size) html += '<div class="p-total-item"><span>Peso total de material</span><strong>' + fmtKg({ kg:kgTotal, approx:anyApprox }) + '</strong></div>';
+    if(kgTotal > 0) html += '<div class="p-total-item"><span>Peso total de material</span><strong>' + fmtKg({ kg:kgTotal, approx:anyApprox }) + '</strong></div>';
+    if(anyTime) html += '<div class="p-total-item"><span>Tempo de corte total</span><strong>' + fmtMin({ min:minTotal, real:!anyEstTime }) + fmtHours(minTotal) + '</strong></div>';
     html += '<div class="p-total-item p-total-main"><span>Total das ' + chosen.length + ' encomendas — sem IVA</span><strong>' + fmtEUR(total) + '</strong></div>';
     html += '</div>';
 
     if(byMat.size){
-      html += '<div class="p-costs-title" style="margin-top:14px;">Material por tipo e espessura</div>';
-      html += '<table class="p-group-table" style="width:auto; min-width:55%;"><tbody>';
+      html += '<div class="p-costs-title" style="margin-top:14px;">Material e tempo por tipo e espessura</div>';
+      html += '<table class="p-group-table" style="width:auto; min-width:60%;"><thead><tr><th>Material</th><th class="num">Peso</th><th class="num">Tempo de corte</th></tr></thead><tbody>';
       byMat.forEach((g, key)=>{
-        html += '<tr><td>' + key + '</td><td class="num">' + fmtKg(g) + (g.metres != null ? ' (' + fmtNum(g.metres, 2) + ' m)' : '') + '</td></tr>';
+        html += '<tr><td>' + key + '</td>' +
+          '<td class="num" style="white-space:nowrap;">' + (g.hasKg ? fmtKg(g) + (g.metres != null ? ' (' + fmtNum(g.metres, 2) + ' m)' : '') : '—') + '</td>' +
+          '<td class="num" style="white-space:nowrap;">' + (g.hasMin ? fmtMin({ min:g.min, real:!g.estTime }) : '—') + '</td></tr>';
       });
       html += '</tbody></table>';
     }
 
     if(anyEstimated){
-      html += '<div class="p-group-note">* Preço ainda estimado — sem tempo real de corte registado.</div>';
+      html += '<div class="p-group-note">* Ainda sem tempo real de corte registado: o preço e o tempo mostrados são os estimados.</div>';
     }
     if(anyClientMat){
       html += '<div class="p-group-note"><b>c</b> Material fornecido pelo cliente: o peso aparece, mas não entra no preço.</div>';
     }
-    if(byMat.size){
+    if(kgTotal > 0){
       html += '<div class="p-group-note">Chapa: peso da chapa ocupada (ou da peça, conforme as Definições), igual ao do orçamento.' +
         (anyApprox ? ' ≈ Tubo: estimado pela secção do perfil × metros cortados.' : '') + '</div>';
     }
