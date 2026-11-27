@@ -377,11 +377,46 @@
     renderOrdersList();
   });
 
-  $('groupPdfBtn').addEventListener('click', ()=>{
+  // Peso de material de uma encomenda (kg), para o resumo. Chapa: o peso gravado no orçamento
+  // (chapa ocupada + margem, ou área líquida, conforme as Definições). Tubo: não é gravado —
+  // estima-se pela secção do perfil × metros cortados (approx:true). null = não dá para saber.
+  const TUBE_DENSITY = { preto:7.85, galvanizado:7.85, inox:7.93, aluminio:2.70, 'alumínio':2.70 }; // g/cm³
+  function tubeKgPerM(o, profiles){
+    const t = o.tubeInputs || {}, ms = o.materialSnapshot || {};
+    const p = t.custom || profiles.find(x=>x.id === (t.profileId || o.materialId)) || null;
+    if(!p || !(p.t > 0) || !(p.w > 0)) return null;
+    const w = p.w, h = p.h || p.w, e = p.t;
+    const shape = ms.shape || t.shape || p.shape;
+    let areaMm2;
+    if(shape === 'redondo') areaMm2 = Math.PI/4 * (w*w - Math.max(0, w-2*e)**2);
+    else if(shape === 'cantoneira') areaMm2 = e * (w + h - e);
+    else if(shape === 'perfilu') areaMm2 = e * (w + 2*h - 2*e);
+    else areaMm2 = w*h - Math.max(0, w-2*e) * Math.max(0, h-2*e); // quadrado / retangular
+    const dens = TUBE_DENSITY[ms.material || t.material || p.material] || 7.85;
+    return areaMm2 * dens / 1000; // mm² × g/cm³ → kg/m
+  }
+  function orderWeight(o, profiles){
+    const cs = o.costSnapshot || {};
+    if(o.pieceType === 'tube'){
+      const kgm = tubeKgPerM(o, profiles);
+      const t = o.tubeInputs || {};
+      const metres = isFinite(cs.lengthTotalM) ? cs.lengthTotalM : (t.lengthMm ? t.lengthMm * (o.quantity||1) / 1000 : null);
+      return (kgm != null && metres != null) ? { kg: kgm * metres, approx:true, metres } : null;
+    }
+    if(isFinite(cs.weightTotal) && cs.weightTotal > 0) return { kg: cs.weightTotal, approx:false };
+    if(isFinite(cs.weightPerPiece) && cs.weightPerPiece > 0) return { kg: cs.weightPerPiece * (o.quantity||1), approx:false };
+    return null;
+  }
+
+  $('groupPdfBtn').addEventListener('click', async ()=>{
     const chosen = state.orders
       .filter(o=>selectedIds.has(o.id))
       .sort((a,b)=>(a.orderNumber||'').localeCompare(b.orderNumber||''));
     if(!chosen.length) return;
+    let tubeProfiles = [];
+    try{ tubeProfiles = await window.LC.loadTubeProfiles(); }catch(e){}
+    const weights = new Map(chosen.map(o=>[o.id, orderWeight(o, tubeProfiles)]));
+    const fmtKg = w => (w.approx ? '≈ ' : '') + fmtNum(w.kg, 2) + ' kg';
 
     const STATE_LABEL = { quote:'Orçamentado', production:'Em produção', done:'Concluído', cancelled:'Cancelada' };
     const clientNames = window.LC.knownClients(chosen); // "Silva" e "SILVA" contam como um só cliente
@@ -397,11 +432,24 @@
 
     html += '<table class="p-group-table"><thead><tr>' +
       '<th>Nº</th><th>Data</th><th>Peça</th><th>Material</th>' +
-      '<th class="num">Qt.</th><th>Estado</th><th class="num">Total s/ IVA</th>' +
+      '<th class="num">Qt.</th><th class="num">Peso</th><th>Estado</th><th class="num">Total s/ IVA</th>' +
       '</tr></thead><tbody>';
+    // Peso total e por material (sem as canceladas, como o valor).
+    let kgTotal = 0, anyApprox = false, anyClientMat = false;
+    const byMat = new Map(); // material → { kg, approx, metres, client }
     chosen.forEach(o=>{
       const cs = o.costSnapshot;
       const mat = o.materialSnapshot ? (escapeHtml(o.materialSnapshot.name) + (o.pieceType==='tube' ? '' : ' ' + o.materialSnapshot.thickness + 'mm')) : '—';
+      const w = weights.get(o.id);
+      const clientMat = !!(o.materialSnapshot && o.materialSnapshot.clientSupplied);
+      if(w && o.orderState !== 'cancelled'){
+        kgTotal += w.kg; anyApprox = anyApprox || w.approx; anyClientMat = anyClientMat || clientMat;
+        const key = mat + (clientMat ? ' <b>c</b>' : '');
+        const g = byMat.get(key) || { kg:0, approx:false, metres:null };
+        g.kg += w.kg; g.approx = g.approx || w.approx;
+        if(w.metres != null) g.metres = (g.metres || 0) + w.metres;
+        byMat.set(key, g);
+      }
       const dateStr = o.createdAt ? new Date(o.createdAt).toLocaleDateString('pt-PT') : '—';
       const isFinal = !!(cs && cs.isFinal);
       html += '<tr>' +
@@ -410,6 +458,7 @@
         '<td>' + escapeHtml(o.orderName||'—') + '</td>' +
         '<td>' + mat + '</td>' +
         '<td class="num">' + (o.quantity||1) + '</td>' +
+        '<td class="num" style="white-space:nowrap;">' + (w ? fmtKg(w) + (clientMat ? ' <b>c</b>' : '') : '—') + '</td>' +
         '<td>' + (STATE_LABEL[o.orderState||'production']||'') + (isFinal ? '' : ' *') + '</td>' +
         '<td class="num">' + (cs ? fmtEUR(cs.totalCost) : '—') + '</td>' +
       '</tr>';
@@ -417,11 +466,28 @@
     html += '</tbody></table>';
 
     html += '<div class="p-totals">';
+    if(byMat.size) html += '<div class="p-total-item"><span>Peso total de material</span><strong>' + fmtKg({ kg:kgTotal, approx:anyApprox }) + '</strong></div>';
     html += '<div class="p-total-item p-total-main"><span>Total das ' + chosen.length + ' encomendas — sem IVA</span><strong>' + fmtEUR(total) + '</strong></div>';
     html += '</div>';
 
+    if(byMat.size){
+      html += '<div class="p-costs-title" style="margin-top:14px;">Material por tipo e espessura</div>';
+      html += '<table class="p-group-table" style="width:auto; min-width:55%;"><tbody>';
+      byMat.forEach((g, key)=>{
+        html += '<tr><td>' + key + '</td><td class="num">' + fmtKg(g) + (g.metres != null ? ' (' + fmtNum(g.metres, 2) + ' m)' : '') + '</td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+
     if(anyEstimated){
       html += '<div class="p-group-note">* Preço ainda estimado — sem tempo real de corte registado.</div>';
+    }
+    if(anyClientMat){
+      html += '<div class="p-group-note"><b>c</b> Material fornecido pelo cliente: o peso aparece, mas não entra no preço.</div>';
+    }
+    if(byMat.size){
+      html += '<div class="p-group-note">Chapa: peso da chapa ocupada (ou da peça, conforme as Definições), igual ao do orçamento.' +
+        (anyApprox ? ' ≈ Tubo: estimado pela secção do perfil × metros cortados.' : '') + '</div>';
     }
     if(anyCancelled){
       html += '<div class="p-group-note">As encomendas canceladas aparecem na lista mas não entram no total.</div>';
